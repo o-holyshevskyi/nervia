@@ -5,7 +5,7 @@ import ConfirmModal from "./ui/ConfirmModal";
 import { useState } from "react";
 
 interface ImportExportProps {
-    onImport: (bookmarks: any[]) => Promise<number | undefined>;
+    onImport: (bookmarks: any[]) => Promise<void>;
     onExport: () => void;
 }
 

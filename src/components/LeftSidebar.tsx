@@ -20,7 +20,7 @@ interface LeftSidebarProps {
   onClose: () => void;
   onSelect: (node: any) => void;
   onTagSelect: (tag: string | null) => void;
-  onImport: (bookmarks: any[]) => Promise<number | undefined>;
+  onImport: (bookmarks: any[]) => Promise<void>;
   onExport: () => void;
 }
 

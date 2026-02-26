@@ -3,7 +3,7 @@
 
 import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AddModal from "@/src/components/AddModal";
 import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
@@ -12,8 +12,13 @@ import ContextMenu from "@/src/components/ui/ContextMenu";
 import PhysicsControl, { PhysicsConfig } from "@/src/components/PhysicsControl";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGraphData } from "@/src/hooks/useGraphData";
+import { useAIProcessor } from "@/src/hooks/useAIProcessor";
+import { createClient } from "@/src/lib/supabase/client";
+import AIStatusBar from "@/src/components/AIStatusBar";
 
 export default function Home() {
+    const supabase = useMemo(() => createClient(), []);
+    
     const { 
         data, 
         isLoading,
@@ -24,7 +29,13 @@ export default function Home() {
         deleteLink,
         importData,
         exportData,
-    } = useGraphData();
+    } = useGraphData(supabase);
+
+    const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
+        supabase, 
+        updateNode, 
+        addLink
+    );
 
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -36,6 +47,9 @@ export default function Home() {
         repulsion: 150,
         linkDistance: 60
     });
+    const [isAIProcessing, setIsAIProcessing] = useState(false);
+    const [aiProgress, setAiProgress] = useState(0);
+    const [aiTotal, setAiTotal] = useState(0);
 
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
@@ -80,6 +94,102 @@ export default function Home() {
         setSelectedNode(node);
     };
 
+    const handleAddWithAI = async (nodeData: any) => {
+        setAiTotal(1);
+        setAiProgress(0);
+        setIsAIProcessing(true);
+
+        await addNewNode(nodeData);
+
+        if (nodeData.autoConnectAI) {
+            try {
+                const res = await fetch('/api/ai/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        mode: 'suggest_connections', 
+                        newNode: { title: nodeData.title, content: nodeData.content, type: nodeData.type },
+                        existingNodes: existingNodeIds 
+                    })
+                });
+
+                const aiResponse = await res.json();
+                
+                if (aiResponse.description && !nodeData.content) {
+                    await updateNode(nodeData.title, { 
+                        ...nodeData,
+                        content: aiResponse.description 
+                    });
+                }
+
+                if (Array.isArray(aiResponse.connections)) {
+                    for (const connection of aiResponse.connections) {
+                        if (connection.id !== nodeData.title) {
+                            const aiLabel = `AI Similarity: ${connection.accuracy}%`;
+                            await addLink(nodeData.title, connection.id, 'ai', aiLabel);
+                        }
+                    }
+                }
+
+                // Встановлюємо прогрес на 100% (1 з 1)
+                setAiProgress(1);
+
+            } catch (err) {
+                console.error("AI logic failed:", err);
+                setIsAIProcessing(false);
+            } finally {
+                // 🔥 Чекаємо 2.5 секунди, щоб користувач насолодився статусом "Done"
+                setTimeout(() => {
+                    setIsAIProcessing(false);
+                    // Скидаємо цифри трохи пізніше, коли анімація закриття завершиться
+                    setTimeout(() => {
+                        setAiProgress(0);
+                        setAiTotal(0);
+                    }, 500);
+                }, 2500);
+            }
+        } else {
+            // Якщо AI вимкнено, просто закриваємо бар
+            setIsAIProcessing(false);
+        }
+    };
+
+    const handleImportWithQueue = async (bookmarks: any[]) => {
+        console.log('Call -> handleImportWithQueue()');
+        const insertedNodes = await importData(bookmarks);
+        console.log('Nodes received for AI processing:', insertedNodes);
+        
+        if (insertedNodes && Array.isArray(insertedNodes) && insertedNodes.length > 0) {
+            const allExistingContext = data.nodes.map((n: any) => 
+                `[ID]: "${n.id}" | CONTEXT: (Tags: ${n.tags?.join(', ') || 'none'}, URL: ${n.url || 'n/a'})`
+            );
+
+            processQueue(insertedNodes, allExistingContext);
+        } else {
+            console.log('No nodes to process (either duplicates or error)');
+        }
+    };
+
+    useEffect(() => {
+        // Чекаємо, поки завантажаться основні дані нод
+        if (!isLoading && data.nodes.length > 0 && !isProcessing) {
+            
+            // Знаходимо ноди, які ще не обробив ШІ
+            const pendingNodes = data.nodes.filter((n: any) => n.is_ai_processed === false);
+
+            if (pendingNodes.length > 0) {
+                console.log(`🚀 Found ${pendingNodes.length} unprocessed nodes. Resuming AI sync...`);
+                
+                const allExistingIds = data.nodes.map((n: any) => 
+                    typeof n.id === 'string' ? n.id : n.id?.id
+                );
+
+                // Запускаємо чергу автоматично
+                processQueue(pendingNodes, allExistingIds);
+            }
+        }
+    }, [isLoading, data.nodes.length]);
+
     if (isLoading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-neutral-950 flex-col gap-4">
@@ -90,7 +200,7 @@ export default function Home() {
     }
     
     return (
-        <main className="flex min-h-screen flex-col items-center justify-between">
+        <main className="bg-red flex min-h-screen flex-col items-center justify-between">
             <GraphNetwork 
                 onNodeSelect={(node) => {
                     setSelectedNode(node);
@@ -109,7 +219,12 @@ export default function Home() {
                 <p className="text-neutral-400 mt-2">Your visual thoughts universe</p>
             </div>
 
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" 
+            />
 
             <AnimatePresence>
                 {!isLoading && data.nodes.length === 0 && (
@@ -202,6 +317,14 @@ export default function Home() {
                 onDelete={deleteNode}
             />
 
+            <AIStatusBar 
+                isVisible={isProcessing || isAIProcessing} 
+                current={isAIProcessing ? aiProgress : progress} 
+                failed={isAIProcessing ? 0 : failed}
+                total={isAIProcessing ? aiTotal : total}
+                label={isAIProcessing ? "Neural Syncing" : "Batch Importing"} 
+            />
+
             <LeftSidebar 
                 isOpen={isLeftSidebarOpen}
                 onClose={() => setIsLeftSidebarOpen(false)}
@@ -210,7 +333,7 @@ export default function Home() {
                 onTagSelect={setActiveTag}
                 nodes={data.nodes}
                 onSelect={handleSearchSelect}
-                onImport={importData}
+                onImport={handleImportWithQueue}
                 onExport={exportData}
             />
 
@@ -226,7 +349,7 @@ export default function Home() {
             <AddModal 
                 isOpen={isAddModalOpen} 
                 onClose={() => setIsAddModalOpen(false)}
-                onAdd={addNewNode}
+                onAdd={handleAddWithAI}
                 existingNodes={existingNodeIds}
                 allTags={allTags}
             />

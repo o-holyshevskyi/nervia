@@ -311,7 +311,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                             </p>
 
                                             <a 
-                                                href={editTitle.startsWith('http') ? editTitle : `https://${editTitle}`} 
+                                                href={editUrl} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="flex items-center justify-between w-full group/link pt-2"

@@ -1,15 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/src/lib/supabase/client';
+import { useState, useEffect } from 'react';
 import { ParsedBookmark } from '../lib/bookmarkParser';
 import { NodeData } from '../components/AddModal';
 
-export function useGraphData() {
+export function useGraphData(supabase: any) {
     const [user, setUser] = useState<any>(null);
     const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
     const [isLoading, setIsLoading] = useState(true);
-
-    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
         const initSession = async () => {
@@ -24,7 +21,7 @@ export function useGraphData() {
                     if (nodesError) throw nodesError;
                     if (linksError) throw linksError;
 
-                    const formattedLinks = linksData?.map(l => ({
+                    const formattedLinks = linksData?.map((l: any) => ({
                         ...l,
                         relationType: l.relation_type || 'manual'
                     })) || [];
@@ -63,35 +60,10 @@ export function useGraphData() {
         const newLinks: any[] = nodeData.connections.map(targetNodeId => ({
             source: nodeData.title,
             target: targetNodeId,
-            relationType: 'manual',
-            label: 'Manual connection',
+            relationType: nodeData.autoConnectAI ? 'ai' : 'manual',
+            label: nodeData.autoConnectAI ? 'AI connection' : 'Manual connection',
             weight: 1
         }));
-
-        if (nodeData.autoConnectAI && data.nodes.length > 0) {
-            const availableNodes = data.nodes.filter((n: any) => {
-                const nodeId = typeof n.id === 'string' ? n.id : n.id?.id;
-                return !nodeData.connections.includes(nodeId);
-            });
-
-            if (availableNodes.length > 0) {
-                const aiConnectionsCount = Math.floor(Math.random() * 2) + 1; 
-                const shuffled = [...availableNodes].sort(() => 0.5 - Math.random());
-                const selectedAiNodes = shuffled.slice(0, aiConnectionsCount);
-
-                selectedAiNodes.forEach((aiNode: any) => {
-                    const aiNodeId = typeof aiNode.id === 'string' ? aiNode.id : aiNode.id?.id;
-                    const similarity = Math.floor(Math.random() * 24) + 75; 
-                    newLinks.push({
-                        source: nodeData.title,
-                        target: aiNodeId,
-                        relationType: 'ai',
-                        label: `AI Generated (Similarity: ${similarity}%)`,
-                        weight: 1
-                    });
-                });
-            }
-        }
 
         setData(prev => ({
             nodes: [...prev.nodes, newNode],
@@ -136,14 +108,14 @@ export function useGraphData() {
         }
     };
 
-    const addLink = async (sourceId: string, targetId: string) => {
+    const addLink = async (sourceId: string, targetId: string, type = 'manual', label = 'Manual connection') => {
         if (!user || sourceId === targetId) return;
 
         const newLink = { 
             source: sourceId, 
             target: targetId, 
-            relationType: 'manual', 
-            label: 'Manual connection' 
+            relationType: type, 
+            label: label
         };
 
         setData((prev: any) => {
@@ -159,8 +131,8 @@ export function useGraphData() {
         await supabase.from('links').insert({
             source: typeof sourceId === 'object' ? (sourceId as any).id : sourceId,
             target: typeof targetId === 'object' ? (targetId as any).id : targetId,
-            relation_type: 'manual',
-            label: 'Manual connection',
+            relation_type: type,
+            label: label,
             user_id: user.id
         });
     };
@@ -223,10 +195,6 @@ export function useGraphData() {
             return { nodes: newNodes, links: newLinks };
         });
 
-        // if (selectedNode && (typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id) === nodeId) {
-        //     setSelectedNode(null);
-        // }
-
         await supabase.from('nodes')
             .delete()
             .eq('id', nodeId)
@@ -245,7 +213,6 @@ export function useGraphData() {
             })
         }));
 
-        // Видаляємо з БД. Шукаємо лінк незалежно від напрямку
         await supabase.from('links')
             .delete()
             .or(`and(source.eq.${sourceId},target.eq.${targetId}),and(source.eq.${targetId},target.eq.${sourceId})`)
@@ -253,11 +220,12 @@ export function useGraphData() {
     };
 
     const importData = async (bookmarks: ParsedBookmark[]) => {
+        console.log('Call -> importData()');
         if (!user) return;
 
         // Готуємо дані для вставки
         const nodesToInsert = bookmarks.map(b => ({
-            id: b.title,        // Використовуємо Title як унікальний ID
+            id: b.title.replace(/[\n\r]/g, ' ').trim(),
             url: b.url,         // Тепер база знає про цю колонку
             content: b.url,     // Дублюємо в контент для пошуку
             type: 'link',
@@ -295,7 +263,7 @@ export function useGraphData() {
             }));
         }
 
-        return insertedNodes?.length || 0;
+        return insertedNodes || [];
     };
 
     const exportData = () => {

@@ -5,13 +5,33 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from 'next/dynamic';
 import { forceManyBody, forceX, forceY } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { LinkIcon, Sparkles } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles } from "lucide-react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const ForceGraph2D = dynamic(() => import ('react-force-graph-2d'), {
     ssr: false,
 });
 
 const imgCache: { [key: string]: HTMLImageElement } = {};
+const iconCache: Record<string, HTMLImageElement> = {};
+
+const createIconImage = (IconComponent: any, color: string, strokeWidth: number = 2.5) => {
+    const cacheKey = `${IconComponent.displayName}-${color}`;
+    if (iconCache[cacheKey]) return iconCache[cacheKey];
+
+    // Конвертуємо компонент у рядок SVG
+    // strokeWidth та size можна налаштувати тут
+    const svgString = renderToStaticMarkup(
+        <IconComponent color={color} size={32} strokeWidth={strokeWidth} />
+    );
+
+    const img = new Image();
+    // Кодуємо SVG у Base64 для використання в src
+    img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
+    
+    iconCache[cacheKey] = img;
+    return img;
+};
 
 interface GraphNetworkProps {
     graphData: { nodes: any[]; links: any[] };
@@ -56,8 +76,15 @@ export default function GraphNetwork({
     }, [zenModeNodeId, graphData.links]);
 
     const getNodeIconUrl = (node: any) => {
-        if (node.type === 'link') {
-            return `https://www.google.com/s2/favicons?domain=${node.id.toLowerCase()}.com&sz=64`;
+        if (node.type === 'link' && node.url) {
+            try {
+                // Витягуємо чистий домен з URL (наприклад, з https://github.com/react -> github.com)
+                const domain = new URL(node.url).hostname;
+                return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+            } catch (e) {
+                // Якщо URL раптом некоректний, пробуємо використати його як є або повертаємо null
+                return `https://www.google.com/s2/favicons?domain=${node.url}&sz=64`;
+            }
         }
         return null; 
     };
@@ -88,57 +115,89 @@ export default function GraphNetwork({
         const label = idStr;
         const size = 8; 
         
-        // 🔥 ПРАВИЛЬНА перевірка: чи є ID ноди в нашому Set-і сусідів
+        // 1. Визначаємо стан прихованості
         const isZenHidden = zenModeNodeId && !zenModeNeighbors.has(idStr);
         const isTagHidden = activeTag && (!node.tags || !node.tags.includes(activeTag));
-        
         const isHidden = isZenHidden || isTagHidden;
 
-        // 2. Main circle (background)
+        // Визначаємо колір залежно від групи
+        const colors: any = { 1: "#3b82f6", 2: "#10b981", 3: "#a855f7", 4: "#f97316", 5: "#06b6d4" };
+        const baseColor = colors[node.group] || "#ec4899";
+        
+        // Колір для контуру та тексту
+        const strokeColor = isHidden ? 'rgba(100, 100, 100, 0.1)' : baseColor;
+
+        // 2. Малюємо порожнє коло (Border)
         ctx.beginPath();
         ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
         
-        const colors: any = { 1: "#3b82f6", 2: "#10b981", 3: "#a855f7", 4: "#f97316", 5: "#06b6d4" };
-        ctx.fillStyle = isHidden ? 'rgba(30, 30, 30, 0.1)' : (colors[node.group] || "#ec4899");
+        // Внутрішня частина (прозора або ледь помітна заливка)
+        ctx.fillStyle = isHidden ? 'rgba(0, 0, 0, 0)' : 'rgba(0, 0, 0, 0.2)'; 
         ctx.fill();
 
-        // 3. Draw icon/image
-        const iconUrl = getNodeIconUrl(node);
-        if (iconUrl && !isHidden) {
-            if (!imgCache[iconUrl]) {
-                const img = new Image();
-                img.src = iconUrl;
-                img.onload = () => { imgCache[iconUrl] = img; };
+        // Налаштування бордера
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2 / globalScale; // Товщина рамки адаптується до зуму
+        ctx.shadowColor = strokeColor;
+        ctx.shadowBlur = 10 / globalScale;
+        ctx.stroke();
+
+        // 3. Малюємо іконку/емодзі всередині (якщо не приховано)
+        if (!isHidden) {
+            const iconUrl = getNodeIconUrl(node);
+            const iconSize = size * 1.2;
+    
+            if (iconUrl) {
+                if (!imgCache[iconUrl]) {
+                    const img = new Image();
+                    img.src = iconUrl;
+                    img.onload = () => { imgCache[iconUrl] = img; };
+                } else {
+                    const img = imgCache[iconUrl];
+                    const iconSize = size * 1.2;
+                    ctx.save();
+                    ctx.beginPath();
+                    // Кліпаємо коло трохи менше за бордер, щоб іконка не вилазила
+                    ctx.arc(node.x, node.y, size * 0.8, 0, Math.PI * 2, true);
+                    ctx.clip(); 
+                    ctx.drawImage(img, node.x - iconSize/2, node.y - iconSize/2, iconSize, iconSize);
+                    ctx.restore();
+                }
             } else {
-                const img = imgCache[iconUrl];
-                const iconSize = size * 1.2;
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size * 0.8, 0, Math.PI * 2, true);
-                ctx.clip(); 
-                ctx.drawImage(img, node.x - iconSize/2, node.y - iconSize/2, iconSize, iconSize);
-                ctx.restore();
+                let iconImg = null;
+                if (node.type === 'idea') {
+                    iconImg = createIconImage(Lightbulb, baseColor);
+                } else if (node.type === 'note') {
+                    iconImg = createIconImage(FileText, baseColor);
+                }
+
+                // Малюємо іконку, якщо вона завантажена
+                if (iconImg && iconImg.complete) {
+                    ctx.save();
+                    // Додаємо легке світіння самій іконці
+                    ctx.shadowColor = baseColor;
+                    ctx.shadowBlur = 8 / globalScale;
+                    
+                    ctx.drawImage(
+                        iconImg, 
+                        node.x - iconSize / 2, 
+                        node.y - iconSize / 2, 
+                        iconSize, 
+                        iconSize
+                    );
+                    ctx.restore();
+                }
             }
-        } else if (node.type === 'idea' && !isHidden) {
-            ctx.font = `${size}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('💡', node.x, node.y);
-        } else if (node.type === 'note' && !isHidden) {
-            ctx.font = `${size}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('📝', node.x, node.y);
         }
 
-        // 4. Text under node
+        // 4. Текст під нодою
         if (globalScale > 1.5) {
             const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)';
-            ctx.fillText(label, node.x, node.y + size + 2);
+            ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)';
+            ctx.fillText(label, node.x, node.y + size + 4);
         }
     }, [zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl]);
     
@@ -225,7 +284,7 @@ export default function GraphNetwork({
                 linkWidth={(link: any) => (link === hoveredLink ? 2 : link.weight || 1)}
                 linkDirectionalParticles={(link: any) => {
                     if (isLinkHidden(link)) return 0; // Немає частинок!
-                    return link.relationType === 'ai' ? 3 : 0;
+                    return link.relationType === 'ai' ? physicsConfig.linkDistance / 20 : 0;
                 }}
                 linkDirectionalParticleSpeed={0.005}
                 linkDirectionalParticleWidth={4}
@@ -237,6 +296,7 @@ export default function GraphNetwork({
                     return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : "rgba(255, 255, 255, 0.15)";
                 }}
                 backgroundColor="#0a0a0a"
+                enablePointerInteraction={true}
             />
             <AnimatePresence>
                 {hoveredLink && (
