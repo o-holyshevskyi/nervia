@@ -114,13 +114,17 @@ export default function Home() {
                 });
 
                 const aiResponse = await res.json();
-                
+                const validGroup = typeof aiResponse.group === 'number' && aiResponse.group >= 1 && aiResponse.group <= 5 ? aiResponse.group : undefined;
+
                 if (aiResponse.description && !nodeData.content) {
-                    await updateNode(nodeData.title, { 
+                    await updateNode(nodeData.title, {
                         ...nodeData,
                         content: aiResponse.description,
                         is_ai_processed: true,
+                        ...(validGroup !== undefined && { group: validGroup }),
                     });
+                } else if (validGroup !== undefined) {
+                    await updateNode(nodeData.title, { group: validGroup });
                 }
 
                 if (Array.isArray(aiResponse.connections)) {

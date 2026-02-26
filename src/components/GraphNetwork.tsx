@@ -30,6 +30,13 @@ const groupNames: Record<number, string> = {
     5: "Research",
 };
 
+/** Deterministic hash from string for reproducible initial positions. */
+function hashStr(s: string): number {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return (h % 1e6) / 1e6;
+}
+
 /** Derive stable group from node data so colors are always based on group/type, not insertion order. */
 function getNodeGroup(node: any): number {
     if (node.group != null) {
@@ -45,11 +52,13 @@ function drawGroupAreas(
     ctx: CanvasRenderingContext2D,
     nodes: any[],
     dimensions: { width: number; height: number },
-    _globalScale: number
+    _globalScale: number,
+    nodeIdToGroup: Map<string | number, number>
 ) {
     const byGroup: Record<number, { x: number; y: number }[]> = {};
     for (const node of nodes) {
-        const g = getNodeGroup(node);
+        const nodeId = typeof node.id === 'string' ? node.id : node?.id;
+        const g = nodeId != null ? (nodeIdToGroup.get(nodeId) ?? getNodeGroup(node)) : getNodeGroup(node);
         if (g == null) continue;
         const x = Number(node.x);
         const y = Number(node.y);
@@ -75,7 +84,8 @@ function drawGroupAreas(
         const color = groupColors[g];
         if (!color) continue;
         const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-        gradient.addColorStop(0, color + "99");
+        gradient.addColorStop(0, color + "19");
+        gradient.addColorStop(0.5, color + "0D");
         gradient.addColorStop(1, "transparent");
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
@@ -87,15 +97,19 @@ function drawGroupAreas(
 
     for (const g of Object.keys(byGroup).map(Number)) {
         const points = byGroup[g];
-        if (!points || points.length <= 3) continue;
+        if (!points?.length) continue;
         const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
         const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
         if (!isFinite(centerX) || !isFinite(centerY)) continue;
+        const label = groupNames[g] ?? `Group ${g}`;
         ctx.font = "600 14px Inter, sans-serif";
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(groupNames[g] ?? `Group ${g}`, centerX, centerY);
+        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        ctx.fillText(label, centerX, centerY);
+        ctx.shadowBlur = 0;
     }
 }
 
@@ -141,6 +155,8 @@ export default function GraphNetwork({
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
+    const lastTransformRef = useRef<{ k: number; x: number; y: number } | null>(null);
+    const prevNodeCountRef = useRef(0);
 
     const [hoveredLink, setHoveredLink] = useState<any | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -159,6 +175,15 @@ export default function GraphNetwork({
         return neighbors;
     }, [zenModeNodeId, graphData.links]);
 
+    const nodeIdToGroupMap = useMemo(() => {
+        const m = new Map<string | number, number>();
+        graphData.nodes.forEach((n: any) => {
+            const id = typeof n.id === 'string' ? n.id : n?.id;
+            if (id != null) m.set(id, getNodeGroup(n));
+        });
+        return m;
+    }, [graphData.nodes]);
+
     const processedData = useMemo(() => {
         const { nodes, links } = graphData;
         const degreeMap: Record<string, number> = {};
@@ -169,11 +194,19 @@ export default function GraphNetwork({
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
-        const nodesWithVal = nodes.map((node: any) => {
+        const layoutRadius = 280;
+        const nodesWithVal = nodes.map((node: any, index: number) => {
             const id = getNodeId(node);
             const degree = degreeMap[id] ?? 0;
             const val = Math.min(4 + degree * 1.5, 20);
-            return { ...node, val };
+            const g = getNodeGroup(node);
+            const idStr = id != null ? String(id) : `i${index}`;
+            const h = hashStr(idStr);
+            const angle = h * 2 * Math.PI;
+            const r = layoutRadius * (0.3 + 0.7 * (hashStr(idStr + "r") % 1));
+            const x = r * Math.cos(angle);
+            const y = r * Math.sin(angle);
+            return { ...node, val, x: node.x ?? x, y: node.y ?? y };
         });
         const linksCopy = links.map((link: any) => ({ ...link }));
         return { nodes: nodesWithVal, links: linksCopy };
@@ -227,8 +260,9 @@ export default function GraphNetwork({
         const isTagHidden = activeTag && (!node.tags || !node.tags.includes(activeTag));
         const isHidden = isZenHidden || isTagHidden;
 
-        // Визначаємо колір залежно від групи (по типу ноди, якщо group не задано)
-        const baseColor = groupColors[getNodeGroup(node)] ?? "#ec4899";
+        // Визначаємо колір залежно від групи (по id з канонічної мапи, щоб не залежати від мутацій бібліотеки)
+        const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
+        const baseColor = groupColors[group] ?? "#ec4899";
 
         // Колір для контуру та тексту
         const strokeColor = isHidden ? 'rgba(100, 100, 100, 0.1)' : baseColor;
@@ -305,13 +339,13 @@ export default function GraphNetwork({
             ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)';
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl]);
+    }, [zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
-            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale);
+            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupMap);
         },
-        [processedData.nodes, dimensions]
+        [processedData.nodes, dimensions, nodeIdToGroupMap]
     );
 
     useEffect(() => {
@@ -349,16 +383,20 @@ export default function GraphNetwork({
 
             fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
 
+            const getGroupForNode = (node: any) => {
+                const id = typeof node.id === 'string' ? node.id : node?.id;
+                return id != null ? (nodeIdToGroup.get(id) ?? getNodeGroup(node)) : getNodeGroup(node);
+            };
             fg.d3Force('center', null);
-            fg.d3Force('x', forceX((node: any) => clusterCenters[getNodeGroup(node)]?.x ?? cx).strength(0.08));
-            fg.d3Force('y', forceY((node: any) => clusterCenters[getNodeGroup(node)]?.y ?? cy).strength(0.08));
+            fg.d3Force('x', forceX((node: any) => clusterCenters[getGroupForNode(node)]?.x ?? cx).strength(0.08));
+            fg.d3Force('y', forceY((node: any) => clusterCenters[getGroupForNode(node)]?.y ?? cy).strength(0.08));
 
             const linkForce = fg.d3Force('link');
             if (linkForce) {
                 linkForce.distance(physicsConfig.linkDistance);
                 linkForce.strength((link: any) => {
-                    const s = typeof link.source === 'object' ? getNodeGroup(link.source) : nodeIdToGroup.get(link.source);
-                    const t = typeof link.target === 'object' ? getNodeGroup(link.target) : nodeIdToGroup.get(link.target);
+                    const s = typeof link.source === 'object' ? getGroupForNode(link.source) : nodeIdToGroup.get(link.source);
+                    const t = typeof link.target === 'object' ? getGroupForNode(link.target) : nodeIdToGroup.get(link.target);
                     return s !== undefined && t !== undefined && s === t ? 0.7 : 0.1;
                 });
             }
@@ -366,6 +404,57 @@ export default function GraphNetwork({
             fg.d3ReheatSimulation();
         }
     }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes]);
+
+    const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
+        lastTransformRef.current = { k: transform.k, x: transform.x, y: transform.y };
+    }, []);
+
+    useEffect(() => {
+        const nodeCount = processedData.nodes.length;
+        const prevCount = prevNodeCountRef.current;
+        prevNodeCountRef.current = nodeCount;
+        if (nodeCount > prevCount && prevCount > 0 && lastTransformRef.current && fgRef.current) {
+            const { k, x, y } = lastTransformRef.current;
+            const w = dimensions.width;
+            const h = dimensions.height;
+            const centerX = (w / 2 - x) / k;
+            const centerY = (h / 2 - y) / k;
+            const fg = fgRef.current;
+            const restore = () => {
+                if (!fgRef.current || !isFinite(centerX) || !isFinite(centerY)) return;
+                fgRef.current.centerAt(centerX, centerY, 0);
+                fgRef.current.zoom(k, 0);
+            };
+            const t1 = setTimeout(restore, 100);
+            const t2 = setTimeout(restore, 400);
+            const t3 = setTimeout(restore, 800);
+            return () => {
+                clearTimeout(t1);
+                clearTimeout(t2);
+                clearTimeout(t3);
+            };
+        }
+    }, [processedData.nodes.length, dimensions.width, dimensions.height]);
+
+    useEffect(() => {
+        if (lastTransformRef.current != null) return;
+        const id = setTimeout(() => {
+            if (fgRef.current) {
+                const center = fgRef.current.centerAt();
+                const zoom = fgRef.current.zoom();
+                if (center && typeof zoom === 'number' && Number.isFinite(center.x) && Number.isFinite(center.y)) {
+                    const w = dimensions.width;
+                    const h = dimensions.height;
+                    lastTransformRef.current = {
+                        k: zoom,
+                        x: w / 2 - center.x * zoom,
+                        y: h / 2 - center.y * zoom,
+                    };
+                }
+            }
+        }, 600);
+        return () => clearTimeout(id);
+    }, [processedData.nodes.length, dimensions.width, dimensions.height]);
 
     return (
         <div 
@@ -382,7 +471,10 @@ export default function GraphNetwork({
                 nodeLabel="id"
                 nodeCanvasObject={drawNode}
                 onRenderFramePre={handleRenderFramePre}
-                warmupTicks={100}                
+                onZoom={handleZoom}
+                warmupTicks={100}
+                d3AlphaDecay={0.0228}
+                d3VelocityDecay={0.4}                
                 onNodeClick={(node: any) => {
                     if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
                         fgRef.current.centerAt(node.x, node.y, 800);
@@ -414,7 +506,8 @@ export default function GraphNetwork({
                     if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return "rgba(30, 30, 30, 0.1)"; 
                     if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return "rgba(50, 50, 50, 0.2)"; 
                     if (nodeId === focusedNodeId) return "#fbbf24"; 
-                    return groupColors[getNodeGroup(node)] ?? "#ec4899";
+                    const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
+                    return groupColors[group] ?? "#ec4899";
                 }}
                 linkWidth={(link: any) => (link === hoveredLink ? 2 : link.weight || 1)}
                 linkDirectionalParticles={(link: any) => {

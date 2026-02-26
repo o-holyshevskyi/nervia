@@ -9,6 +9,14 @@ function cleanJsonString(str: string) {
     return str.replace(/```json/g, "").replace(/```/g, "").trim();
 }
 
+// Semantic groups for graph clustering (same as GraphNetwork groupNames)
+const GROUP_DEF = "1=Development/Tech, 2=AI/ML, 3=Finance/Business, 4=Design/Creative, 5=Research/Education";
+
+function validGroup(value: unknown): number | undefined {
+    const n = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(n) && n >= 1 && n <= 5 ? n : undefined;
+}
+
 export async function POST(req: Request) {
     try {
         // Перевірка ключа (якщо його немає, сервер видасть 500 з цим повідомленням)
@@ -47,10 +55,12 @@ export async function POST(req: Request) {
                 - If Context is empty, generate a 1-3 sentence description for the NEW neuron.
                 - If the TYPE is 'note' or 'idea' generate the content or suggestions based on the NEW neuron.
                 - RETURN EMPTY ARRAY if no strong (80%+) matches are found.
+                - Assign the NEW neuron to exactly one semantic group: ${GROUP_DEF}. Choose the group that best fits its topic.
                 
                 Return ONLY JSON:
                 {
                     "newNodeDescription": "Brief description",
+                    "group": 1,
                     "connections": [
                         { "id": "Neuron Name", "accuracy": 95 }
                     ]
@@ -62,10 +72,11 @@ export async function POST(req: Request) {
             
             try {
                 const parsed = JSON.parse(text);
-        
+                const group = validGroup(parsed.group);
                 return NextResponse.json({
                     description: parsed.newNodeDescription || "",
-                    connections: (parsed.connections || []).filter((c: any) => c.accuracy >= 80)
+                    connections: (parsed.connections || []).filter((c: any) => c.accuracy >= 80),
+                    ...(group !== undefined && { group }),
                 });
             } catch (e) {
                 console.error("🔴 Failed to parse Gemini JSON:", text);
@@ -86,11 +97,13 @@ export async function POST(req: Request) {
                 IMPORTANT:
                 In the "connections" array, the "id" must be EXACTLY one of the strings provided in the EXISTING LIST.
                 If no high-confidence (80%+) match is found, return an empty array.
+                Assign this neuron to exactly one semantic group: ${GROUP_DEF}. Choose the group that best fits its content/URL.
 
                 Return JSON:
                 {
                     "summary": "1-sentence context",
                     "tags": ["tag1", "tag2"],
+                    "group": 1,
                     "connections": [
                         { "id": "Exact string from the list", "accuracy": 90 }
                     ]
@@ -102,10 +115,12 @@ export async function POST(req: Request) {
             
             try {
                 const parsed = JSON.parse(text);
+                const group = validGroup(parsed.group);
                 return NextResponse.json({
                     summary: parsed.summary || "",
                     tags: parsed.tags || [],
-                    connections: (parsed.connections || []).filter((c: any) => c.accuracy >= 80)
+                    connections: (parsed.connections || []).filter((c: any) => c.accuracy >= 80),
+                    ...(group !== undefined && { group }),
                 });
             } catch (e) {
                 return NextResponse.json({ summary: newNode.url, tags: [], connections: [] });

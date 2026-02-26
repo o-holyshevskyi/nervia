@@ -142,7 +142,7 @@ export function useGraphData(supabase: any) {
         });
     };
 
-    const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, is_ai_processed?: boolean }) => {
+    const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, is_ai_processed?: boolean, group?: number }) => {
         if (!user) return;
 
         const newId = newData.title ?? nodeId;
@@ -150,13 +150,14 @@ export function useGraphData(supabase: any) {
         setData((prev) => {
             const newNodes = prev.nodes.map((node) => {
                 if (node.id === nodeId) {
-                    return { 
-                        ...node, 
-                        id: newId, 
+                    return {
+                        ...node,
+                        id: newId,
                         content: newData.content ?? node.content,
                         tags: newData.tags ?? node.tags,
                         url: newData.url ?? node.url,
                         is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
+                        group: newData.group ?? node.group,
                     };
                 }
                 return node;
@@ -175,14 +176,17 @@ export function useGraphData(supabase: any) {
             return { nodes: newNodes, links: newLinks };
         });
 
+        const dbUpdate: Record<string, unknown> = {
+            id: newId,
+            content: newData.content,
+            tags: newData.tags,
+            url: newData.url,
+            is_ai_processed: newData.is_ai_processed,
+        };
+        if (newData.group !== undefined) dbUpdate.group = newData.group;
+
         await supabase.from('nodes')
-            .update({
-                id: newId,
-                content: newData.content,
-                tags: newData.tags,
-                url: newData.url,
-                is_ai_processed: newData.is_ai_processed,
-            })
+            .update(dbUpdate)
             .eq('id', nodeId)
             .eq('user_id', user.id);
     };

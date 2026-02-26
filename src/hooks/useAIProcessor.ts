@@ -88,20 +88,28 @@ export function useAIProcessor(
                     }
                 }
 
-                // 1. Оновлюємо основні дані ноди в БД
+                // 1. Оновлюємо основні дані ноди в БД (включаючи AI-призначену групу)
                 const finalTags = [...new Set([...(node.tags || []), ...(aiData.tags || [])])];
-                
+                const validGroup = typeof aiData.group === 'number' && aiData.group >= 1 && aiData.group <= 5 ? aiData.group : undefined;
+                const dbUpdate: Record<string, unknown> = {
+                    content: aiData.summary,
+                    tags: finalTags,
+                    is_ai_processed: true,
+                };
+                if (validGroup !== undefined) dbUpdate.group = validGroup;
+
                 await supabase.from('nodes')
-                    .update({ 
-                        content: aiData.summary, 
-                        tags: finalTags,
-                        is_ai_processed: true
-                    })
+                    .update(dbUpdate)
                     .eq('id', node.id)
                     .eq('user_id', userId);
 
                 // 2. Оновлюємо UI для цієї ноди
-                onNodeUpdate(node.id, { content: aiData.summary, tags: finalTags });
+                onNodeUpdate(node.id, {
+                    content: aiData.summary,
+                    tags: finalTags,
+                    is_ai_processed: true,
+                    ...(validGroup !== undefined && { group: validGroup }),
+                });
 
                 // 3. 🔥 Створюємо ШІ-зв'язки
                 if (aiData.connections && aiData.connections.length > 0) {
