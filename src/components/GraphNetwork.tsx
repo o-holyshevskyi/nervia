@@ -138,6 +138,8 @@ interface GraphNetworkProps {
     zenModeNodeId: string | null;
     physicsConfig: { repulsion: number; linkDistance: number };
     highlightedNodes?: string[];
+    pathNodes?: string[];
+    pathLinks?: any[];
     flyToNodeId?: string | null;
     onFlyToComplete?: () => void;
     onNodeSelect: (node: any) => void;
@@ -155,6 +157,8 @@ export default function GraphNetwork({
     zenModeNodeId,
     physicsConfig,
     highlightedNodes = [],
+    pathNodes = [],
+    pathLinks = [],
     flyToNodeId = null,
     onFlyToComplete
 }: GraphNetworkProps) {
@@ -193,6 +197,26 @@ export default function GraphNetwork({
     const highlightedSet = useMemo(() => new Set(highlightedNodes), [highlightedNodes]);
     const searchActive = highlightedSet.size > 0;
 
+    const pathfinderActive = pathNodes.length > 0;
+    const pathNodeSet = useMemo(() => new Set(pathNodes), [pathNodes]);
+    const pathLinkSet = useMemo(() => {
+        const set = new Set<string>();
+        const linkKey = (a: string, b: string) => (a < b ? `${a}\0${b}` : `${b}\0${a}`);
+        pathLinks.forEach((link: any) => {
+            const sId = typeof link.source === "string" ? link.source : link.source?.id;
+            const tId = typeof link.target === "string" ? link.target : link.target?.id;
+            if (sId != null && tId != null) set.add(linkKey(sId, tId));
+        });
+        return set;
+    }, [pathLinks]);
+    const isPathLink = useCallback((link: any) => {
+        const sId = typeof link.source === "string" ? link.source : link.source?.id;
+        const tId = typeof link.target === "string" ? link.target : link.target?.id;
+        if (sId == null || tId == null) return false;
+        const key = sId < tId ? `${sId}\0${tId}` : `${tId}\0${sId}`;
+        return pathLinkSet.has(key);
+    }, [pathLinkSet]);
+
     const processedData = useMemo(() => {
         const { nodes, links } = graphData;
         const degreeMap: Record<string, number> = {};
@@ -218,6 +242,17 @@ export default function GraphNetwork({
             return { ...node, val, x: node.x ?? x, y: node.y ?? y };
         });
         const linksCopy = links.map((link: any) => ({ ...link }));
+        if (pathfinderActive) {
+            const pathSet = new Set(pathNodes);
+            const dim: any[] = [];
+            const bright: any[] = [];
+            nodesWithVal.forEach((n: any) => {
+                const id = getNodeId(n);
+                if (pathSet.has(id)) bright.push(n);
+                else dim.push(n);
+            });
+            return { nodes: [...dim, ...bright], links: linksCopy };
+        }
         if (searchActive) {
             const dim: any[] = [];
             const bright: any[] = [];
@@ -229,7 +264,7 @@ export default function GraphNetwork({
             return { nodes: [...dim, ...bright], links: linksCopy };
         }
         return { nodes: nodesWithVal, links: linksCopy };
-    }, [graphData, searchActive, highlightedSet]);
+    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
@@ -246,6 +281,11 @@ export default function GraphNetwork({
     const isLinkHidden = useCallback((link: any) => {
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
         const tId = typeof link.target === 'string' ? link.target : link.target?.id;
+
+        // Pathfinder: show only path links; hide all others
+        if (pathfinderActive) {
+            return !isPathLink(link);
+        }
 
         // 0. Neural Search: hide links that don't touch at least one highlighted node
         if (searchActive) {
@@ -267,7 +307,7 @@ export default function GraphNetwork({
             }
         }
         return false;
-    }, [searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
+    }, [pathfinderActive, isPathLink, searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
 
     const drawNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const x = Number(node.x);
@@ -279,20 +319,37 @@ export default function GraphNetwork({
         const rawSize = (node.val ?? 4) * 1;
         let size = Math.min(20, Math.max(6, rawSize));
 
-        const isSearchHighlighted = searchActive && highlightedSet.has(idStr);
-        if (searchActive) {
+        // Pathfinder mode overrides Zen and search
+        const isPathNode = pathfinderActive && pathNodeSet.has(idStr);
+        const pathStartId = pathNodes[0];
+        const pathEndId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
+        const isPathStart = idStr === pathStartId;
+        const isPathEnd = pathEndId != null && idStr === pathEndId;
+
+        const isSearchHighlighted = !pathfinderActive && searchActive && highlightedSet.has(idStr);
+        if (searchActive && !pathfinderActive) {
             if (isSearchHighlighted) size = Math.min(24, size * 1.2);
         }
+        if (pathfinderActive && isPathNode) size = Math.min(24, size * 1.2);
 
         // 1. Визначаємо стан прихованості (when search active, non-highlighted are dim)
-        const isZenHidden = !searchActive && zenModeNodeId && !zenModeNeighbors.has(idStr);
-        const isTagHidden = !searchActive && activeTag && (!node.tags || !node.tags.includes(activeTag));
-        const isDimmedBySearch = searchActive && !isSearchHighlighted;
-        const isHidden = isZenHidden || isTagHidden || isDimmedBySearch;
+        const isZenHidden = !pathfinderActive && !searchActive && zenModeNodeId && !zenModeNeighbors.has(idStr);
+        const isTagHidden = !pathfinderActive && !searchActive && activeTag && (!node.tags || !node.tags.includes(activeTag));
+        const isDimmedBySearch = !pathfinderActive && searchActive && !isSearchHighlighted;
+        const isDimmedByPath = pathfinderActive && !isPathNode;
+        const isHidden = isZenHidden || isTagHidden || isDimmedBySearch || isDimmedByPath;
 
-        // Визначаємо колір залежно від групи або search highlight
-        const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
-        const baseColor = isSearchHighlighted ? '#a855f7' : (groupColors[group] ?? "#ec4899");
+        // Визначаємо колір: pathfinder start=cyan, end=orange, path=cyan; else group/search
+        let baseColor: string;
+        if (pathfinderActive) {
+            if (isPathStart) baseColor = "#06b6d4";
+            else if (isPathEnd) baseColor = "#f97316";
+            else if (isPathNode) baseColor = "#06b6d4";
+            else baseColor = "rgba(50, 50, 50, 0.1)";
+        } else {
+            const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
+            baseColor = isSearchHighlighted ? "#a855f7" : (groupColors[group] ?? "#ec4899");
+        }
 
         // Колір для контуру та тексту
         const strokeColor = isHidden ? 'rgba(100, 100, 100, 0.1)' : baseColor;
@@ -305,11 +362,12 @@ export default function GraphNetwork({
         ctx.fillStyle = isHidden ? 'rgba(0, 0, 0, 0)' : 'rgba(0, 0, 0, 0.2)'; 
         ctx.fill();
 
-        // Налаштування бордера (stronger glow for search highlight)
+        // Налаштування бордера (stronger glow for search/path highlight)
+        const strongGlow = isSearchHighlighted || isPathNode;
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = isSearchHighlighted ? 2.5 / globalScale : 2 / globalScale;
+        ctx.lineWidth = strongGlow ? 2.5 / globalScale : 2 / globalScale;
         ctx.shadowColor = strokeColor;
-        ctx.shadowBlur = isSearchHighlighted ? 18 / globalScale : 10 / globalScale;
+        ctx.shadowBlur = strongGlow ? 18 / globalScale : 10 / globalScale;
         ctx.stroke();
 
         // 3. Малюємо іконку/емодзі всередині (якщо не приховано)
@@ -369,7 +427,7 @@ export default function GraphNetwork({
             ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)';
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
+    }, [pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -540,10 +598,9 @@ export default function GraphNetwork({
                     if (!isFinite(x) || !isFinite(y)) return;
                     const rawSize = (node.val ?? 4) * 1;
                     let radius = Math.min(20, Math.max(6, rawSize));
-                    if (searchActive) {
-                        const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
-                        if (highlightedSet.has(nodeId)) radius = radius * 1.2;
-                    }
+                    const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                    if (pathfinderActive && pathNodeSet.has(nodeId)) radius = radius * 1.2;
+                    else if (searchActive && highlightedSet.has(nodeId)) radius = radius * 1.2;
                     ctx.fillStyle = color;
                     ctx.beginPath();
                     ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
@@ -551,6 +608,16 @@ export default function GraphNetwork({
                 }}
                 nodeColor={(node: any) => {
                     const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                    if (pathfinderActive) {
+                        if (pathNodeSet.has(nodeId)) {
+                            const startId = pathNodes[0];
+                            const endId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
+                            if (nodeId === startId) return "#06b6d4";
+                            if (endId != null && nodeId === endId) return "#f97316";
+                            return "#06b6d4";
+                        }
+                        return "rgba(50, 50, 50, 0.1)";
+                    }
                     if (searchActive) {
                         if (highlightedSet.has(nodeId)) return "#a855f7";
                         return "rgba(50, 50, 50, 0.1)";
@@ -561,17 +628,22 @@ export default function GraphNetwork({
                     const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
                     return groupColors[group] ?? "#ec4899";
                 }}
-                linkWidth={(link: any) => (link === hoveredLink ? 2 : link.weight || 1)}
+                linkWidth={(link: any) => {
+                    if (pathfinderActive) return isPathLink(link) ? 4 : 0.5;
+                    return link === hoveredLink ? 2 : link.weight || 1;
+                }}
                 linkDirectionalParticles={(link: any) => {
-                    if (isLinkHidden(link)) return 0; // Немає частинок!
+                    if (isLinkHidden(link)) return 0;
+                    if (pathfinderActive && isPathLink(link)) return 4;
                     return link.relationType === 'ai' ? physicsConfig.linkDistance / 20 : 0;
                 }}
-                linkDirectionalParticleSpeed={0.005}
+                linkDirectionalParticleSpeed={pathfinderActive ? 0.01 : 0.005}
                 linkDirectionalParticleWidth={4}
-                linkDirectionalParticleColor={() => "#fafafa"}
+                linkDirectionalParticleColor={() => (pathfinderActive ? "#ffffff" : "#fafafa")}
                 linkColor={(link: any) => {
                     if (isLinkHidden(link)) return "rgba(0,0,0,0)";
-                    
+                    if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
+                    if (pathfinderActive) return "rgba(0,0,0,0)";
                     if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : "#ffffff";
                     return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : "rgba(255, 255, 255, 0.15)";
                 }}

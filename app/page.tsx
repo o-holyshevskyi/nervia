@@ -5,7 +5,7 @@ import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddModal from "@/src/components/AddModal";
-import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X } from "lucide-react";
+import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
 import CommandPalette from "@/src/components/CommandPalette";
 import ContextMenu from "@/src/components/ui/ContextMenu";
@@ -16,6 +16,7 @@ import { useAIProcessor } from "@/src/hooks/useAIProcessor";
 import { createClient } from "@/src/lib/supabase/client";
 import AIStatusBar from "@/src/components/AIStatusBar";
 import NeuralSearch from "@/src/components/NeuralSearch";
+import PathfinderPanel from "@/src/components/PathfinderPanel";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -55,6 +56,8 @@ export default function Home() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [flyToNodeId, setFlyToNodeId] = useState<string | null>(null);
     const searchFocusRef = useRef<(() => void) | null>(null);
+    const [pathData, setPathData] = useState<{ nodes: string[]; links: any[] }>({ nodes: [], links: [] });
+    const [isPathfinderOpen, setIsPathfinderOpen] = useState(false);
 
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
@@ -201,6 +204,10 @@ export default function Home() {
                 e.preventDefault();
                 openSearch();
             }
+            if (e.key === "p" && (e.metaKey || e.ctrlKey) && e.altKey) {
+                e.preventDefault();
+                setIsPathfinderOpen(true);
+            }
         };
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
@@ -248,6 +255,8 @@ export default function Home() {
                 zenModeNodeId={zenModeNodeId}
                 physicsConfig={physicsConfig}
                 highlightedNodes={highlightedNodes}
+                pathNodes={pathData.nodes}
+                pathLinks={pathData.links}
                 flyToNodeId={flyToNodeId}
                 onFlyToComplete={() => setFlyToNodeId(null)}
                 onNodeContextMenu={handleNodeContextMenu}
@@ -343,6 +352,21 @@ export default function Home() {
                             <X size={14} className="opacity-70" />
                         </motion.button>
                     )}
+
+                    {pathData.nodes.length > 0 && (
+                        <motion.button
+                            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                            key={'clear-path'}
+                            onClick={() => setPathData({ nodes: [], links: [] })}
+                            className="hover:cursor-pointer flex items-center gap-2 px-4 py-2 bg-cyan-500/20 backdrop-blur-md border border-cyan-500/50 rounded-full text-cyan-300 hover:bg-cyan-500/40 hover:text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+                        >
+                            <Route size={14} className="opacity-70" />
+                            <span className="text-sm font-medium">Clear Path</span>
+                            <X size={14} className="opacity-70" />
+                        </motion.button>
+                    )}
                 </AnimatePresence>
             </div>
 
@@ -384,6 +408,18 @@ export default function Home() {
                 onOpenRef={searchFocusRef}
             />
 
+            {isPathfinderOpen && (
+                <PathfinderPanel
+                    nodes={data.nodes}
+                    links={data.links}
+                    onPathFound={(pathNodes, pathLinks) => setPathData({ nodes: pathNodes, links: pathLinks })}
+                    onClose={() => {
+                        setIsPathfinderOpen(false);
+                        setPathData({ nodes: [], links: [] });
+                    }}
+                />
+            )}
+
             <LeftSidebar 
                 isOpen={isLeftSidebarOpen}
                 onClose={() => setIsLeftSidebarOpen(false)}
@@ -395,6 +431,7 @@ export default function Home() {
                 onImport={handleImportWithQueue}
                 onExport={exportData}
                 onOpenSearch={openSearch}
+                onOpenPathfinder={() => setIsPathfinderOpen(true)}
             />
 
             <Sidebar 

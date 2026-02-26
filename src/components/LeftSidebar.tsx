@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2 } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import { createClient } from "../lib/supabase/client";
@@ -22,6 +22,7 @@ interface LeftSidebarProps {
   onImport: (bookmarks: any[]) => Promise<void>;
   onExport: () => void;
   onOpenSearch?: () => void;
+  onOpenPathfinder?: () => void;
 }
 
 export default function LeftSidebar({ 
@@ -34,7 +35,8 @@ export default function LeftSidebar({
   onSelect,
   onImport, 
   onExport,
-  onOpenSearch
+  onOpenSearch,
+  onOpenPathfinder
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [user, setUser] = useState<any>(null);
@@ -76,6 +78,26 @@ export default function LeftSidebar({
               >
                 <Search size={16} />
                 Open Search (Ctrl+K)
+              </button>
+            </div>
+          )
+        },
+        {
+          id: 'pathfinder',
+          title: 'Pathfinder',
+          icon: <Route size={18} />,
+          content: (
+            <div className="py-2 space-y-2">
+              <p className="text-xs text-neutral-400">
+                Find and visualize the shortest path between two nodes (Thought Chains).
+              </p>
+              <button
+                type="button"
+                onClick={() => onOpenPathfinder?.()}
+                className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30 hover:text-white transition-colors text-sm font-medium"
+              >
+                <Route size={16} />
+                Open Pathfinder (Ctrl+Alt+P)
               </button>
             </div>
           )
