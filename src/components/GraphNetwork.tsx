@@ -133,6 +133,7 @@ const createIconImage = (IconComponent: any, color: string, strokeWidth: number 
 
 interface GraphNetworkProps {
     graphData: { nodes: any[]; links: any[] };
+    timelineDate?: number;
     activeTag: string | null;
     focusedNodeId: string | null;
     zenModeNodeId: string | null;
@@ -147,11 +148,16 @@ interface GraphNetworkProps {
     onBackgroundClick?: () => void;
 }
 
+function getLinkEnd(linkEnd: any): string | undefined {
+    return typeof linkEnd === "string" ? linkEnd : linkEnd?.id;
+}
+
 export default function GraphNetwork({ 
     onNodeSelect, 
     onBackgroundClick, 
     onNodeContextMenu, 
     graphData, 
+    timelineDate,
     activeTag, 
     focusedNodeId, 
     zenModeNodeId,
@@ -219,16 +225,35 @@ export default function GraphNetwork({
 
     const processedData = useMemo(() => {
         const { nodes, links } = graphData;
-        const degreeMap: Record<string, number> = {};
         const getNodeId = (n: any) => (typeof n === 'string' ? n : n?.id);
-        links.forEach((link: any) => {
+
+        const useTimeline = typeof timelineDate === 'number' && Number.isFinite(timelineDate);
+        let workingNodes = nodes;
+        let workingLinks = links;
+        if (useTimeline) {
+            const filteredNodes = nodes.filter(
+                (n: any) => new Date(n.created_at ?? n.createdAt ?? 0).getTime() <= timelineDate!
+            );
+            const filteredNodeIds = new Set(
+                filteredNodes.map((n: any) => getNodeId(n)).filter((id): id is string => id != null)
+            );
+            workingNodes = filteredNodes;
+            workingLinks = links.filter((l: any) => {
+                const sId = getLinkEnd(l.source);
+                const tId = getLinkEnd(l.target);
+                return sId != null && tId != null && filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
+            });
+        }
+
+        const degreeMap: Record<string, number> = {};
+        workingLinks.forEach((link: any) => {
             const sId = getNodeId(link.source);
             const tId = getNodeId(link.target);
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
         const layoutRadius = 280;
-        const nodesWithVal = nodes.map((node: any, index: number) => {
+        const nodesWithVal = workingNodes.map((node: any, index: number) => {
             const id = getNodeId(node);
             const degree = degreeMap[id] ?? 0;
             const val = Math.min(4 + degree * 1.5, 20);
@@ -241,7 +266,7 @@ export default function GraphNetwork({
             const y = r * Math.sin(angle);
             return { ...node, val, x: node.x ?? x, y: node.y ?? y };
         });
-        const linksCopy = links.map((link: any) => ({ ...link }));
+        const linksCopy = workingLinks.map((link: any) => ({ ...link }));
         if (pathfinderActive) {
             const pathSet = new Set(pathNodes);
             const dim: any[] = [];
@@ -264,7 +289,7 @@ export default function GraphNetwork({
             return { nodes: [...dim, ...bright], links: linksCopy };
         }
         return { nodes: nodesWithVal, links: linksCopy };
-    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes]);
+    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
@@ -512,6 +537,7 @@ export default function GraphNetwork({
     }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
     useEffect(() => {
+        if (timelineDate != null) return;
         const nodeCount = processedData.nodes.length;
         const prevCount = prevNodeCountRef.current;
         prevNodeCountRef.current = nodeCount;
@@ -521,7 +547,6 @@ export default function GraphNetwork({
             const h = dimensions.height;
             const centerX = (w / 2 - x) / k;
             const centerY = (h / 2 - y) / k;
-            const fg = fgRef.current;
             const restore = () => {
                 if (!fgRef.current || !isFinite(centerX) || !isFinite(centerY)) return;
                 fgRef.current.centerAt(centerX, centerY, 0);
@@ -536,7 +561,15 @@ export default function GraphNetwork({
                 clearTimeout(t3);
             };
         }
-    }, [processedData.nodes.length, dimensions.width, dimensions.height]);
+    }, [processedData.nodes.length, dimensions.width, dimensions.height, timelineDate]);
+
+    useEffect(() => {
+        if (!fgRef.current || processedData.nodes.length === 0) return;
+        const t = setTimeout(() => {
+            fgRef.current?.d3ReheatSimulation();
+        }, 50);
+        return () => clearTimeout(t);
+    }, [processedData.nodes.length]);
 
     useEffect(() => {
         if (lastTransformRef.current != null) return;

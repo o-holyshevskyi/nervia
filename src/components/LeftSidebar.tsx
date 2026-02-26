@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import { createClient } from "../lib/supabase/client";
@@ -23,6 +23,7 @@ interface LeftSidebarProps {
   onExport: () => void;
   onOpenSearch?: () => void;
   onOpenPathfinder?: () => void;
+  onOpenTimeline?: () => void;
 }
 
 export default function LeftSidebar({ 
@@ -36,7 +37,8 @@ export default function LeftSidebar({
   onImport, 
   onExport,
   onOpenSearch,
-  onOpenPathfinder
+  onOpenPathfinder,
+  onOpenTimeline
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [user, setUser] = useState<any>(null);
@@ -98,6 +100,26 @@ export default function LeftSidebar({
               >
                 <Route size={16} />
                 Open Pathfinder (Ctrl+Alt+P)
+              </button>
+            </div>
+          )
+        },
+        {
+          id: 'timeline',
+          title: 'Time Machine',
+          icon: <Clock size={18} />,
+          content: (
+            <div className="py-2 space-y-2">
+              <p className="text-xs text-neutral-400">
+                Replay how your knowledge graph grew over time.
+              </p>
+              <button
+                type="button"
+                onClick={() => onOpenTimeline?.()}
+                className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 hover:text-white transition-colors text-sm font-medium"
+              >
+                <Clock size={16} />
+                Open Time Machine (Ctrl+Alt+T)
               </button>
             </div>
           )

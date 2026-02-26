@@ -3,7 +3,7 @@
 
 import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import AddModal from "@/src/components/AddModal";
 import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
@@ -17,6 +17,7 @@ import { createClient } from "@/src/lib/supabase/client";
 import AIStatusBar from "@/src/components/AIStatusBar";
 import NeuralSearch from "@/src/components/NeuralSearch";
 import PathfinderPanel from "@/src/components/PathfinderPanel";
+import TimelinePanel from "@/src/components/TimelinePanel";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -58,6 +59,77 @@ export default function Home() {
     const searchFocusRef = useRef<(() => void) | null>(null);
     const [pathData, setPathData] = useState<{ nodes: string[]; links: any[] }>({ nodes: [], links: [] });
     const [isPathfinderOpen, setIsPathfinderOpen] = useState(false);
+    const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+
+    const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
+        const nodes = data.nodes;
+        if (!nodes.length) {
+            const now = Date.now();
+            return { timelineMinDate: now, timelineMaxDate: now, timelineDatePoints: [] as number[] };
+        }
+        const withTimestamps = nodes.map((n: any, index: number) => {
+            const raw = n.created_at ?? n.createdAt;
+            const t = raw != null ? new Date(raw).getTime() : NaN;
+            return Number.isFinite(t) ? t : null;
+        });
+        const valid = withTimestamps.filter((t): t is number => t !== null);
+        const min = valid.length ? Math.min(...valid) : Date.now();
+        const max = valid.length ? Math.max(...valid) : Date.now();
+        if (valid.length < nodes.length) {
+            const span = max - min || 1;
+            withTimestamps.forEach((t, i) => {
+                if (t === null) (withTimestamps as number[])[i] = min + (span * i) / nodes.length;
+            });
+        }
+        const resolved = withTimestamps as number[];
+        const datePoints = [...new Set(resolved)].sort((a, b) => a - b);
+        const fallbackMin = datePoints[0] ?? Date.now();
+        const fallbackMax = datePoints[datePoints.length - 1] ?? Date.now();
+        return { timelineMinDate: fallbackMin, timelineMaxDate: fallbackMax, timelineDatePoints: datePoints };
+    }, [data.nodes]);
+
+    const [timelineDate, setTimelineDate] = useState<number>(0);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackDurationSeconds, setPlaybackDurationSeconds] = useState(60);
+    const timelineInitialized = useRef(false);
+    useLayoutEffect(() => {
+        if (data.nodes.length === 0) return;
+        if (!timelineInitialized.current) {
+            setTimelineDate(timelineMaxDate);
+            timelineInitialized.current = true;
+        }
+    }, [data.nodes.length, timelineMaxDate]);
+
+    const timelineDateRef = useRef(timelineDate);
+    timelineDateRef.current = timelineDate;
+    const playbackRafRef = useRef<number>(0);
+    useEffect(() => {
+        if (!isPlaying || data.nodes.length === 0 || timelineDatePoints.length === 0) return;
+        const duration = playbackDurationSeconds * 1000;
+        const start = Date.now();
+        const points = timelineDatePoints;
+        let startStep = points.findIndex((d) => d >= timelineDateRef.current);
+        if (startStep < 0) startStep = points.length - 1;
+        const endStep = points.length - 1;
+        if (startStep >= endStep) {
+            setIsPlaying(false);
+            return;
+        }
+        const tick = () => {
+            const elapsed = Date.now() - start;
+            const t = Math.min(1, elapsed / duration);
+            const step = startStep + t * (endStep - startStep);
+            const idx = Math.round(step);
+            setTimelineDate(points[Math.min(idx, endStep)]!);
+            if (t < 1) {
+                playbackRafRef.current = requestAnimationFrame(tick);
+            } else {
+                setIsPlaying(false);
+            }
+        };
+        playbackRafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(playbackRafRef.current);
+    }, [isPlaying, data.nodes.length, timelineDatePoints, playbackDurationSeconds]);
 
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
@@ -208,6 +280,10 @@ export default function Home() {
                 e.preventDefault();
                 setIsPathfinderOpen(true);
             }
+            if (e.key === "t" && (e.metaKey || e.ctrlKey) && e.altKey) {
+                e.preventDefault();
+                setIsTimelineOpen(true);
+            }
         };
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
@@ -250,6 +326,7 @@ export default function Home() {
                     setFocusedNodeId(typeof node.id === 'string' ? node.id : node.id?.id);
                 }} 
                 graphData={data}
+                timelineDate={data.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
                 activeTag={activeTag}
                 focusedNodeId={focusedNodeId}
                 zenModeNodeId={zenModeNodeId}
@@ -432,6 +509,7 @@ export default function Home() {
                 onExport={exportData}
                 onOpenSearch={openSearch}
                 onOpenPathfinder={() => setIsPathfinderOpen(true)}
+                onOpenTimeline={() => setIsTimelineOpen(true)}
             />
 
             <Sidebar 
@@ -457,6 +535,23 @@ export default function Home() {
                 config={physicsConfig} 
                 onChange={setPhysicsConfig} 
             />
+
+            {data.nodes.length > 0 && isTimelineOpen && (
+                <TimelinePanel
+                    datePoints={timelineDatePoints}
+                    currentDate={timelineDate}
+                    onChange={setTimelineDate}
+                    isPlaying={isPlaying}
+                    onTogglePlay={() => setIsPlaying((p) => !p)}
+                    playbackDurationSeconds={playbackDurationSeconds}
+                    onPlaybackDurationChange={setPlaybackDurationSeconds}
+                    onClose={() => {
+                        setIsTimelineOpen(false);
+                        setIsPlaying(false);
+                        setTimelineDate(timelineMaxDate);
+                    }}
+                />
+            )}
 
             {!isLoading && data.nodes.length > 0 && ( 
                 <button
