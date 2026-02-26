@@ -3,21 +3,29 @@
 
 import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
-import { useEffect, useMemo, useState } from "react";
-import AddModal, { NodeData } from "@/src/components/AddModal";
+import { useMemo, useState } from "react";
+import AddModal from "@/src/components/AddModal";
 import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
 import CommandPalette from "@/src/components/CommandPalette";
 import ContextMenu from "@/src/components/ui/ContextMenu";
 import PhysicsControl, { PhysicsConfig } from "@/src/components/PhysicsControl";
 import { AnimatePresence, motion } from "framer-motion";
-import { createClient } from "@/src/lib/supabase/client";
+import { useGraphData } from "@/src/hooks/useGraphData";
 
 export default function Home() {
-    const [user, setUser] = useState<any>(null);
+    const { 
+        data, 
+        isLoading,
+        addNewNode,
+        updateNode,
+        deleteNode,
+        addLink,
+        deleteLink,
+        importData,
+        exportData,
+    } = useGraphData();
 
-    const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
-    const [isLoading, setIsLoading] = useState(true);
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -29,56 +37,12 @@ export default function Home() {
         linkDistance: 60
     });
 
-    const supabase = createClient();
-
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
         x: 0,
         y: 0,
         node: null as any | null
     });
-
-    useEffect(() => {
-        const initSession = async () => {
-            try {
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                setUser(authUser);
-
-                if (authUser) {
-                    const { data: nodesData, error: nodesError } = await supabase.from('nodes').select('*');
-                    const { data: linksData, error: linksError } = await supabase.from('links').select('*');
-
-                    if (nodesError) throw nodesError;
-                    if (linksError) throw linksError;
-
-                    const formattedLinks = linksData?.map(l => ({
-                        ...l,
-                        relationType: l.relation_type || 'manual'
-                    })) || [];
-
-                    setData({ nodes: nodesData || [], links: formattedLinks });
-                }
-                // const { data: nodesData, error: nodesError } = await supabase.from('nodes').select('*');
-                // const { data: linksData, error: linksError } = await supabase.from('links').select('*');
-
-                // if (nodesError) throw nodesError;
-                // if (linksError) throw linksError;
-
-                // const formattedLinks = linksData.map(l => ({
-                //     ...l,
-                //     relationType: l.relation_type || 'manual'
-                // }));
-
-                // setData({ nodes: nodesData || [], links: formattedLinks || [] });
-            } catch (error) {
-                console.error("Error initializing session/data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        initSession();
-    }, []);
 
     const allTags = useMemo(() => {
         const tagsSet = new Set<string>();
@@ -95,217 +59,6 @@ export default function Home() {
             setZenModeNodeId(nodeId);
             setFocusedNodeId(nodeId);
         }
-    };
-
-    const handleAddNewThought = async (nodeData: NodeData) => {
-        if (!user) return;
-
-        let group = 1;
-        if (nodeData.type === 'link') group = 1;
-        if (nodeData.type === 'note') group = 2;
-        if (nodeData.type === 'idea') group = 3;
-
-        const newNode = { 
-            id: nodeData.title,
-            group: group,
-            val: 5,
-            type: nodeData.type,
-            tags: nodeData.tags,
-            content: nodeData.content ?? '',
-            full_data: nodeData
-        };
-
-        const newLinks: any[] = nodeData.connections.map(targetNodeId => ({
-            source: nodeData.title,
-            target: targetNodeId,
-            relationType: 'manual',
-            label: 'Manual connection',
-            weight: 1
-        }));
-
-        if (nodeData.autoConnectAI && data.nodes.length > 0) {
-            const availableNodes = data.nodes.filter((n: any) => {
-                const nodeId = typeof n.id === 'string' ? n.id : n.id?.id;
-                return !nodeData.connections.includes(nodeId);
-            });
-
-            if (availableNodes.length > 0) {
-                const aiConnectionsCount = Math.floor(Math.random() * 2) + 1; 
-                const shuffled = [...availableNodes].sort(() => 0.5 - Math.random());
-                const selectedAiNodes = shuffled.slice(0, aiConnectionsCount);
-
-                selectedAiNodes.forEach((aiNode: any) => {
-                    const aiNodeId = typeof aiNode.id === 'string' ? aiNode.id : aiNode.id?.id;
-                    const similarity = Math.floor(Math.random() * 24) + 75; 
-                    newLinks.push({
-                        source: nodeData.title,
-                        target: aiNodeId,
-                        relationType: 'ai',
-                        label: `AI Generated (Similarity: ${similarity}%)`,
-                        weight: 1
-                    });
-                });
-            }
-        }
-
-        // Оптимістичне оновлення UI
-        setData(prev => ({
-            nodes: [...prev.nodes, newNode],
-            links: [...prev.links, ...newLinks]
-        }));
-
-        const dbNode = {
-            ...newNode,
-            user_id: user.id,
-        };
-
-        const { error: nodeError } = await supabase.from('nodes').insert(dbNode);
-        
-        if (nodeError) {
-            console.error("🔴 Failed to save node:", nodeError.message, nodeError.details);
-            
-            setData(prev => ({
-                nodes: prev.nodes.filter(n => n.id !== newNode.id),
-                links: prev.links.filter(l => 
-                    (typeof l.source === 'object' ? l.source.id : l.source) !== newNode.id &&
-                    (typeof l.target === 'object' ? l.target.id : l.target) !== newNode.id
-                )
-            }));
-            
-            return; // Зупиняємо виконання
-        }
-        
-        if (newLinks.length > 0) {
-            const dbLinks = newLinks.map(l => ({
-                source: typeof l.source === 'object' ? l.source.id : l.source,
-                target: typeof l.target === 'object' ? l.target.id : l.target,
-                relation_type: l.relationType,
-                label: l.label,
-                weight: l.weight,
-                user_id: user.id
-            }));
-            const { error: linkError } = await supabase.from('links').insert(dbLinks);
-            
-            if (linkError) {
-                console.error("🔴 Failed to save links:", linkError.message);
-            }
-        }
-    };
-
-    const handleAddLink = async (sourceId: string, targetId: string) => {
-        if (!user || sourceId === targetId) return;
-
-        const newLink = { 
-            source: sourceId, 
-            target: targetId, 
-            relationType: 'manual', 
-            label: 'Manual connection' 
-        };
-
-        setData((prev: any) => {
-            const exists = prev.links.some((l: any) => {
-                const s = typeof l.source === 'object' ? l.source.id : l.source;
-                const t = typeof l.target === 'object' ? l.target.id : l.target;
-                return (s === sourceId && t === targetId) || (s === targetId && t === sourceId);
-            });
-            if (exists) return prev;
-            return { ...prev, links: [...prev.links, newLink] };
-        });
-
-        // Відправка в Supabase
-        await supabase.from('links').insert({
-            source: typeof sourceId === 'object' ? (sourceId as any).id : sourceId,
-            target: typeof targetId === 'object' ? (targetId as any).id : targetId,
-            relation_type: 'manual',
-            label: 'Manual connection',
-            user_id: user.id
-        });
-    };
-
-    const handleUpdateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[] }) => {
-        if (!user) return;
-
-        const newId = newData.title ?? nodeId;
-
-        // Оптимістичне оновлення
-        setData((prev) => {
-            const newNodes = prev.nodes.map((node) => {
-                if (node.id === nodeId) {
-                    return { 
-                        ...node, 
-                        id: newId, 
-                        content: newData.content ?? node.content,
-                        tags: newData.tags ?? node.tags
-                    };
-                }
-                return node;
-            });
-
-            const newLinks = prev.links.map((link) => {
-                const currentSourceId = typeof link.source === 'object' ? link.source.id : link.source;
-                const currentTargetId = typeof link.target === 'object' ? link.target.id : link.target;
-                return { 
-                    ...link, 
-                    source: currentSourceId === nodeId ? newId : currentSourceId, 
-                    target: currentTargetId === nodeId ? newId : currentTargetId 
-                };
-            });
-
-            return { nodes: newNodes, links: newLinks };
-        });
-
-        await supabase.from('nodes')
-            .update({
-                id: newId,
-                content: newData.content,
-                tags: newData.tags
-            })
-            .eq('id', nodeId)
-            .eq('user_id', user.id);
-    };
-
-    const handleDeleteNode = async (nodeId: string) => {
-        if (!user) return;
-
-        setData((prevData) => {
-            const newNodes = prevData.nodes.filter(
-                (n: any) => (typeof n.id === 'string' ? n.id : n.id?.id) !== nodeId
-            );
-            const newLinks = prevData.links.filter((l: any) => {
-                const sourceId = typeof l.source === 'string' ? l.source : l.source?.id;
-                const targetId = typeof l.target === 'string' ? l.target : l.target?.id;
-                return sourceId !== nodeId && targetId !== nodeId;
-            });
-            return { nodes: newNodes, links: newLinks };
-        });
-
-        if (selectedNode && (typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id) === nodeId) {
-            setSelectedNode(null);
-        }
-
-        await supabase.from('nodes')
-            .delete()
-            .eq('id', nodeId)
-            .eq('user_id', user.id);
-    };
-
-    const handleDeleteLink = async (sourceId: string, targetId: string) => {
-        if (!user) return;
-
-        setData((prev) => ({
-            ...prev,
-            links: prev.links.filter(l => {
-                const s = typeof l.source === 'object' ? l.source.id : l.source;
-                const t = typeof l.target === 'object' ? l.target.id : l.target;
-                return !((s === sourceId && t === targetId) || (s === targetId && t === sourceId));
-            })
-        }));
-
-        // Видаляємо з БД. Шукаємо лінк незалежно від напрямку
-        await supabase.from('links')
-            .delete()
-            .or(`and(source.eq.${sourceId},target.eq.${targetId}),and(source.eq.${targetId},target.eq.${sourceId})`)
-            .eq('user_id', user.id);
     };
 
     const handleNodeContextMenu = (node: any, event: MouseEvent) => {
@@ -356,26 +109,36 @@ export default function Home() {
                 <p className="text-neutral-400 mt-2">Your visual thoughts universe</p>
             </div>
 
-            {!isLoading && data.nodes.length === 0 && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
-                    <div className="bg-neutral-900/60 backdrop-blur-xl border border-white/10 p-10 rounded-3xl text-center max-w-md pointer-events-auto shadow-2xl flex flex-col items-center transform transition-all hover:border-white/20 hover:bg-neutral-900/80">
-                        <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
-                            <Sparkles className="text-purple-400" size={32} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
+
+            <AnimatePresence>
+                {!isLoading && data.nodes.length === 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, x: 0 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                    >
+                        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                            <div className="bg-neutral-900/60 backdrop-blur-xl border border-white/10 p-10 rounded-3xl text-center max-w-md pointer-events-auto shadow-2xl flex flex-col items-center transform transition-all hover:border-white/20 hover:bg-neutral-900/80">
+                                <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+                                    <Sparkles className="text-purple-400" size={32} />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">Nothing here yet</h2>
+                                <p className="text-neutral-400 mb-8 text-sm leading-relaxed">
+                                    Start building your knowledge graph. Add a note, idea, or link to create your first connection.
+                                </p>
+                                <button
+                                    onClick={() => setIsAddModalOpen(true)}
+                                    className="hover:cursor-pointer flex items-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-full font-semibold transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:-translate-y-1"
+                                >
+                                    <Plus size={18} />
+                                    Create First Node
+                                </button>
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">Nothing here yet</h2>
-                        <p className="text-neutral-400 mb-8 text-sm leading-relaxed">
-                            Start building your knowledge graph. Add a note, idea, or link to create your first connection.
-                        </p>
-                        <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="hover:cursor-pointer flex items-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-full font-semibold transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:-translate-y-1"
-                        >
-                            <Plus size={18} />
-                            Create First Node
-                        </button>
-                    </div>
-                </div>
-            )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {!isLeftSidebarOpen && (
                 <button
@@ -436,7 +199,7 @@ export default function Home() {
                 onEdit={(node) => {
                     setSelectedNode(node);
                 }}
-                onDelete={handleDeleteNode}
+                onDelete={deleteNode}
             />
 
             <LeftSidebar 
@@ -447,21 +210,23 @@ export default function Home() {
                 onTagSelect={setActiveTag}
                 nodes={data.nodes}
                 onSelect={handleSearchSelect}
+                onImport={importData}
+                onExport={exportData}
             />
 
             <Sidebar 
                 selectedNode={selectedNode} 
                 onClose={() => setSelectedNode(null)} 
-                onUpdateNode={handleUpdateNode}
+                onUpdateNode={updateNode}
                 allNodes={data}
-                onAddLink={handleAddLink}
-                onDeleteLink={handleDeleteLink}
+                onAddLink={addLink}
+                onDeleteLink={deleteLink}
             />
 
             <AddModal 
                 isOpen={isAddModalOpen} 
                 onClose={() => setIsAddModalOpen(false)}
-                onAdd={handleAddNewThought}
+                onAdd={addNewNode}
                 existingNodes={existingNodeIds}
                 allTags={allTags}
             />

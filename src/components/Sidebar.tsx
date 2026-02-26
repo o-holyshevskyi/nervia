@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, Li
 interface SidebarProps {
     selectedNode: any | null;
     onClose: () => void;
-    onUpdateNode: (nodeId: string, newData: { title?: string, content?: string, tags?: string[] }) => void;
+    onUpdateNode: (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string }) => void;
     allNodes: { nodes: any[], links: any[] };
     onDeleteLink: (sourceId: string, targetId: string) => void;
     onAddLink: (sourceId: string, targetId: string) => void;
@@ -20,6 +20,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
     const [editTitle, setEditTitle] = useState("");
     const [editContent, setEditContent] = useState("");
+    const [editUrl, setEditUrl] = useState("");
     const [editTags, setEditTags] = useState<string[]>([]);
     const [newTag, setNewTag] = useState("");
     const [isDirty, setIsDirty] = useState(false);
@@ -57,15 +58,17 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         const titleChanged = editTitle !== selectedNode?.id;
         const contentChanged = editContent !== (selectedNode?.content || "");
         const tagsChanged = JSON.stringify(editTags) !== JSON.stringify(selectedNode?.tags || []);
+        const urlChanged = editUrl !== (selectedNode?.url || "");
         
-        setIsDirty(titleChanged || contentChanged || tagsChanged);
-    }, [editContent, editTitle, editTags, selectedNode]);
+        setIsDirty(titleChanged || contentChanged || tagsChanged || urlChanged);
+    }, [editContent, editTitle, editTags, selectedNode, editUrl]);
 
     useEffect(() => {
         if (selectedNode) {
             setEditTitle(selectedNode.id);
             setEditContent(selectedNode.content || "");
             setEditTags(selectedNode.tags || []);
+            setEditUrl(selectedNode.url || "");
             setError(null);
             setConnectionSearch("");
             setIsConnListOpen(false);
@@ -74,11 +77,11 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
     useEffect(() => {
         const fetchPreview = async () => {
-            if (selectedNode?.type === 'link') {
+            if (selectedNode?.type === 'link' && editUrl) {
                 setIsLoadingPreview(true);
                 setPreviewData(null);
 
-                let targetUrl = editTitle.toLowerCase().trim();
+                let targetUrl = editUrl.toLowerCase().trim();
                 if (!targetUrl.startsWith('http')) {
                     targetUrl = `https://${targetUrl}`;
                 }
@@ -91,32 +94,21 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                         const { data } = result;
                         setPreviewData({
                             image: data.image?.url || data.logo?.url || null,
-                            description: data.description || "No description available for this link.",
+                            description: data.description || "No description available.",
                             siteName: data.publisher || data.author || "Web Source",
                             title: data.title || editTitle,
                             url: data.url
                         });
-                    } else {
-                        console.log("Failed to load");
                     }
                 } catch (error) {
                     console.error("Link Preview Error:", error);
-                    setPreviewData({
-                        image: null,
-                        description: "Couldn't fetch preview. The link might be invalid or restricted.",
-                        siteName: "Unknown Source",
-                    });
                 } finally {
                     setIsLoadingPreview(false);
                 }
-            } else {
-                setPreviewData(null);
-                setIsLoadingPreview(false);
             }
         };
-
         fetchPreview();
-    }, [selectedNode, selectedNode?.id, editTitle]);
+    }, [selectedNode?.type, editUrl, editTitle]);
 
     const handleSave = () => {
         if (!selectedNode || !isDirty) return;
@@ -144,7 +136,8 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         onUpdateNode(selectedNode.id, { 
             title: trimmedTitle, 
             content: editContent,
-            tags: editTags 
+            tags: editTags,
+            url: editUrl.trim()
         });
         
         reset();
@@ -158,6 +151,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
     const reset = () => {
         setIsDirty(false);
         setError(null);
+        setIsLoadingPreview(true);
     }
 
     const addTag = () => {
@@ -183,7 +177,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                     }}
                     exit={{ x: '100%', opacity: 0 }}
                     transition={{ type: 'spring', duration: 0.8, delay: 0.1 }}
-                    className="fixed top-0 right-0 h-full bg-neutral-950/80 backdrop-blur-2xl border-l border-white/5 p-8 shadow-2xl z-50 flex flex-col"
+                    className="fixed top-0 right-0 h-full w-80 bg-neutral-950/80 backdrop-blur-2xl border-l border-white/10 p-8 shadow-2xl z-50 flex flex-col"
                 >
                     {/* Header */}
                     <div className="flex flex-row items-center justify-between w-full mb-10 min-h-10">
@@ -247,9 +241,26 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                 }}
                                 className="no-scrollbar w-full bg-transparent text-4xl font-bold text-white outline-none border-none p-0 resize-none placeholder-neutral-800 leading-tight"
-                                placeholder="Untitled"
+                                placeholder="Node Name"
                                 rows={2}
                             />
+
+                            {selectedNode.type === 'link' && (
+                                <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-xl group focus-within:border-indigo-500/50 transition-all">
+                                    <Globe size={14} className="text-neutral-600 group-focus-within:text-indigo-400" />
+                                    <input 
+                                        value={editUrl}
+                                        onChange={(e) => setEditUrl(e.target.value)}
+                                        placeholder="https://..."
+                                        className="bg-transparent outline-none text-xs text-neutral-400 w-full font-mono"
+                                    />
+                                    {editUrl && (
+                                        <a href={editUrl.startsWith('http') ? editUrl : `https://${editUrl}`} target="_blank" className="text-neutral-600 hover:text-white">
+                                            <ExternalLink size={14} />
+                                        </a>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2">

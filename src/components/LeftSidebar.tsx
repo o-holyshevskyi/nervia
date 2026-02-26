@@ -3,25 +3,39 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2 } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import SearchInput from "./ui/SearchInput";
 import { createClient } from "../lib/supabase/client";
 import { useRouter } from "next/navigation";
+import ImportExport from "./ImportExport";
+import Image from "next/image";
 
 interface LeftSidebarProps {
   isOpen: boolean;
-  onClose: () => void;
   tags: string[];
   activeTag: string | null;
   nodes: any[];
+  onClose: () => void;
   onSelect: (node: any) => void;
   onTagSelect: (tag: string | null) => void;
+  onImport: (bookmarks: any[]) => Promise<number | undefined>;
+  onExport: () => void;
 }
 
-export default function LeftSidebar({ isOpen, onClose, tags, activeTag, onTagSelect, nodes, onSelect }: LeftSidebarProps) {
-  const [openAccordion, setOpenAccordion] = useState<string | null>(null);
+export default function LeftSidebar({ 
+  isOpen, 
+  nodes, 
+  tags, 
+  activeTag, 
+  onClose, 
+  onTagSelect, 
+  onSelect,
+  onImport, 
+  onExport
+}: LeftSidebarProps) {
+  const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
   const router = useRouter();
@@ -39,30 +53,49 @@ export default function LeftSidebar({ isOpen, onClose, tags, activeTag, onTagSel
     router.refresh();
   };
 
-  const accordionItems = [
+  // Логічне групування елементів
+  const sections = [
     {
-      id: 'filters',
-      title: 'Filters',
-      icon: <Filter size={20} />,
-      content: (
-        tags.length === 0 ? (<div className="self-center">
-          <p className="text-sm text-neutral-600 italic px-1 py-3">Oops... No available filters</p>
-        </div>)
-        : (<FilterPanel
-          activeTag={activeTag}
-          tags={tags}
-          onClose={onClose}
-          onTagSelect={onTagSelect}
-        />)
-      )
+      label: "Discovery",
+      icon: <Compass size={14} className="text-neutral-500" />,
+      items: [
+        {
+          id: 'search',
+          title: 'Search',
+          icon: <Search size={18} />,
+          content: <SearchInput nodes={nodes} onSelect={onSelect} handleClose={() => {}} bordered={false} />
+        }
+      ]
     },
     {
-      id: 'search',
-      title: 'Search',
-      icon: <Search size={20} />,
-      content: (
-        <SearchInput nodes={nodes} onSelect={onSelect} handleClose={() => {}} bordered={false} />
-      )
+      label: "Collections",
+      icon: <Layers size={14} className="text-neutral-500" />,
+      items: [
+        {
+          id: 'filters',
+          title: 'Filters',
+          icon: <Filter size={18} />,
+          content: tags.length === 0 ? (
+            <div className="py-4 px-2 text-center bg-white/5 rounded-xl border border-white/5">
+              <p className="text-xs text-neutral-500 italic">No tags available yet</p>
+            </div>
+          ) : (
+            <FilterPanel activeTag={activeTag} tags={tags} onClose={onClose} onTagSelect={onTagSelect} />
+          )
+        }
+      ]
+    },
+    {
+      label: "Management",
+      icon: <Settings2 size={14} className="text-neutral-500" />,
+      items: [
+        {
+          id: 'import-export',
+          title: 'Data Transfer',
+          icon: <ImportIcon size={18} />,
+          content: <ImportExport onImport={onImport} onExport={onExport} />
+        }
+      ]
     }
   ];
 
@@ -75,72 +108,94 @@ export default function LeftSidebar({ isOpen, onClose, tags, activeTag, onTagSel
       {isOpen && (
         <motion.div
           initial={{ x: '-100%', opacity: 0 }}
-          animate={{ 
-            x: 0, 
-            opacity: 1,
-          }}
-          exit={{ x: '-1000%', opacity: 0 }}
-          transition={{ 
-            type: 'spring', 
-            duration: 0.8,
-            delay: 0.1,
-            ease: [0, 0.71, 0.2, 1.01]
-          }}
-          className="fixed top-0 left-0 h-full w-80 bg-neutral-900/60 backdrop-blur-xl border-r border-white/10 p-6 shadow-2xl z-40 flex flex-col"
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: '-100%', opacity: 0 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+          className="fixed top-0 left-0 h-full w-80 bg-neutral-950/80 backdrop-blur-2xl border-r border-white/10 p-8 shadow-2xl z-50 flex flex-col"
         >
-          <div className="self-end">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+              <span className="text-xs font-mono text-neutral-400 uppercase tracking-[0.2em]">Dashboard</span>
+            </div>
             <CloseButton onClose={onClose} />
           </div>
-          
-          <div className="flex flex-col gap-4 py-4 px-2 overflow-y-auto mt-6 border border-white/10 rounded-xl">
-            {accordionItems.map((item) => (
-              <div key={item.id} className="overflow-hidden">
-                <button
-                  onClick={() => toggleAccordion(item.id)}
-                  className="hover:cursor-pointer w-full flex items-center justify-between px-4 py-3 text-white hover:bg-white/5 hover:rounded-xl transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {item.icon}
-                    <span className="font-medium">{item.title}</span>
-                  </div>
-                  <motion.div
-                    animate={{ rotate: openAccordion === item.id ? 180 : 0 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-neutral-400">
-                      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </motion.div>
-                </button>
 
-                <AnimatePresence initial={false}>
-                  {openAccordion === item.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ 
-                        height: { duration: 0.3, ease: "easeInOut" },
-                        opacity: { duration: 0.2 }
-                      }}
-                      className="px-4 pb-4"
-                    >
-                      {item.content}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+          {/* Grouped Content */}
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-8 pr-2">
+            {sections.map((section) => (
+              <div key={section.label} className="space-y-3">
+                {/* Section Header */}
+                <div className="flex items-center gap-2">
+                  {section.icon}
+                  <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">
+                    {section.label}
+                  </span>
+                </div>
+
+                {/* Items in Section */}
+                <div className="space-y-1">
+                  {section.items.map((item) => (
+                    <div key={item.id} className="overflow-hidden">
+                      <button
+                        onClick={() => toggleAccordion(item.id)}
+                        className={`hover:cursor-pointer w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group ${
+                          openAccordion === item.id ? 'bg-white/5 shadow-inner' : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`${openAccordion === item.id ? 'text-purple-400' : 'text-neutral-500 group-hover:text-white'} transition-colors`}>
+                            {item.icon}
+                          </span>
+                          <span className={`text-sm font-medium ${openAccordion === item.id ? 'text-white' : 'text-neutral-400 group-hover:text-white'}`}>
+                            {item.title}
+                          </span>
+                        </div>
+                        <motion.div
+                          animate={{ rotate: openAccordion === item.id ? 180 : 0 }}
+                          className="text-neutral-600"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </motion.div>
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {openAccordion === item.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                          >
+                            <div className="px-4 py-3">
+                              {item.content}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
-          <div className="mt-auto pt-6 border-t border-white/5">
-            <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between group">
+
+          {/* User Profile Card */}
+          <div className="mt-6 pt-6 border-t border-white/5">
+            <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between group border border-white/5 hover:border-white/10 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 overflow-hidden flex items-center justify-center">
-                  {user?.user_metadata?.avatar_url ? (
-                    <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <UserIcon size={20} className="text-purple-400" />
-                  )}
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 overflow-hidden flex items-center justify-center">
+                    {user?.user_metadata?.avatar_url ? (
+                      <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon size={20} className="text-purple-400" />
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-neutral-900 rounded-full" />
                 </div>
                 <div className="flex flex-col max-w-[120px]">
                   <span className="text-sm font-semibold text-white truncate">

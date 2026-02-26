@@ -3,13 +3,14 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { FileText, GitMerge, Hash, Lightbulb, LinkIcon, Sparkles, X, Plus, AlertCircle } from "lucide-react";
+import { FileText, GitMerge, Hash, Lightbulb, LinkIcon, Sparkles, X, Plus, AlertCircle, Globe } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
 
 export interface NodeData {
     type: 'link' | 'note' | 'idea';
     title: string;
     content?: string;
+    url?: string;
     tags: string[];
     connections: string[];
     autoConnectAI: boolean;
@@ -26,6 +27,7 @@ interface AddModalProps {
 export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose }: AddModalProps) {
     const [activeTab, setActiveTab] = useState<'link' | 'note' | 'idea'>('link');
     const [title, setTitle] = useState("");
+    const [url, setUrl] = useState("");
     const [content, setContent] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +59,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
             type: activeTab,
             title: trimmedTitle,
             content: content.trim(),
+            url: activeTab === 'link' ? url.trim() : undefined,
             tags,
             connections,
             autoConnectAI,
@@ -74,6 +77,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
         setContent("");
         setTags([]);
         setTagInput("");
+        setUrl("");
         setConnections([]);
         setConnectionSearch("");
         setAutoConnectAI(true);
@@ -189,56 +193,39 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div>
-                                <label htmlFor="title-input" className="block text-sm font-medium text-neutral-300 mb-1">
-                                    <AnimatePresence mode="wait">
-                                        <motion.span
-                                            key={`label-${activeTab}`}
-                                            initial={{ opacity: 0, y: 5 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -5 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="inline-block"
-                                        >
-                                            {activeTab === 'link' ? 'URL' : activeTab === 'note' ? 'Title' : 'Idea Title'}
-                                        </motion.span>
-                                    </AnimatePresence>
+                                <label className="block text-sm font-medium text-neutral-300 mb-1">
+                                    {activeTab === 'link' ? 'Display Name' : 'Title'}
                                 </label>
-                                <div className="relative">
-                                    <input
-                                        id="title-input"
-                                        type={activeTab === 'link' ? "url" : "text"}
-                                        value={title}
-                                        onChange={(e) => {
-                                            setTitle(e.target.value);
-                                            if (error) setError(null);
-                                        }}
-                                        /* 🔥 2. Видаляємо стандартний placeholder атрибут! */
-                                        className="w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-colors"
-                                        autoFocus
-                                    />
-
-                                    {/* 🔥 3. Наш кастомний анімований плейсхолдер */}
-                                    <div className="absolute left-4 top-0 h-full flex items-center pointer-events-none overflow-hidden">
-                                        <AnimatePresence mode="popLayout">
-                                            {/* Показуємо тільки якщо інпут пустий */}
-                                            {!title && (
-                                                <motion.span
-                                                    // Зміна ключа змушує Framer Motion перемалювати елемент з анімацією
-                                                    key={`placeholder-${activeTab}`} 
-                                                    initial={{ opacity: 0, y: 15 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -15 }}
-                                                    transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
-                                                    className="text-neutral-600 whitespace-nowrap block"
-                                                >
-                                                    {activeTab === 'link' ? "https://..." : 
-                                                    activeTab === 'note' ? "Note title..." : "Brief essence of the idea..."}
-                                                </motion.span>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                </div>
+                                <input
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    placeholder={activeTab === 'link' ? "e.g. My Portfolio" : "Title..."}
+                                    className="w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white outline-none focus:border-purple-500/50"
+                                    autoFocus
+                                />
                             </div>
+
+                            <AnimatePresence>
+                                {activeTab === 'link' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                    >
+                                        <label className="block text-sm font-medium text-neutral-300 mb-1">URL</label>
+                                        <div className="relative">
+                                            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-600" size={16} />
+                                            <input
+                                                type="url"
+                                                value={url}
+                                                onChange={(e) => setUrl(e.target.value)}
+                                                placeholder="https://example.com"
+                                                className="w-full pl-11 pr-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white outline-none focus:border-indigo-500/50 transition-all font-mono text-sm"
+                                            />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
 
                             <AnimatePresence>
                                 {activeTab !== 'link' && (
@@ -463,7 +450,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             <button
                                 type="submit"
                                 disabled={!title.trim()}
-                                className="w-full mt-4 py-3 bg-white text-black font-semibold rounded-xl hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="hover:cursor-pointer w-full mt-4 py-3 bg-white text-black font-semibold rounded-xl hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 Save to universe
                             </button>

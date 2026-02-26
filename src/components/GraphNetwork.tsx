@@ -124,6 +124,11 @@ export default function GraphNetwork({
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('💡', node.x, node.y);
+        } else if (node.type === 'note' && !isHidden) {
+            ctx.font = `${size}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('📝', node.x, node.y);
         }
 
         // 4. Text under node
