@@ -108,7 +108,7 @@ export default function Home() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         mode: 'suggest_connections', 
-                        newNode: { title: nodeData.title, content: nodeData.content, type: nodeData.type },
+                        newNode: { title: nodeData.title, content: nodeData.content, type: nodeData.type, url: nodeData.url },
                         existingNodes: existingNodeIds 
                     })
                 });
@@ -118,7 +118,8 @@ export default function Home() {
                 if (aiResponse.description && !nodeData.content) {
                     await updateNode(nodeData.title, { 
                         ...nodeData,
-                        content: aiResponse.description 
+                        content: aiResponse.description,
+                        is_ai_processed: true,
                     });
                 }
 
@@ -218,13 +219,6 @@ export default function Home() {
                 <h1 className="text-4xl font-bold text-white tracking-tighter">Synapse Bookmark</h1>
                 <p className="text-neutral-400 mt-2">Your visual thoughts universe</p>
             </div>
-
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" 
-            />
 
             <AnimatePresence>
                 {!isLoading && data.nodes.length === 0 && (

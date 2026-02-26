@@ -26,6 +26,7 @@ export async function POST(req: Request) {
 
                 NEW NEURON: "${newNode.id || newNode.title}"
                 TYPE: ${newNode.type || 'unknown'}
+                URL: ${newNode.url || 'No URL provided.'}
                 CONTEXT: ${newNode.content || 'No additional context provided.'}
                 
                 EXISTING NEURONS: ${existingNodes.join(', ')}

@@ -26,7 +26,12 @@ export function useGraphData(supabase: any) {
                         relationType: l.relation_type || 'manual'
                     })) || [];
 
-                    setData({ nodes: nodesData || [], links: formattedLinks });
+                    const normalizedNodes = (nodesData || []).map((n: any) => ({
+                        ...n,
+                        group: n.group != null ? n.group : (n.type === 'note' ? 2 : n.type === 'idea' ? 3 : 1)
+                    }));
+
+                    setData({ nodes: normalizedNodes, links: formattedLinks });
                 }
             } catch (error) {
                 console.error("Error initializing session/data:", error);
@@ -137,7 +142,7 @@ export function useGraphData(supabase: any) {
         });
     };
 
-    const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string }) => {
+    const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, is_ai_processed?: boolean }) => {
         if (!user) return;
 
         const newId = newData.title ?? nodeId;
@@ -151,6 +156,7 @@ export function useGraphData(supabase: any) {
                         content: newData.content ?? node.content,
                         tags: newData.tags ?? node.tags,
                         url: newData.url ?? node.url,
+                        is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
                     };
                 }
                 return node;
@@ -174,7 +180,8 @@ export function useGraphData(supabase: any) {
                 id: newId,
                 content: newData.content,
                 tags: newData.tags,
-                url: newData.url
+                url: newData.url,
+                is_ai_processed: newData.is_ai_processed,
             })
             .eq('id', nodeId)
             .eq('user_id', user.id);
