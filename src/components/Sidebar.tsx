@@ -365,8 +365,8 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
                                 {/* Список існуючих зв'язків */}
                                 <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
-                                    {nodeConnections.map((connId: any) => (
-                                        <div key={connId} className="flex items-center justify-between group/conn p-2 rounded-xl hover:bg-white/5 transition-all">
+                                    {nodeConnections.map((connId: any, index) => (
+                                        <div key={connId+index} className="flex items-center justify-between group/conn p-2 rounded-xl hover:bg-white/5 transition-all">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-neutral-500 group-hover/conn:text-indigo-400 transition-colors">
                                                     <LinkIcon size={14} />

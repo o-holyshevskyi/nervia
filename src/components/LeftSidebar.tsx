@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2 } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
-import SearchInput from "./ui/SearchInput";
 import { createClient } from "../lib/supabase/client";
 import { useRouter } from "next/navigation";
 import ImportExport from "./ImportExport";
@@ -22,6 +21,7 @@ interface LeftSidebarProps {
   onTagSelect: (tag: string | null) => void;
   onImport: (bookmarks: any[]) => Promise<void>;
   onExport: () => void;
+  onOpenSearch?: () => void;
 }
 
 export default function LeftSidebar({ 
@@ -33,7 +33,8 @@ export default function LeftSidebar({
   onTagSelect, 
   onSelect,
   onImport, 
-  onExport
+  onExport,
+  onOpenSearch
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [user, setUser] = useState<any>(null);
@@ -63,7 +64,21 @@ export default function LeftSidebar({
           id: 'search',
           title: 'Search',
           icon: <Search size={18} />,
-          content: <SearchInput nodes={nodes} onSelect={onSelect} handleClose={() => {}} bordered={false} />
+          content: (
+            <div className="py-2 space-y-2">
+              <p className="text-xs text-neutral-400">
+                Search by name or meaning. Press Enter for semantic (AI) search.
+              </p>
+              <button
+                type="button"
+                onClick={() => onOpenSearch?.()}
+                className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 hover:text-white transition-colors text-sm font-medium"
+              >
+                <Search size={16} />
+                Open Search (Ctrl+K)
+              </button>
+            </div>
+          )
         }
       ]
     },

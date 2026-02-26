@@ -137,6 +137,9 @@ interface GraphNetworkProps {
     focusedNodeId: string | null;
     zenModeNodeId: string | null;
     physicsConfig: { repulsion: number; linkDistance: number };
+    highlightedNodes?: string[];
+    flyToNodeId?: string | null;
+    onFlyToComplete?: () => void;
     onNodeSelect: (node: any) => void;
     onNodeContextMenu?: (node: any, event: MouseEvent) => void; 
     onBackgroundClick?: () => void;
@@ -150,7 +153,10 @@ export default function GraphNetwork({
     activeTag, 
     focusedNodeId, 
     zenModeNodeId,
-    physicsConfig
+    physicsConfig,
+    highlightedNodes = [],
+    flyToNodeId = null,
+    onFlyToComplete
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
@@ -184,6 +190,9 @@ export default function GraphNetwork({
         return m;
     }, [graphData.nodes]);
 
+    const highlightedSet = useMemo(() => new Set(highlightedNodes), [highlightedNodes]);
+    const searchActive = highlightedSet.size > 0;
+
     const processedData = useMemo(() => {
         const { nodes, links } = graphData;
         const degreeMap: Record<string, number> = {};
@@ -209,8 +218,18 @@ export default function GraphNetwork({
             return { ...node, val, x: node.x ?? x, y: node.y ?? y };
         });
         const linksCopy = links.map((link: any) => ({ ...link }));
+        if (searchActive) {
+            const dim: any[] = [];
+            const bright: any[] = [];
+            nodesWithVal.forEach((n: any) => {
+                const id = getNodeId(n);
+                if (highlightedSet.has(id)) bright.push(n);
+                else dim.push(n);
+            });
+            return { nodes: [...dim, ...bright], links: linksCopy };
+        }
         return { nodes: nodesWithVal, links: linksCopy };
-    }, [graphData]);
+    }, [graphData, searchActive, highlightedSet]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
@@ -227,6 +246,11 @@ export default function GraphNetwork({
     const isLinkHidden = useCallback((link: any) => {
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
         const tId = typeof link.target === 'string' ? link.target : link.target?.id;
+
+        // 0. Neural Search: hide links that don't touch at least one highlighted node
+        if (searchActive) {
+            if (!highlightedSet.has(sId) && !highlightedSet.has(tId)) return true;
+        }
         
         // 1. Zen Mode: ховаємо лінки, якщо жодна з нод не є центральною
         if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) {
@@ -243,7 +267,7 @@ export default function GraphNetwork({
             }
         }
         return false;
-    }, [zenModeNodeId, activeTag, graphData.nodes]);
+    }, [searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
 
     const drawNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const x = Number(node.x);
@@ -253,16 +277,22 @@ export default function GraphNetwork({
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
         const label = idStr;
         const rawSize = (node.val ?? 4) * 1;
-        const size = Math.min(20, Math.max(6, rawSize));
+        let size = Math.min(20, Math.max(6, rawSize));
 
-        // 1. Визначаємо стан прихованості
-        const isZenHidden = zenModeNodeId && !zenModeNeighbors.has(idStr);
-        const isTagHidden = activeTag && (!node.tags || !node.tags.includes(activeTag));
-        const isHidden = isZenHidden || isTagHidden;
+        const isSearchHighlighted = searchActive && highlightedSet.has(idStr);
+        if (searchActive) {
+            if (isSearchHighlighted) size = Math.min(24, size * 1.2);
+        }
 
-        // Визначаємо колір залежно від групи (по id з канонічної мапи, щоб не залежати від мутацій бібліотеки)
+        // 1. Визначаємо стан прихованості (when search active, non-highlighted are dim)
+        const isZenHidden = !searchActive && zenModeNodeId && !zenModeNeighbors.has(idStr);
+        const isTagHidden = !searchActive && activeTag && (!node.tags || !node.tags.includes(activeTag));
+        const isDimmedBySearch = searchActive && !isSearchHighlighted;
+        const isHidden = isZenHidden || isTagHidden || isDimmedBySearch;
+
+        // Визначаємо колір залежно від групи або search highlight
         const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
-        const baseColor = groupColors[group] ?? "#ec4899";
+        const baseColor = isSearchHighlighted ? '#a855f7' : (groupColors[group] ?? "#ec4899");
 
         // Колір для контуру та тексту
         const strokeColor = isHidden ? 'rgba(100, 100, 100, 0.1)' : baseColor;
@@ -275,11 +305,11 @@ export default function GraphNetwork({
         ctx.fillStyle = isHidden ? 'rgba(0, 0, 0, 0)' : 'rgba(0, 0, 0, 0.2)'; 
         ctx.fill();
 
-        // Налаштування бордера
+        // Налаштування бордера (stronger glow for search highlight)
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2 / globalScale; // Товщина рамки адаптується до зуму
+        ctx.lineWidth = isSearchHighlighted ? 2.5 / globalScale : 2 / globalScale;
         ctx.shadowColor = strokeColor;
-        ctx.shadowBlur = 10 / globalScale;
+        ctx.shadowBlur = isSearchHighlighted ? 18 / globalScale : 10 / globalScale;
         ctx.stroke();
 
         // 3. Малюємо іконку/емодзі всередині (якщо не приховано)
@@ -339,7 +369,7 @@ export default function GraphNetwork({
             ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)';
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
+    }, [searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -408,6 +438,20 @@ export default function GraphNetwork({
     const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
         lastTransformRef.current = { k: transform.k, x: transform.x, y: transform.y };
     }, []);
+
+    useEffect(() => {
+        if (!flyToNodeId || !fgRef.current) return;
+        const node = processedData.nodes.find(
+            (n: any) => (typeof n.id === "string" ? n.id : n?.id) === flyToNodeId
+        );
+        if (node && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
+            fgRef.current.centerAt(node.x, node.y, 800);
+            fgRef.current.zoom(4, 800);
+            const t = setTimeout(() => onFlyToComplete?.(), 850);
+            return () => clearTimeout(t);
+        }
+        onFlyToComplete?.();
+    }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
     useEffect(() => {
         const nodeCount = processedData.nodes.length;
@@ -490,12 +534,16 @@ export default function GraphNetwork({
                 }}
                 onLinkHover={(link) => setHoveredLink(link)}
                 
-                nodePointerAreaPaint={(node, color, ctx) => {
+                nodePointerAreaPaint={(node: any, color, ctx) => {
                     const x = node.x ?? 0;
                     const y = node.y ?? 0;
                     if (!isFinite(x) || !isFinite(y)) return;
                     const rawSize = (node.val ?? 4) * 1;
-                    const radius = Math.min(20, Math.max(6, rawSize));
+                    let radius = Math.min(20, Math.max(6, rawSize));
+                    if (searchActive) {
+                        const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                        if (highlightedSet.has(nodeId)) radius = radius * 1.2;
+                    }
                     ctx.fillStyle = color;
                     ctx.beginPath();
                     ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
@@ -503,6 +551,10 @@ export default function GraphNetwork({
                 }}
                 nodeColor={(node: any) => {
                     const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                    if (searchActive) {
+                        if (highlightedSet.has(nodeId)) return "#a855f7";
+                        return "rgba(50, 50, 50, 0.1)";
+                    }
                     if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return "rgba(30, 30, 30, 0.1)"; 
                     if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return "rgba(50, 50, 50, 0.2)"; 
                     if (nodeId === focusedNodeId) return "#fbbf24"; 

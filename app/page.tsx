@@ -3,7 +3,7 @@
 
 import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddModal from "@/src/components/AddModal";
 import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
@@ -15,6 +15,7 @@ import { useGraphData } from "@/src/hooks/useGraphData";
 import { useAIProcessor } from "@/src/hooks/useAIProcessor";
 import { createClient } from "@/src/lib/supabase/client";
 import AIStatusBar from "@/src/components/AIStatusBar";
+import NeuralSearch from "@/src/components/NeuralSearch";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -50,6 +51,10 @@ export default function Home() {
     const [isAIProcessing, setIsAIProcessing] = useState(false);
     const [aiProgress, setAiProgress] = useState(0);
     const [aiTotal, setAiTotal] = useState(0);
+    const [highlightedNodes, setHighlightedNodes] = useState<string[]>([]);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [flyToNodeId, setFlyToNodeId] = useState<string | null>(null);
+    const searchFocusRef = useRef<(() => void) | null>(null);
 
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
@@ -93,6 +98,12 @@ export default function Home() {
         setFocusedNodeId(idStr);
         setSelectedNode(node);
     };
+
+    const handleSearchResultSelect = useCallback((node: any) => {
+        const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
+        setIsSearchOpen(false);
+        setFlyToNodeId(idStr);
+    }, []);
 
     const handleAddWithAI = async (nodeData: any) => {
         setAiTotal(1);
@@ -179,6 +190,22 @@ export default function Home() {
         }
     };
 
+    const openSearch = useCallback(() => {
+        setIsSearchOpen(true);
+        setTimeout(() => searchFocusRef.current?.(), 100);
+    }, []);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "k" && e.ctrlKey && e.altKey) {
+                e.preventDefault();
+                openSearch();
+            }
+        };
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [openSearch]);
+
     useEffect(() => {
         // Чекаємо, поки завантажаться основні дані нод
         if (!isLoading && data.nodes.length > 0 && !isProcessing) {
@@ -220,6 +247,9 @@ export default function Home() {
                 focusedNodeId={focusedNodeId}
                 zenModeNodeId={zenModeNodeId}
                 physicsConfig={physicsConfig}
+                highlightedNodes={highlightedNodes}
+                flyToNodeId={flyToNodeId}
+                onFlyToComplete={() => setFlyToNodeId(null)}
                 onNodeContextMenu={handleNodeContextMenu}
                 onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
             />
@@ -298,6 +328,21 @@ export default function Home() {
                             <span className="text-sm font-medium">Exit Zen Mode</span>
                         </motion.button>
                     )}
+
+                    {highlightedNodes.length > 0 && (
+                        <motion.button
+                            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                            key={'clear-search'}
+                            onClick={() => setHighlightedNodes([])}
+                            className="hover:cursor-pointer flex items-center gap-2 px-4 py-2 bg-purple-500/20 backdrop-blur-md border border-purple-500/50 rounded-full text-purple-300 hover:bg-purple-500/40 hover:text-white shadow-[0_0_20px_rgba(168,85,247,0.3)]"
+                        >
+                            <Sparkles size={14} className="opacity-70" />
+                            <span className="text-sm font-medium">Clear search</span>
+                            <X size={14} className="opacity-70" />
+                        </motion.button>
+                    )}
                 </AnimatePresence>
             </div>
 
@@ -327,6 +372,18 @@ export default function Home() {
                 label={isAIProcessing ? "Neural Syncing" : "Batch Importing"} 
             />
 
+            <NeuralSearch
+                nodes={data.nodes}
+                onResultSelect={handleSearchResultSelect}
+                onSearchChange={setHighlightedNodes}
+                isOpen={isSearchOpen}
+                onClose={() => {
+                    setIsSearchOpen(false);
+                    setHighlightedNodes([]);
+                }}
+                onOpenRef={searchFocusRef}
+            />
+
             <LeftSidebar 
                 isOpen={isLeftSidebarOpen}
                 onClose={() => setIsLeftSidebarOpen(false)}
@@ -337,6 +394,7 @@ export default function Home() {
                 onSelect={handleSearchSelect}
                 onImport={handleImportWithQueue}
                 onExport={exportData}
+                onOpenSearch={openSearch}
             />
 
             <Sidebar 
@@ -356,10 +414,7 @@ export default function Home() {
                 allTags={allTags}
             />
 
-            <CommandPalette 
-                nodes={data.nodes} 
-                onSelect={handleSearchSelect} 
-            />
+            <CommandPalette onOpenSearch={openSearch} />
 
             <PhysicsControl 
                 config={physicsConfig} 
