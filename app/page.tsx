@@ -163,13 +163,17 @@ export default function Home() {
         console.log('Call -> handleImportWithQueue()');
         const insertedNodes = await importData(bookmarks);
         console.log('Nodes received for AI processing:', insertedNodes);
-        
-        if (insertedNodes && Array.isArray(insertedNodes) && insertedNodes.length > 0) {
-            const allExistingContext = data.nodes.map((n: any) => 
-                `[ID]: "${n.id}" | CONTEXT: (Tags: ${n.tags?.join(', ') || 'none'}, URL: ${n.url || 'n/a'})`
-            );
 
-            processQueue(insertedNodes, allExistingContext);
+        if (insertedNodes && Array.isArray(insertedNodes) && insertedNodes.length > 0) {
+            const toLine = (n: any) => {
+                const id = typeof n.id === 'string' ? n.id : n.id?.id;
+                const url = (n.url || '').slice(0, 120);
+                return url ? `${id} | ${url}` : id;
+            };
+            const existingLines = data.nodes.map(toLine);
+            const insertedLines = insertedNodes.map((n: any) => toLine(n));
+            const allWithContext = [...existingLines, ...insertedLines];
+            processQueue(insertedNodes, allWithContext);
         } else {
             console.log('No nodes to process (either duplicates or error)');
         }

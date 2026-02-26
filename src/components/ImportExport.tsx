@@ -68,7 +68,7 @@ export default function ImportExport({ onImport, onExport }: ImportExportProps) 
                 onClose={() => setIsConfirmOpen(false)}
                 onConfirm={confirmImport}
                 title="Ready to Synapse?"
-                description={`We found ${pendingData.length} bookmarks. They will be added to your graph and automatically tagged based on your browser folders.`}
+                description={`We found ${pendingData.length} bookmarks. They will be added to your graph and AI will assign tags, connections, and semantic groups (e.g. Development, AI, Finance).`}
                 confirmText="Import Now"
             />
         </div>

@@ -48,25 +48,20 @@ export function useAIProcessor(
                     continue;
                 }
 
+                const allGraphIds = (existingNodeIds || []).map((s: string) => {
+                    const bar = s.indexOf(' | ');
+                    return bar >= 0 ? s.slice(0, bar).trim() : String(s).trim();
+                }).filter(Boolean);
+
                 if (aiData.connections && aiData.connections.length > 0) {
                     for (const conn of aiData.connections) {
                         try {
-                            // 1. Отримуємо чистий масив реальних ID з об'єкта data.nodes
-                            // (Не використовуємо existingNodeIds, бо там рядки з тегами)
-                            const realNodeIds = nodes.map((n: any) => 
-                                typeof n.id === 'string' ? n.id : n.id?.id
-                            );
-
-                            // 2. Очищаємо назву від ШІ
                             const aiSuggestedId = conn.id.replace(/^["']|["']$/g, '').trim();
 
-                            // 3. Шукаємо відповідність:
-                            // а) Точне співпадіння
-                            let finalTargetId = realNodeIds.find(id => id === aiSuggestedId);
+                            let finalTargetId = allGraphIds.find((id: string) => id === aiSuggestedId);
 
-                            // б) Часткове співпадіння (якщо ШІ скоротив "OpenAI Dashboard" до "OpenAI")
                             if (!finalTargetId) {
-                                finalTargetId = realNodeIds.find(id => 
+                                finalTargetId = allGraphIds.find((id: string) =>
                                     id.toLowerCase().includes(aiSuggestedId.toLowerCase()) ||
                                     aiSuggestedId.toLowerCase().includes(id.toLowerCase())
                                 );
@@ -110,16 +105,6 @@ export function useAIProcessor(
                     is_ai_processed: true,
                     ...(validGroup !== undefined && { group: validGroup }),
                 });
-
-                // 3. 🔥 Створюємо ШІ-зв'язки
-                if (aiData.connections && aiData.connections.length > 0) {
-                    for (const conn of aiData.connections) {
-                        if (conn.id !== node.id) {
-                            const label = `AI Similarity: ${conn.accuracy}%`;
-                            await onAddLink(node.id, conn.id, 'ai', label);
-                        }
-                    }
-                }
 
                 await new Promise(resolve => setTimeout(resolve, 500));
             } catch (err) {
