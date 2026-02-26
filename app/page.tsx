@@ -10,10 +10,12 @@ import LeftSidebar from "@/src/components/LeftSidebar";
 import CommandPalette from "@/src/components/CommandPalette";
 import ContextMenu from "@/src/components/ui/ContextMenu";
 import PhysicsControl, { PhysicsConfig } from "@/src/components/PhysicsControl";
-import { supabase } from "@/src/lib/supabaseClient";
 import { AnimatePresence, motion } from "framer-motion";
+import { createClient } from "@/src/lib/supabase/client";
 
 export default function Home() {
+    const [user, setUser] = useState<any>(null);
+
     const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
     const [isLoading, setIsLoading] = useState(true);
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
@@ -27,6 +29,8 @@ export default function Home() {
         linkDistance: 60
     });
 
+    const supabase = createClient();
+
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
         x: 0,
@@ -35,28 +39,45 @@ export default function Home() {
     });
 
     useEffect(() => {
-        const fetchGraphData = async () => {
+        const initSession = async () => {
             try {
-                const { data: nodesData, error: nodesError } = await supabase.from('nodes').select('*');
-                const { data: linksData, error: linksError } = await supabase.from('links').select('*');
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                setUser(authUser);
 
-                if (nodesError) throw nodesError;
-                if (linksError) throw linksError;
+                if (authUser) {
+                    const { data: nodesData, error: nodesError } = await supabase.from('nodes').select('*');
+                    const { data: linksData, error: linksError } = await supabase.from('links').select('*');
 
-                const formattedLinks = linksData.map(l => ({
-                    ...l,
-                    relationType: l.relation_type || 'manual'
-                }));
+                    if (nodesError) throw nodesError;
+                    if (linksError) throw linksError;
 
-                setData({ nodes: nodesData || [], links: formattedLinks || [] });
+                    const formattedLinks = linksData?.map(l => ({
+                        ...l,
+                        relationType: l.relation_type || 'manual'
+                    })) || [];
+
+                    setData({ nodes: nodesData || [], links: formattedLinks });
+                }
+                // const { data: nodesData, error: nodesError } = await supabase.from('nodes').select('*');
+                // const { data: linksData, error: linksError } = await supabase.from('links').select('*');
+
+                // if (nodesError) throw nodesError;
+                // if (linksError) throw linksError;
+
+                // const formattedLinks = linksData.map(l => ({
+                //     ...l,
+                //     relationType: l.relation_type || 'manual'
+                // }));
+
+                // setData({ nodes: nodesData || [], links: formattedLinks || [] });
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error initializing session/data:", error);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchGraphData();
+        initSession();
     }, []);
 
     const allTags = useMemo(() => {
@@ -77,6 +98,8 @@ export default function Home() {
     };
 
     const handleAddNewThought = async (nodeData: NodeData) => {
+        if (!user) return;
+
         let group = 1;
         if (nodeData.type === 'link') group = 1;
         if (nodeData.type === 'note') group = 2;
@@ -132,23 +155,15 @@ export default function Home() {
         }));
 
         const dbNode = {
-            id: newNode.id,
-            group: newNode.group,
-            val: newNode.val,
-            type: newNode.type,
-            tags: newNode.tags,
-            content: newNode.content,
-            full_data: newNode.full_data
+            ...newNode,
+            user_id: user.id,
         };
 
-        // 🔥 ВІДПРАВКА В SUPABASE З ОБРОБКОЮ ПОМИЛОК 🔥
         const { error: nodeError } = await supabase.from('nodes').insert(dbNode);
         
         if (nodeError) {
             console.error("🔴 Failed to save node:", nodeError.message, nodeError.details);
             
-            // 🔥 РОБИМО ROLLBACK (ВІДКАТ) АНІМАЦІЇ ЗАМІСТЬ ALERT 🔥
-            // Видаляємо ноду і лінки, які ми щойно оптимістично додали
             setData(prev => ({
                 nodes: prev.nodes.filter(n => n.id !== newNode.id),
                 links: prev.links.filter(l => 
@@ -166,7 +181,8 @@ export default function Home() {
                 target: typeof l.target === 'object' ? l.target.id : l.target,
                 relation_type: l.relationType,
                 label: l.label,
-                weight: l.weight
+                weight: l.weight,
+                user_id: user.id
             }));
             const { error: linkError } = await supabase.from('links').insert(dbLinks);
             
@@ -177,7 +193,7 @@ export default function Home() {
     };
 
     const handleAddLink = async (sourceId: string, targetId: string) => {
-        if (sourceId === targetId) return; 
+        if (!user || sourceId === targetId) return;
 
         const newLink = { 
             source: sourceId, 
@@ -201,11 +217,14 @@ export default function Home() {
             source: typeof sourceId === 'object' ? (sourceId as any).id : sourceId,
             target: typeof targetId === 'object' ? (targetId as any).id : targetId,
             relation_type: 'manual',
-            label: 'Manual connection'
+            label: 'Manual connection',
+            user_id: user.id
         });
     };
 
     const handleUpdateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[] }) => {
+        if (!user) return;
+
         const newId = newData.title ?? nodeId;
 
         // Оптимістичне оновлення
@@ -235,19 +254,19 @@ export default function Home() {
             return { nodes: newNodes, links: newLinks };
         });
 
-        // Відправка в Supabase
-        // Якщо ID змінилося, треба бути обережним (залежить від ON UPDATE CASCADE в БД)
-        // Для початку ми просто оновлюємо вміст і теги
         await supabase.from('nodes')
             .update({
                 id: newId,
                 content: newData.content,
                 tags: newData.tags
             })
-            .eq('id', nodeId);
+            .eq('id', nodeId)
+            .eq('user_id', user.id);
     };
 
     const handleDeleteNode = async (nodeId: string) => {
+        if (!user) return;
+
         setData((prevData) => {
             const newNodes = prevData.nodes.filter(
                 (n: any) => (typeof n.id === 'string' ? n.id : n.id?.id) !== nodeId
@@ -264,11 +283,15 @@ export default function Home() {
             setSelectedNode(null);
         }
 
-        // Supabase видалить пов'язані лінки автоматично завдяки ON DELETE CASCADE
-        await supabase.from('nodes').delete().eq('id', nodeId);
+        await supabase.from('nodes')
+            .delete()
+            .eq('id', nodeId)
+            .eq('user_id', user.id);
     };
 
     const handleDeleteLink = async (sourceId: string, targetId: string) => {
+        if (!user) return;
+
         setData((prev) => ({
             ...prev,
             links: prev.links.filter(l => {
@@ -279,7 +302,10 @@ export default function Home() {
         }));
 
         // Видаляємо з БД. Шукаємо лінк незалежно від напрямку
-        await supabase.from('links').delete().or(`and(source.eq.${sourceId},target.eq.${targetId}),and(source.eq.${targetId},target.eq.${sourceId})`);
+        await supabase.from('links')
+            .delete()
+            .or(`and(source.eq.${sourceId},target.eq.${targetId}),and(source.eq.${targetId},target.eq.${sourceId})`)
+            .eq('user_id', user.id);
     };
 
     const handleNodeContextMenu = (node: any, event: MouseEvent) => {

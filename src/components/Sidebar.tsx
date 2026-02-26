@@ -189,7 +189,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                     <div className="flex flex-row items-center justify-between w-full mb-10 min-h-10">
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className="text-neutral-500 hover:text-white transition-colors"
+                            className="hover:cursor-pointer text-neutral-500 hover:text-white transition-colors"
                         >
                             {isExpanded ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
                         </button>
