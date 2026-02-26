@@ -1,11 +1,10 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import CloseButton from "./ui/CloseButton";
-import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle } from "lucide-react";
 
 interface SidebarProps {
     selectedNode: any | null;
@@ -24,6 +23,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
     const [editTags, setEditTags] = useState<string[]>([]);
     const [newTag, setNewTag] = useState("");
     const [isDirty, setIsDirty] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [previewData, setPreviewData] = useState<any>(null);
     const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
@@ -66,6 +66,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             setEditTitle(selectedNode.id);
             setEditContent(selectedNode.content || "");
             setEditTags(selectedNode.tags || []);
+            setError(null);
+            setConnectionSearch("");
+            setIsConnListOpen(false);
         }
     }, [selectedNode]);
 
@@ -116,15 +119,46 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
     }, [selectedNode, selectedNode?.id, editTitle]);
 
     const handleSave = () => {
-        if (selectedNode && isDirty) {
-            onUpdateNode(selectedNode.id, { 
-                title: editTitle, 
-                content: editContent,
-                tags: editTags 
-            });
-            setIsDirty(false);
+        if (!selectedNode || !isDirty) return;
+
+        const trimmedTitle = editTitle.trim();
+        if (!trimmedTitle) {
+            setError("Title cannot be empty.");
+            return;
         }
+
+        const originalId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
+
+        if (trimmedTitle.toLowerCase() !== originalId.toLowerCase()) {
+            const isDuplicate = allNodes.nodes.some((n: any) => {
+                const nodeId = typeof n.id === 'string' ? n.id : n.id?.id;
+                return nodeId.toLowerCase() === trimmedTitle.toLowerCase();
+            });
+
+            if (isDuplicate) {
+                setError(`A neuron named "${trimmedTitle}" already exists.`);
+                return;
+            }
+        }
+
+        onUpdateNode(selectedNode.id, { 
+            title: trimmedTitle, 
+            content: editContent,
+            tags: editTags 
+        });
+        
+        reset();
     };
+
+    const handleClose = () => {
+        reset();
+        onClose();
+    }
+
+    const reset = () => {
+        setIsDirty(false);
+        setError(null);
+    }
 
     const addTag = () => {
         if (newTag.trim() && !editTags.includes(newTag.trim())) {
@@ -152,30 +186,55 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                     className="fixed top-0 right-0 h-full bg-neutral-950/80 backdrop-blur-2xl border-l border-white/5 p-8 shadow-2xl z-50 flex flex-col"
                 >
                     {/* Header */}
-                    <div className="flex flex-row items-center justify-between w-full mb-10">
+                    <div className="flex flex-row items-center justify-between w-full mb-10 min-h-10">
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
                             className="text-neutral-500 hover:text-white transition-colors"
                         >
                             {isExpanded ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
                         </button>
+                        <AnimatePresence>
+                            {isDirty && (
+                                <motion.button
+                                    initial={{ opacity: 0, x: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, x: 0 }}
+                                    onClick={handleSave}
+                                    className="hover:cursor-pointer flex items-center gap-2 px-4 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-full hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+                                >
+                                    <Save size={14} /> Save
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
                         <div className="flex flex-row items-center gap-4">
-                            <AnimatePresence>
-                                {isDirty && (
-                                    <motion.button
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 10 }}
-                                        onClick={handleSave}
-                                        className="flex items-center gap-2 px-4 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-full hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
-                                    >
-                                        <Save size={14} /> Save
-                                    </motion.button>
-                                )}
-                            </AnimatePresence>
-                            <CloseButton onClose={onClose} />
+                            
+                            <CloseButton onClose={handleClose} />
                         </div>
                     </div>
+
+                    <AnimatePresence>
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0, x: 0 }}
+                                animate={{ 
+                                    opacity: 1, 
+                                    height: 'auto',
+                                    x: [0, -10, 10, -10, 10, -5, 5, 0] 
+                                }}
+                                exit={{ opacity: 0, height: 0, x: 0 }}
+                                transition={{ 
+                                    duration: 0.4,
+                                    x: { duration: 0.4, ease: "easeInOut" } 
+                                }}
+                                className="overflow-hidden mb-4"
+                            >
+                                <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-sm font-medium">
+                                    <AlertCircle size={16} className="shrink-0" />
+                                    {error}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
                     <div className="flex-1 overflow-y-auto space-y-8  no-scrollbar">
                         <div className="space-y-2">
@@ -183,6 +242,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 value={editTitle}
                                 onChange={(e) => {
                                     setEditTitle(e.target.value);
+                                    if (error) setError(null);
                                     e.target.style.height = 'auto';
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                 }}

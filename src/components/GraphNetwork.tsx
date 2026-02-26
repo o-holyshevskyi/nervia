@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from 'next/dynamic';
 import { forceManyBody, forceX, forceY } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
@@ -41,7 +41,19 @@ export default function GraphNetwork({
     const [hoveredLink, setHoveredLink] = useState<any | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-    const zenModeNeighbors = new Set<string>();
+    const zenModeNeighbors = useMemo(() => {
+        const neighbors = new Set<string>();
+        if (zenModeNodeId) {
+            neighbors.add(zenModeNodeId);
+            graphData.links.forEach((link: any) => {
+                const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
+                const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
+                if (sourceId === zenModeNodeId) neighbors.add(targetId);
+                if (targetId === zenModeNodeId) neighbors.add(sourceId);
+            });
+        }
+        return neighbors;
+    }, [zenModeNodeId, graphData.links]);
 
     const getNodeIconUrl = (node: any) => {
         if (node.type === 'link') {
@@ -50,42 +62,49 @@ export default function GraphNetwork({
         return null; 
     };
 
-    if (zenModeNodeId) {
-        zenModeNeighbors.add(zenModeNodeId);
-        graphData.links.forEach((link: any) => {
-            const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
-            const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
-            if (sourceId === zenModeNodeId) zenModeNeighbors.add(targetId);
-            if (targetId === zenModeNodeId) zenModeNeighbors.add(sourceId);
-        });
-    }
+    const isLinkHidden = useCallback((link: any) => {
+        const sId = typeof link.source === 'string' ? link.source : link.source?.id;
+        const tId = typeof link.target === 'string' ? link.target : link.target?.id;
+        
+        // 1. Zen Mode: ховаємо лінки, якщо жодна з нод не є центральною
+        if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) {
+            return true; 
+        }
+
+        // 2. Filter Tag: ховаємо лінки, якщо хоча б одна з нод не має потрібного тегу
+        if (activeTag) {
+            const sTags = typeof link.source === 'object' ? link.source.tags : graphData.nodes.find((n: any) => n.id === sId)?.tags;
+            const tTags = typeof link.target === 'object' ? link.target.tags : graphData.nodes.find((n: any) => n.id === tId)?.tags;
+            
+            if (!sTags?.includes(activeTag) || !tTags?.includes(activeTag)) {
+                return true;
+            }
+        }
+        return false;
+    }, [zenModeNodeId, activeTag, graphData.nodes]);
 
     const drawNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-        const label = node.id;
-        const size = 8; // Base node size
-        const isFocused = (typeof node.id === 'string' ? node.id : node.id?.id) === focusedNodeId;
-        const isZenHidden = zenModeNodeId && !node.isNeighbor && node.id !== zenModeNodeId;
-
-        // 1. Glow effect for focus
-        if (isFocused) {
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, size * 1.5, 0, 2 * Math.PI, false);
-            ctx.fillStyle = 'rgba(251, 191, 36, 0.2)';
-            ctx.fill();
-        }
+        const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
+        const label = idStr;
+        const size = 8; 
+        
+        // 🔥 ПРАВИЛЬНА перевірка: чи є ID ноди в нашому Set-і сусідів
+        const isZenHidden = zenModeNodeId && !zenModeNeighbors.has(idStr);
+        const isTagHidden = activeTag && (!node.tags || !node.tags.includes(activeTag));
+        
+        const isHidden = isZenHidden || isTagHidden;
 
         // 2. Main circle (background)
         ctx.beginPath();
         ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
         
-        // Determine color based on group
         const colors: any = { 1: "#3b82f6", 2: "#10b981", 3: "#a855f7", 4: "#f97316", 5: "#06b6d4" };
-        ctx.fillStyle = isZenHidden ? 'rgba(30, 30, 30, 0.1)' : (colors[node.group] || "#ec4899");
+        ctx.fillStyle = isHidden ? 'rgba(30, 30, 30, 0.1)' : (colors[node.group] || "#ec4899");
         ctx.fill();
 
         // 3. Draw icon/image
         const iconUrl = getNodeIconUrl(node);
-        if (iconUrl && !isZenHidden) {
+        if (iconUrl && !isHidden) {
             if (!imgCache[iconUrl]) {
                 const img = new Image();
                 img.src = iconUrl;
@@ -96,28 +115,27 @@ export default function GraphNetwork({
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, size * 0.8, 0, Math.PI * 2, true);
-                ctx.clip(); // Make icon circular inside
+                ctx.clip(); 
                 ctx.drawImage(img, node.x - iconSize/2, node.y - iconSize/2, iconSize, iconSize);
                 ctx.restore();
             }
-        } else if (node.type === 'idea' && !isZenHidden) {
-            // If no image, draw symbol (e.g., for Idea)
+        } else if (node.type === 'idea' && !isHidden) {
             ctx.font = `${size}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('💡', node.x, node.y);
         }
 
-        // 4. Text under node (appears on zoom)
+        // 4. Text under node
         if (globalScale > 1.5) {
             const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillStyle = isZenHidden ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)';
+            ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)';
             ctx.fillText(label, node.x, node.y + size + 2);
         }
-    }, [focusedNodeId, zenModeNodeId, getNodeIconUrl]);
+    }, [zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl]);
     
     useEffect(() => {
         if (containerRef.current) {
@@ -200,14 +218,16 @@ export default function GraphNetwork({
                     return "#ec4899";
                 }}
                 linkWidth={(link: any) => (link === hoveredLink ? 2 : link.weight || 1)}
-                linkDirectionalParticles={(link: any) => (link.relationType === 'ai' ? 3 : 0)}
+                linkDirectionalParticles={(link: any) => {
+                    if (isLinkHidden(link)) return 0; // Немає частинок!
+                    return link.relationType === 'ai' ? 3 : 0;
+                }}
                 linkDirectionalParticleSpeed={0.005}
                 linkDirectionalParticleWidth={4}
                 linkDirectionalParticleColor={() => "#fafafa"}
                 linkColor={(link: any) => {
-                    const sId = typeof link.source === 'string' ? link.source : link.source?.id;
-                    const tId = typeof link.target === 'string' ? link.target : link.target?.id;
-                    if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) return "rgba(0,0,0,0)"; 
+                    if (isLinkHidden(link)) return "rgba(0,0,0,0)";
+                    
                     if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : "#ffffff";
                     return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : "rgba(255, 255, 255, 0.15)";
                 }}

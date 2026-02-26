@@ -2,7 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Settings2, X, Magnet, Activity } from "lucide-react";
+import { Settings2, Magnet, Activity } from "lucide-react";
+import CloseButton from "./ui/CloseButton";
 
 export interface PhysicsConfig {
     repulsion: number;
@@ -32,9 +33,7 @@ export default function PhysicsControl({ config, onChange }: PhysicsControlProps
                                 <Settings2 size={18} className="text-purple-400" />
                                 Physics of the Universe
                             </h3>
-                            <button onClick={() => setIsOpen(false)} className="text-neutral-500 hover:text-white transition-colors">
-                                <X size={18} />
-                            </button>
+                            <CloseButton onClose={() => setIsOpen(false)} />
                         </div>
 
                         <div className="flex flex-col gap-6">
@@ -84,10 +83,16 @@ export default function PhysicsControl({ config, onChange }: PhysicsControlProps
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
-                    className="flex items-center justify-center w-12 h-12 bg-neutral-900/60 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/10 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] group"
+                    className="hover:cursor-pointer absolute -top-14.5 right-0 z-10 -translate-x-1/2 flex items-center gap-2 px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white rounded-full shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 hover:scale-105 transition-all z-20 group"
                 >
-                    <Settings2 size={20} className="text-neutral-400 group-hover:text-purple-400 transition-colors" />
+                    <Settings2 className="transition-transform duration-300" size={24} />
                 </button>
+                // <button
+                //     onClick={() => setIsOpen(true)}
+                //     className="flex items-center justify-center w-12 h-12 bg-neutral-900/60 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/10 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] group"
+                // >
+                //     <Settings2 size={20} className="text-neutral-400 group-hover:text-purple-400 transition-colors" />
+                // </button>
             )}
         </div>
     );

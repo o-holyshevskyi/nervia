@@ -11,6 +11,7 @@ interface ContextMenuProps {
     y: number;
     node: any | null;
     isZenModeActive: boolean;
+    isActiveTag: boolean;
     onClose: () => void;
     onFocus: (nodeId: string) => void;
     onEdit: (node: any) => void;
@@ -18,7 +19,7 @@ interface ContextMenuProps {
     onZenMode: (nodeId: string) => void;
 }
 
-export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, onClose, onFocus, onEdit, onDelete, onZenMode }: ContextMenuProps) {
+export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isActiveTag, onClose, onFocus, onEdit, onDelete, onZenMode }: ContextMenuProps) {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") onClose();
@@ -54,7 +55,7 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, onClo
                                 onFocus(typeof node.id === 'string' ? node.id : node.id?.id);
                                 onClose();
                             }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
                             <Crosshair size={14} className="text-blue-400" /> Focus
                         </button>
@@ -64,7 +65,8 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, onClo
                                 onZenMode(typeof node.id === 'string' ? node.id : node.id?.id);
                                 onClose();
                             }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            disabled={isActiveTag}
+                            className={`${isActiveTag && 'opacity-50'} ${!isActiveTag && 'hover:cursor-pointer hover:text-white hover:bg-white/10'} flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 rounded-lg transition-colors text-left`}
                         >
                             <Eye size={14} className={isZenModeActive ? "text-purple-400" : "text-white"} /> 
                             {isZenModeActive ? "Disable Zen Mode" : "Zen Mode (Isolate)"}
@@ -75,7 +77,7 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, onClo
                                 navigator.clipboard.writeText(typeof node.id === 'string' ? node.id : node.id?.id);
                                 onClose();
                             }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
                             <Copy size={14} className="text-green-400" /> Copy Name
                         </button>
@@ -85,7 +87,7 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, onClo
                                 onEdit(node);
                                 onClose();
                             }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
                             <Edit2 size={14} className="text-yellow-400" /> Edit
                         </button>
@@ -97,7 +99,7 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, onClo
                                 onDelete(typeof node.id === 'string' ? node.id : node.id?.id);
                                 onClose();
                             }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors text-left"
                         >
                             <Trash2 size={14} /> Remove Neuron
                         </button>
