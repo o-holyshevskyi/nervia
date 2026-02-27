@@ -11,27 +11,58 @@ export function useAIProcessor(
     const [total, setTotal] = useState(0);
     const [failed, setFailed] = useState(0);
 
-    const processQueue = async (nodes: any[], existingNodeIds: string[]) => {
+    const getNodeTitle = (n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? '';
+    const getNodeId = (n: any) => typeof n.id === 'string' ? n.id : n.id?.id;
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const processQueue = async (nodes: any[], existingNodes: any[]) => {
         console.log('Call -> processQueue()');
         setIsProcessing(true);
         setTotal(nodes.length);
         setProgress(0);
 
+        const existingLinesForAPI = (existingNodes || []).map((n: any) => {
+            const title = getNodeTitle(n);
+            const url = (n.url || '').slice(0, 120);
+            return url ? `${title} | ${url}` : title;
+        }).filter(Boolean);
+
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
-            
-            try {
-                const res = await fetch('/api/ai/process', {
-                    method: 'POST',
-                    body: JSON.stringify({ 
-                        mode: 'analyze_link', 
-                        newNode: node,
-                        existingNodes: existingNodeIds // Передаємо контекст для зв'язків
-                    })
-                });
-                const aiData = await res.json();
+            const nodeId = getNodeId(node);
 
-                const userId = node.user_id; // Беремо userId прямо з об'єкта ноди
+            try {
+                let aiData: any = null;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    const res = await fetch('/api/ai/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            mode: 'analyze_link',
+                            newNode: node,
+                            existingNodes: existingLinesForAPI
+                        })
+                    });
+
+                    aiData = await res.json().catch(() => ({}));
+
+                    const isRateLimited =
+                        res.status === 429 ||
+                        aiData?.error === 'RATE_LIMIT' ||
+                        (typeof aiData?.error === 'string' && aiData.error.toLowerCase().includes('rate_limit'));
+
+                    if (isRateLimited) {
+                        const retrySeconds = Number(aiData?.retryAfterSeconds) || 40;
+                        console.warn(`⏳ AI rate-limited. Retrying node ${nodeId} in ~${retrySeconds}s (attempt ${attempt}/3)...`);
+                        await sleep(retrySeconds * 1000 + 250);
+                        continue;
+                    }
+
+                    break;
+                }
+
+                const userId = node.user_id;
 
                 if (!userId) {
                     console.error("Missing user_id for node:", node.id);
@@ -39,44 +70,34 @@ export function useAIProcessor(
                 }
 
                 if (aiData.error) {
-                    setFailed(prev => prev + 1); // 📈 Рахуємо помилку API
-                    if (aiData.error.includes("quota")) {
-                        // Якщо квота скінчилась, зупиняємо чергу, але показуємо результат
-                        setFailed(prev => prev + (nodes.length - i - 1)); // Всі інші теж "пропущені"
+                    setFailed(prev => prev + 1);
+                    if (typeof aiData.error === 'string' && aiData.error.includes("quota")) {
+                        setFailed(prev => prev + (nodes.length - i - 1));
                         break;
                     }
                     continue;
                 }
 
-                const allGraphIds = (existingNodeIds || []).map((s: string) => {
-                    const bar = s.indexOf(' | ');
-                    return bar >= 0 ? s.slice(0, bar).trim() : String(s).trim();
-                }).filter(Boolean);
-
                 if (aiData.connections && aiData.connections.length > 0) {
                     for (const conn of aiData.connections) {
                         try {
-                            const aiSuggestedId = conn.id.replace(/^["']|["']$/g, '').trim();
+                            const aiSuggestedTitle = (conn.id ?? '').toString().replace(/^["']|["']$/g, '').trim();
+                            const targetNode = existingNodes.find((n: any) => {
+                                const t = getNodeTitle(n).toLowerCase();
+                                return t === aiSuggestedTitle.toLowerCase() ||
+                                    t.includes(aiSuggestedTitle.toLowerCase()) ||
+                                    aiSuggestedTitle.toLowerCase().includes(t);
+                            });
+                            const finalTargetId = targetNode ? getNodeId(targetNode) : null;
 
-                            let finalTargetId = allGraphIds.find((id: string) => id === aiSuggestedId);
-
-                            if (!finalTargetId) {
-                                finalTargetId = allGraphIds.find((id: string) =>
-                                    id.toLowerCase().includes(aiSuggestedId.toLowerCase()) ||
-                                    aiSuggestedId.toLowerCase().includes(id.toLowerCase())
-                                );
-                            }
-
-                            // 4. ТІЛЬКИ ЯКЩО ЗНАЙШЛИ, створюємо зв'язок
-                            if (finalTargetId && finalTargetId !== node.id) {
-                                const label = `AI Similarity: ${conn.accuracy}%`;
-                                await onAddLink(node.id, finalTargetId, 'ai', label);
+                            if (finalTargetId && finalTargetId !== nodeId) {
+                                const label = `AI Similarity: ${conn.accuracy ?? 0}%`;
+                                await onAddLink(nodeId, finalTargetId, 'ai', label);
                             } else {
-                                console.warn(`[AI Resolver] Node not found for "${aiSuggestedId}". Skipping link.`);
+                                console.warn(`[AI Resolver] Node not found for "${aiSuggestedTitle}". Skipping link.`);
                                 setFailed(prev => prev + 1);
                             }
                         } catch (linkError) {
-                            // Це заблокує виліт всього додатка (Runtime Error)
                             console.error("🔴 Error creating AI link:", linkError);
                             setFailed(prev => prev + 1);
                         }
@@ -95,20 +116,19 @@ export function useAIProcessor(
 
                 await supabase.from('nodes')
                     .update(dbUpdate)
-                    .eq('id', node.id)
+                    .eq('id', nodeId)
                     .eq('user_id', userId);
 
-                // 2. Оновлюємо UI для цієї ноди
-                onNodeUpdate(node.id, {
+                onNodeUpdate(nodeId, {
                     content: aiData.summary,
                     tags: finalTags,
                     is_ai_processed: true,
                     ...(validGroup !== undefined && { group: validGroup }),
                 });
 
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await sleep(350);
             } catch (err) {
-                console.error(`AI failed for ${node.id}:`, err);
+                console.error(`AI failed for ${nodeId}:`, err);
                 setFailed(prev => prev + 1);
             }
 

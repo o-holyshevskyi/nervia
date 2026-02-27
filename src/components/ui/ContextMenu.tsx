@@ -46,7 +46,7 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
                     >
                         <div className="px-3 py-2 border-b border-white/10 mb-1">
                             <p className="text-xs font-medium text-neutral-400 truncate">
-                                {typeof node.id === 'string' ? node.id : node.id?.id}
+                                {node.title ?? node.content ?? (typeof node.id === 'string' ? node.id : node.id?.id)}
                             </p>
                         </div>
 
@@ -74,7 +74,8 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
 
                         <button
                             onClick={() => {
-                                navigator.clipboard.writeText(typeof node.id === 'string' ? node.id : node.id?.id);
+                                const name = node.title ?? node.content ?? (typeof node.id === 'string' ? node.id : node.id?.id);
+                                navigator.clipboard.writeText(name ?? '');
                                 onClose();
                             }}
                             className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"

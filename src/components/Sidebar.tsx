@@ -53,19 +53,19 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             });
     }, [selectedNode, allNodes.links]);
 
-    // Перевірка на "брудні" дані (включаючи теги)
     useEffect(() => {
-        const titleChanged = editTitle !== selectedNode?.id;
+        const displayTitle = selectedNode?.title ?? selectedNode?.content ?? selectedNode?.id ?? '';
+        const titleChanged = editTitle !== displayTitle;
         const contentChanged = editContent !== (selectedNode?.content || "");
         const tagsChanged = JSON.stringify(editTags) !== JSON.stringify(selectedNode?.tags || []);
         const urlChanged = editUrl !== (selectedNode?.url || "");
-        
+
         setIsDirty(titleChanged || contentChanged || tagsChanged || urlChanged);
     }, [editContent, editTitle, editTags, selectedNode, editUrl]);
 
     useEffect(() => {
         if (selectedNode) {
-            setEditTitle(selectedNode.id);
+            setEditTitle(selectedNode.title ?? selectedNode.content ?? selectedNode.id ?? "");
             setEditContent(selectedNode.content || "");
             setEditTags(selectedNode.tags || []);
             setEditUrl(selectedNode.url || "");
@@ -119,12 +119,14 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             return;
         }
 
-        const originalId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
+        const existingTitle = (selectedNode.title ?? selectedNode.content ?? selectedNode.id ?? '').toString().toLowerCase();
 
-        if (trimmedTitle.toLowerCase() !== originalId.toLowerCase()) {
+        if (trimmedTitle.toLowerCase() !== existingTitle) {
             const isDuplicate = allNodes.nodes.some((n: any) => {
-                const nodeId = typeof n.id === 'string' ? n.id : n.id?.id;
-                return nodeId.toLowerCase() === trimmedTitle.toLowerCase();
+                const otherId = typeof n.id === 'string' ? n.id : n.id?.id;
+                if (otherId === selectedNode.id) return false;
+                const otherTitle = (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase();
+                return otherTitle === trimmedTitle.toLowerCase();
             });
 
             if (isDuplicate) {
@@ -133,8 +135,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             }
         }
 
-        onUpdateNode(selectedNode.id, { 
-            title: trimmedTitle, 
+        const nodeId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
+        onUpdateNode(nodeId, {
+            title: trimmedTitle,
             content: editContent,
             tags: editTags,
             url: editUrl.trim()
@@ -365,22 +368,27 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
                                 {/* Список існуючих зв'язків */}
                                 <div className="space-y-2 max-h-40 overflow-y-auto no-scrollbar">
-                                    {nodeConnections.map((connId: any, index) => (
-                                        <div key={connId+index} className="flex items-center justify-between group/conn p-2 rounded-xl hover:bg-white/5 transition-all">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-neutral-500 group-hover/conn:text-indigo-400 transition-colors">
-                                                    <LinkIcon size={14} />
+                                    {nodeConnections.map((connId: any, index) => {
+                                        const connNode = allNodes.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n.id?.id) === connId);
+                                        const connLabel = connNode ? (connNode.title ?? connNode.content ?? connId) : connId;
+                                        const selectedId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
+                                        return (
+                                            <div key={connId + index} className="flex items-center justify-between group/conn p-2 rounded-xl hover:bg-white/5 transition-all">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 flex items-center justify-center bg-white/5 rounded-lg text-neutral-500 group-hover/conn:text-indigo-400 transition-colors">
+                                                        <LinkIcon size={14} />
+                                                    </div>
+                                                    <span className="text-sm text-neutral-400 group-hover/conn:text-white transition-colors">{connLabel}</span>
                                                 </div>
-                                                <span className="text-sm text-neutral-400 group-hover/conn:text-white transition-colors">{connId}</span>
+                                                <button
+                                                    onClick={() => onDeleteLink(selectedId, connId)}
+                                                    className="opacity-0 group-hover/conn:opacity-100 p-2 text-neutral-600 hover:text-red-400 transition-all"
+                                                >
+                                                    <X size={14} className="hover:cursor-pointer" />
+                                                </button>
                                             </div>
-                                            <button 
-                                                onClick={() => onDeleteLink(selectedNode.id, connId)}
-                                                className="opacity-0 group-hover/conn:opacity-100 p-2 text-neutral-600 hover:text-red-400 transition-all"
-                                            >
-                                                <X size={14} className="hover:cursor-pointer" />
-                                            </button>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Кастомний Select / Пошук нових зв'язків */}
@@ -421,16 +429,19 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                                     .filter(n => {
                                                         const nodeId = typeof n.id === 'string' ? n.id : n.id?.id;
                                                         const selectedId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
-                                                        const matchesSearch = nodeId.toLowerCase().includes(connectionSearch.toLowerCase());
+                                                        const label = (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase();
+                                                        const matchesSearch = label.includes(connectionSearch.toLowerCase());
                                                         return nodeId !== selectedId && !nodeConnections.includes(nodeId) && matchesSearch;
                                                     })
                                                     .map((node) => {
                                                         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
+                                                        const label = node.title ?? node.content ?? idStr;
+                                                        const selectedId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
                                                         return (
                                                             <button
                                                                 key={idStr}
                                                                 onClick={() => {
-                                                                    onAddLink(selectedNode.id, idStr);
+                                                                    onAddLink(selectedId, idStr);
                                                                     setConnectionSearch("");
                                                                     setIsConnListOpen(false);
                                                                 }}
@@ -441,7 +452,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                                                         <Plus size={14} />
                                                                     </div>
                                                                     <div>
-                                                                        <p className="text-white text-sm font-medium">{idStr}</p>
+                                                                        <p className="text-white text-sm font-medium">{label}</p>
                                                                         {node.tags && node.tags.length > 0 && (
                                                                             <p className="text-[10px] text-neutral-500 mt-0.5">#{node.tags[0]}</p>
                                                                         )}
@@ -456,8 +467,8 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                                 }
                                                 {/* Якщо нічого не знайдено */}
                                                 {allNodes.nodes.filter(n => {
-                                                    const nodeId = typeof n.id === 'string' ? n.id : n.id?.id;
-                                                    return nodeId.toLowerCase().includes(connectionSearch.toLowerCase());
+                                                    const label = (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase();
+                                                    return label.includes(connectionSearch.toLowerCase());
                                                 }).length === 0 && (
                                                     <div className="p-4 text-center text-xs text-neutral-600 italic">
                                                         No neurons found...

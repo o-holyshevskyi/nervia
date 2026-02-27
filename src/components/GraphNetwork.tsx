@@ -391,7 +391,7 @@ export default function GraphNetwork({
         if (!isFinite(x) || !isFinite(y)) return;
 
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
-        const label = idStr;
+        const label = node.title ?? node.content ?? idStr ?? '';
         const rawSize = (node.val ?? 4) * 1;
         let size = Math.min(20, Math.max(6, rawSize));
 
@@ -713,7 +713,7 @@ export default function GraphNetwork({
                 height={dimensions.height}
                 graphData={processedData}
                 nodeVal={(node: any) => node.val ?? 4}
-                nodeLabel="id"
+                nodeLabel={(node: any) => node.title ?? node.content ?? (typeof node.id === 'string' ? node.id : node.id?.id) ?? ''}
                 nodeCanvasObject={drawNode}
                 onRenderFramePre={handleRenderFramePre}
                 onZoom={handleZoom}

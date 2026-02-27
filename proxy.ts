@@ -27,10 +27,13 @@ export async function proxy(request: NextRequest) {
         }
     );
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const isExtensionApi = request.nextUrl.pathname.startsWith('/api/extension/save');
 
     if (
         !user &&
+        !isExtensionApi &&
         !request.nextUrl.pathname.startsWith('/login') &&
         !request.nextUrl.pathname.startsWith('/auth')
     ) {
@@ -43,6 +46,10 @@ export async function proxy(request: NextRequest) {
         const url = request.nextUrl.clone()
         url.pathname = '/'
         return NextResponse.redirect(url)
+    }
+
+    if (request.method === 'OPTIONS' && isExtensionApi) {
+        return supabaseResponse;
     }
 
     return supabaseResponse;

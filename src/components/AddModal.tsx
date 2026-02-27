@@ -18,7 +18,7 @@ export interface NodeData {
 
 interface AddModalProps {
     isOpen: boolean;
-    existingNodes: string[];
+    existingNodes: any[];
     allTags: string[];
     onClose: () => void;
     onAdd: (data: NodeData) => void;
@@ -46,8 +46,8 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
         const trimmedTitle = title.trim();
         if (!trimmedTitle) return;
 
-        const isDuplicate = existingNodes.some(
-            (nodeId) => nodeId.toLowerCase() === trimmedTitle.toLowerCase()
+        const isDuplicate = existingNodes.some((n: any) =>
+            (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase() === trimmedTitle.toLowerCase()
         );
 
         if (isDuplicate) {
@@ -112,11 +112,15 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
         setTags(tags.filter(t => t !== tagToRemove));
     };
 
-    const filteredNodes = existingNodes.filter(nodeId => 
-        nodeId.toLowerCase().includes(connectionSearch.toLowerCase()) &&
-        !connections.includes(nodeId) &&
-        nodeId !== title
-    );
+    const getNodeLabel = (n: any) => (n.title ?? n.content ?? n.id ?? '').toString();
+    const getNodeId = (n: any) => typeof n.id === 'string' ? n.id : n.id?.id;
+    const filteredNodes = existingNodes.filter((n: any) => {
+        const label = getNodeLabel(n).toLowerCase();
+        const id = getNodeId(n);
+        return label.includes(connectionSearch.toLowerCase()) &&
+            !connections.includes(id) &&
+            label !== title.trim().toLowerCase();
+    });
 
     const filteredTags = allTags.filter(t => 
         t.toLowerCase().includes(tagInput.toLowerCase()) && 
@@ -293,15 +297,19 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                             </label>
                                             <div id="link-input" className="mt-1 relative bg-black/50 border border-white/10 rounded-xl p-2 focus-within:border-blue-500/50 transition-colors">
                                                 <div className="flex flex-wrap gap-2 mb-2">
-                                                    {connections.map(conn => (
-                                                        <span key={conn} className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-xs text-blue-300 border border-blue-500/30 rounded-md">
-                                                            <GitMerge size={12} />
-                                                            {conn}
-                                                            <button type="button" onClick={() => setConnections(connections.filter(c => c !== conn))} className="ml-1 hover:text-white">
-                                                                <X size={12} />
-                                                            </button>
-                                                        </span>
-                                                    ))}
+                                                    {connections.map(connId => {
+                                                        const node = existingNodes.find((n: any) => getNodeId(n) === connId);
+                                                        const label = node ? getNodeLabel(node) : connId;
+                                                        return (
+                                                            <span key={connId} className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-xs text-blue-300 border border-blue-500/30 rounded-md">
+                                                                <GitMerge size={12} />
+                                                                {label}
+                                                                <button type="button" onClick={() => setConnections(connections.filter(c => c !== connId))} className="ml-1 hover:text-white">
+                                                                    <X size={12} />
+                                                                </button>
+                                                            </span>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <GitMerge size={16} className="text-neutral-500 ml-2" />
@@ -326,17 +334,17 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                                             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                                                             className="absolute left-0 right-0 top-[105%] mt-1 bg-neutral-800 border border-white/10 rounded-xl shadow-xl z-50 max-h-40 overflow-y-auto no-scrollbar"
                                                         >
-                                                            {filteredNodes.map(nodeId => (
+                                                            {filteredNodes.map((n: any) => (
                                                                 <button
-                                                                    key={nodeId}
+                                                                    key={getNodeId(n)}
                                                                     type="button"
                                                                     onClick={() => {
-                                                                        setConnections([...connections, nodeId]);
+                                                                        setConnections([...connections, getNodeId(n)]);
                                                                         setConnectionSearch("");
                                                                     }}
                                                                     className="w-full text-left px-4 py-2 text-sm text-neutral-300 hover:bg-white/10 hover:text-white transition-colors border-b border-white/5 last:border-0"
                                                                 >
-                                                                    {nodeId}
+                                                                    {getNodeLabel(n)}
                                                                 </button>
                                                             ))}
                                                         </motion.div>

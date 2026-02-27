@@ -166,10 +166,6 @@ export default function Home() {
         });
     };
 
-    const existingNodeIds = useMemo(() => {
-        return data.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id || n.id);
-    }, [data.nodes]);
-
     const handleSearchSelect = (node: any) => {
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
         setFocusedNodeId(idStr);
@@ -182,22 +178,30 @@ export default function Home() {
         setFlyToNodeId(idStr);
     }, []);
 
+    const existingNodeTitlesForAI = useMemo(() => {
+        return data.nodes.map((n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? String(n.id));
+    }, [data.nodes]);
+
     const handleAddWithAI = async (nodeData: any) => {
         setAiTotal(1);
         setAiProgress(0);
         setIsAIProcessing(true);
 
-        await addNewNode(nodeData);
+        const createdNode = await addNewNode(nodeData);
+        if (!createdNode) {
+            setIsAIProcessing(false);
+            return;
+        }
 
         if (nodeData.autoConnectAI) {
             try {
                 const res = await fetch('/api/ai/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        mode: 'suggest_connections', 
+                    body: JSON.stringify({
+                        mode: 'suggest_connections',
                         newNode: { title: nodeData.title, content: nodeData.content, type: nodeData.type, url: nodeData.url },
-                        existingNodes: existingNodeIds 
+                        existingNodes: existingNodeTitlesForAI
                     })
                 });
 
@@ -205,36 +209,41 @@ export default function Home() {
                 const validGroup = typeof aiResponse.group === 'number' && aiResponse.group >= 1 && aiResponse.group <= 5 ? aiResponse.group : undefined;
 
                 if (aiResponse.description && !nodeData.content) {
-                    await updateNode(nodeData.title, {
-                        ...nodeData,
+                    await updateNode(createdNode.id, {
                         content: aiResponse.description,
                         is_ai_processed: true,
                         ...(validGroup !== undefined && { group: validGroup }),
                     });
                 } else if (validGroup !== undefined) {
-                    await updateNode(nodeData.title, { group: validGroup });
+                    await updateNode(createdNode.id, { group: validGroup });
                 }
 
                 if (Array.isArray(aiResponse.connections)) {
                     for (const connection of aiResponse.connections) {
-                        if (connection.id !== nodeData.title) {
-                            const aiLabel = `AI Similarity: ${connection.accuracy}%`;
-                            await addLink(nodeData.title, connection.id, 'ai', aiLabel);
+                        const suggestedTitle = (connection.id ?? '').toString().trim();
+                        if (!suggestedTitle || suggestedTitle === nodeData.title) continue;
+                        const targetNode = data.nodes.find((n: any) => {
+                            const t = (n.title ?? n.content ?? n.id)?.toString?.() ?? '';
+                            return t.toLowerCase() === suggestedTitle.toLowerCase() || t.toLowerCase().includes(suggestedTitle.toLowerCase());
+                        });
+                        if (targetNode) {
+                            const targetId = typeof targetNode.id === 'string' ? targetNode.id : targetNode.id?.id;
+                            if (targetId && targetId !== createdNode.id) {
+                                const aiLabel = `AI Similarity: ${connection.accuracy ?? 0}%`;
+                                await addLink(createdNode.id, targetId, 'ai', aiLabel);
+                            }
                         }
                     }
                 }
 
-                // Встановлюємо прогрес на 100% (1 з 1)
                 setAiProgress(1);
 
             } catch (err) {
                 console.error("AI logic failed:", err);
                 setIsAIProcessing(false);
             } finally {
-                // 🔥 Чекаємо 2.5 секунди, щоб користувач насолодився статусом "Done"
                 setTimeout(() => {
                     setIsAIProcessing(false);
-                    // Скидаємо цифри трохи пізніше, коли анімація закриття завершиться
                     setTimeout(() => {
                         setAiProgress(0);
                         setAiTotal(0);
@@ -242,7 +251,6 @@ export default function Home() {
                 }, 2500);
             }
         } else {
-            // Якщо AI вимкнено, просто закриваємо бар
             setIsAIProcessing(false);
         }
     };
@@ -253,15 +261,16 @@ export default function Home() {
         console.log('Nodes received for AI processing:', insertedNodes);
 
         if (insertedNodes && Array.isArray(insertedNodes) && insertedNodes.length > 0) {
-            const toLine = (n: any) => {
-                const id = typeof n.id === 'string' ? n.id : n.id?.id;
-                const url = (n.url || '').slice(0, 120);
-                return url ? `${id} | ${url}` : id;
-            };
-            const existingLines = data.nodes.map(toLine);
-            const insertedLines = insertedNodes.map((n: any) => toLine(n));
-            const allWithContext = [...existingLines, ...insertedLines];
-            processQueue(insertedNodes, allWithContext);
+            const allNodesForContext = [...data.nodes, ...insertedNodes];
+            const MAX_NODES_PER_RUN = 25;
+            for (let i = 0; i < insertedNodes.length; i += MAX_NODES_PER_RUN) {
+                const batch = insertedNodes.slice(i, i + MAX_NODES_PER_RUN);
+                // eslint-disable-next-line no-await-in-loop
+                await processQueue(batch, allNodesForContext);
+                // Small pause between batches to avoid bursts
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise((r) => setTimeout(r, 1000));
+            }
         } else {
             console.log('No nodes to process (either duplicates or error)');
         }
@@ -291,6 +300,37 @@ export default function Home() {
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [openSearch]);
 
+    const nodeIdsSet = useMemo(() => new Set(data.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id)), [data.nodes]);
+
+    // When graph is empty or when referenced nodes no longer exist, clear node-related state to avoid "node not found" errors
+    useEffect(() => {
+        if (data.nodes.length === 0) {
+            setSelectedNode(null);
+            setFocusedNodeId(null);
+            setZenModeNodeId(null);
+            setSolarSystemNodeId(null);
+            setFlyToNodeId(null);
+            setHighlightedNodes([]);
+            setPathData({ nodes: [], links: [] });
+            return;
+        }
+        const stillExists = (id: string | null) => id != null && nodeIdsSet.has(id);
+        setSelectedNode((prev: any) => {
+            if (!prev) return null;
+            const id = typeof prev.id === 'string' ? prev.id : prev.id?.id;
+            return stillExists(id) ? prev : null;
+        });
+        setFocusedNodeId((prev) => (stillExists(prev) ? prev : null));
+        setZenModeNodeId((prev) => (stillExists(prev) ? prev : null));
+        setSolarSystemNodeId((prev) => (stillExists(prev) ? prev : null));
+        setFlyToNodeId((prev) => (stillExists(prev) ? prev : null));
+        setHighlightedNodes((prev) => prev.filter((id) => nodeIdsSet.has(id)));
+        setPathData((prev) => ({
+            nodes: prev.nodes.filter((id) => nodeIdsSet.has(id)),
+            links: prev.links,
+        }));
+    }, [data.nodes.length, nodeIdsSet]);
+
     useEffect(() => {
         // Чекаємо, поки завантажаться основні дані нод
         if (!isLoading && data.nodes.length > 0 && !isProcessing) {
@@ -300,13 +340,8 @@ export default function Home() {
 
             if (pendingNodes.length > 0) {
                 console.log(`🚀 Found ${pendingNodes.length} unprocessed nodes. Resuming AI sync...`);
-                
-                const allExistingIds = data.nodes.map((n: any) => 
-                    typeof n.id === 'string' ? n.id : n.id?.id
-                );
-
-                // Запускаємо чергу автоматично
-                processQueue(pendingNodes, allExistingIds);
+                const MAX_NODES_PER_RUN = 25;
+                processQueue(pendingNodes.slice(0, MAX_NODES_PER_RUN), data.nodes);
             }
         }
     }, [isLoading, data.nodes.length]);
@@ -544,7 +579,7 @@ export default function Home() {
                 isOpen={isAddModalOpen} 
                 onClose={() => setIsAddModalOpen(false)}
                 onAdd={handleAddWithAI}
-                existingNodes={existingNodeIds}
+                existingNodes={data.nodes}
                 allTags={allTags}
             />
 

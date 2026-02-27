@@ -9,6 +9,25 @@ function cleanJsonString(str: string) {
     return str.replace(/```json/g, "").replace(/```/g, "").trim();
 }
 
+function parseRetryAfterSeconds(message: string): number | undefined {
+    // Examples we may see:
+    // - "Please retry in 36.6229s."
+    // - ..."\"retryDelay\":\"36s\""
+    const m1 = message.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i);
+    if (m1?.[1]) return Math.max(1, Math.ceil(Number(m1[1])));
+    const m2 = message.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
+    if (m2?.[1]) return Math.max(1, Number(m2[1]));
+    return undefined;
+}
+
+function isRateLimitError(err: unknown): { retryAfterSeconds?: number } | null {
+    const message = err instanceof Error ? err.message : String(err ?? "");
+    const looksLike429 = /(^|\b)429(\b|$)/.test(message) || /too many requests/i.test(message);
+    const looksLikeQuota = /quota/i.test(message) || /rate limit/i.test(message);
+    if (!looksLike429 && !looksLikeQuota) return null;
+    return { retryAfterSeconds: parseRetryAfterSeconds(message) };
+}
+
 // Semantic groups for graph clustering (same as GraphNetwork groupNames)
 const GROUP_DEF = "1=Development/Tech, 2=AI/ML, 3=Finance/Business, 4=Design/Creative, 5=Research/Education";
 
@@ -67,8 +86,20 @@ export async function POST(req: Request) {
                 }
             `;
 
-            const result = await model.generateContent(prompt);
-            const text = cleanJsonString(result.response.text());
+            let text = "";
+            try {
+                const result = await model.generateContent(prompt);
+                text = cleanJsonString(result.response.text());
+            } catch (err) {
+                const rate = isRateLimitError(err);
+                if (rate) {
+                    return NextResponse.json(
+                        { error: 'RATE_LIMIT', retryAfterSeconds: rate.retryAfterSeconds ?? 40 },
+                        { status: 429 }
+                    );
+                }
+                throw err;
+            }
             
             try {
                 const parsed = JSON.parse(text);
@@ -120,8 +151,20 @@ export async function POST(req: Request) {
                 }
             `;
 
-            const result = await model.generateContent(prompt);
-            const text = cleanJsonString(result.response.text());
+            let text = "";
+            try {
+                const result = await model.generateContent(prompt);
+                text = cleanJsonString(result.response.text());
+            } catch (err) {
+                const rate = isRateLimitError(err);
+                if (rate) {
+                    return NextResponse.json(
+                        { error: 'RATE_LIMIT', retryAfterSeconds: rate.retryAfterSeconds ?? 40 },
+                        { status: 429 }
+                    );
+                }
+                throw err;
+            }
             
             try {
                 const parsed = JSON.parse(text);

@@ -21,10 +21,21 @@ export function useGraphData(supabase: any) {
                     if (nodesError) throw nodesError;
                     if (linksError) throw linksError;
 
+                    const nodeIdSet = new Set(
+                        (nodesData || [])
+                            .map((n: any) => (typeof n?.id === 'string' ? n.id : n?.id))
+                            .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+                    );
+
                     const formattedLinks = linksData?.map((l: any) => ({
                         ...l,
                         relationType: l.relation_type || 'manual'
-                    })) || [];
+                    })).filter((l: any) => {
+                        const s = typeof l.source === 'string' ? l.source : l.source?.id;
+                        const t = typeof l.target === 'string' ? l.target : l.target?.id;
+                        // Drop orphaned links so the force-graph never throws "node not found"
+                        return typeof s === 'string' && typeof t === 'string' && nodeIdSet.has(s) && nodeIdSet.has(t);
+                    }) || [];
 
                     const normalizedNodes = (nodesData || []).map((n: any) => ({
                         ...n,
@@ -43,16 +54,27 @@ export function useGraphData(supabase: any) {
         initSession();
     }, [supabase]);
 
-    const addNewNode = async (nodeData: NodeData) => {
-        if (!user) return;
+    const addNewNode = async (nodeData: NodeData): Promise<any> => {
+        if (!user) return undefined;
 
         let group = 1;
         if (nodeData.type === 'link') group = 1;
         if (nodeData.type === 'note') group = 2;
         if (nodeData.type === 'idea') group = 3;
 
-        const newNode = { 
-            id: nodeData.title,
+        const existingIdSet = new Set(
+            data.nodes
+                .map((n: any) => (typeof n?.id === 'string' ? n.id : n?.id))
+                .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+        );
+        const validTargetIds = (nodeData.connections || [])
+            .map((id) => String(id))
+            .filter((id) => existingIdSet.has(id));
+
+        const newId = crypto.randomUUID();
+        const newNode = {
+            id: newId,
+            title: nodeData.title,
             group: group,
             val: 5,
             type: nodeData.type,
@@ -62,8 +84,8 @@ export function useGraphData(supabase: any) {
             full_data: nodeData
         };
 
-        const newLinks: any[] = nodeData.connections.map(targetNodeId => ({
-            source: nodeData.title,
+        const newLinks: any[] = validTargetIds.map(targetNodeId => ({
+            source: newId,
             target: targetNodeId,
             relationType: nodeData.autoConnectAI ? 'ai' : 'manual',
             label: nodeData.autoConnectAI ? 'AI connection' : 'Manual connection',
@@ -81,21 +103,21 @@ export function useGraphData(supabase: any) {
         };
 
         const { error: nodeError } = await supabase.from('nodes').insert(dbNode);
-        
+
         if (nodeError) {
             console.error("🔴 Failed to save node:", nodeError.message, nodeError.details);
-            
+
             setData(prev => ({
                 nodes: prev.nodes.filter(n => n.id !== newNode.id),
-                links: prev.links.filter(l => 
+                links: prev.links.filter(l =>
                     (typeof l.source === 'object' ? l.source.id : l.source) !== newNode.id &&
                     (typeof l.target === 'object' ? l.target.id : l.target) !== newNode.id
                 )
             }));
-            
-            return;
+
+            return undefined;
         }
-        
+
         if (newLinks.length > 0) {
             const dbLinks = newLinks.map(l => ({
                 source: typeof l.source === 'object' ? l.source.id : l.source,
@@ -106,11 +128,13 @@ export function useGraphData(supabase: any) {
                 user_id: user.id
             }));
             const { error: linkError } = await supabase.from('links').insert(dbLinks);
-            
+
             if (linkError) {
                 console.error("🔴 Failed to save links:", linkError.message);
             }
         }
+
+        return newNode;
     };
 
     const addLink = async (sourceId: string, targetId: string, type = 'manual', label = 'Manual connection') => {
@@ -145,14 +169,12 @@ export function useGraphData(supabase: any) {
     const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, is_ai_processed?: boolean, group?: number }) => {
         if (!user) return;
 
-        const newId = newData.title ?? nodeId;
-
         setData((prev) => {
             const newNodes = prev.nodes.map((node) => {
                 if (node.id === nodeId) {
                     return {
                         ...node,
-                        id: newId,
+                        title: newData.title ?? node.title,
                         content: newData.content ?? node.content,
                         tags: newData.tags ?? node.tags,
                         url: newData.url ?? node.url,
@@ -162,28 +184,18 @@ export function useGraphData(supabase: any) {
                 }
                 return node;
             });
-
-            const newLinks = prev.links.map((link) => {
-                const currentSourceId = typeof link.source === 'object' ? link.source.id : link.source;
-                const currentTargetId = typeof link.target === 'object' ? link.target.id : link.target;
-                return { 
-                    ...link, 
-                    source: currentSourceId === nodeId ? newId : currentSourceId, 
-                    target: currentTargetId === nodeId ? newId : currentTargetId 
-                };
-            });
-
-            return { nodes: newNodes, links: newLinks };
+            return { ...prev, nodes: newNodes };
         });
 
-        const dbUpdate: Record<string, unknown> = {
-            id: newId,
-            content: newData.content,
-            tags: newData.tags,
-            url: newData.url,
-            is_ai_processed: newData.is_ai_processed,
-        };
+        const dbUpdate: Record<string, unknown> = {};
+        if (newData.title !== undefined) dbUpdate.title = newData.title;
+        if (newData.content !== undefined) dbUpdate.content = newData.content;
+        if (newData.tags !== undefined) dbUpdate.tags = newData.tags;
+        if (newData.url !== undefined) dbUpdate.url = newData.url;
+        if (newData.is_ai_processed !== undefined) dbUpdate.is_ai_processed = newData.is_ai_processed;
         if (newData.group !== undefined) dbUpdate.group = newData.group;
+
+        if (Object.keys(dbUpdate).length === 0) return;
 
         await supabase.from('nodes')
             .update(dbUpdate)
@@ -234,11 +246,11 @@ export function useGraphData(supabase: any) {
         console.log('Call -> importData()');
         if (!user) return;
 
-        // Готуємо дані для вставки
         const nodesToInsert = bookmarks.map(b => ({
-            id: b.title.replace(/[\n\r]/g, ' ').trim(),
-            url: b.url,         // Тепер база знає про цю колонку
-            content: b.url,     // Дублюємо в контент для пошуку
+            id: crypto.randomUUID(),
+            title: b.title.replace(/[\n\r]/g, ' ').trim(),
+            url: b.url,
+            content: b.url,
             type: 'link',
             group: 1,
             tags: b.tags || [],
@@ -246,18 +258,9 @@ export function useGraphData(supabase: any) {
             val: 5
         }));
 
-        // Очищаємо від дублікатів всередині самого масиву (клієнтська перевірка)
-        const uniqueNodes = nodesToInsert.filter((v, i, a) => 
-            a.findIndex(t => t.id === v.id) === i
-        );
-
-        // 🔥 UPSERT з ігноруванням дублікатів
         const { data: insertedNodes, error } = await supabase
             .from('nodes')
-            .upsert(uniqueNodes, { 
-                onConflict: 'id', 
-                ignoreDuplicates: true 
-            })
+            .insert(nodesToInsert)
             .select();
 
         if (error) {

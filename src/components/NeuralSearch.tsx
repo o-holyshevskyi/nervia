@@ -212,6 +212,7 @@ export default function NeuralSearch({
                     </p>
                     {textFilteredNodes.map((node: any) => {
                       const idStr = typeof node.id === "string" ? node.id : node.id?.id;
+                      const label = node.title ?? node.content ?? idStr;
                       return (
                         <button
                           key={idStr}
@@ -224,7 +225,7 @@ export default function NeuralSearch({
                               {getNodeIcon(node.type)}
                             </div>
                             <div>
-                              <p className="text-white text-sm font-medium">{idStr}</p>
+                              <p className="text-white text-sm font-medium">{label}</p>
                               {node.tags && node.tags.length > 0 && (
                                 <p className="text-xs text-neutral-500 mt-0.5">#{node.tags[0]}</p>
                               )}
@@ -257,7 +258,7 @@ export default function NeuralSearch({
                             <div className="p-2 bg-white/5 rounded-lg group-hover:bg-white/10 transition-colors shrink-0">
                               {node ? getNodeIcon(node.type) : <FileText size={14} className="text-neutral-400" />}
                             </div>
-                            <span className="text-white font-medium truncate">{r.id}</span>
+                            <span className="text-white font-medium truncate">{node ? (node.title ?? node.content ?? r.id) : r.id}</span>
                           </div>
                           <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 shrink-0">
                             {r.relevance}%
