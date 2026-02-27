@@ -5,7 +5,7 @@ import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import AddModal from "@/src/components/AddModal";
-import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route } from "lucide-react";
+import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route, Sun } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
 import CommandPalette from "@/src/components/CommandPalette";
 import ContextMenu from "@/src/components/ui/ContextMenu";
@@ -46,6 +46,7 @@ export default function Home() {
     const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
     const [zenModeNodeId, setZenModeNodeId] = useState<string | null>(null);
+    const [solarSystemNodeId, setSolarSystemNodeId] = useState<string | null>(null);
     const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
         repulsion: 150,
         linkDistance: 60
@@ -338,6 +339,7 @@ export default function Home() {
                 onFlyToComplete={() => setFlyToNodeId(null)}
                 onNodeContextMenu={handleNodeContextMenu}
                 onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
+                solarSystemNodeId={solarSystemNodeId}
             />
             <div className="absolute top-10 left-10 pointer-events-none">
                 <h1 className="text-4xl font-bold text-white tracking-tighter">Synapse Bookmark</h1>
@@ -415,6 +417,21 @@ export default function Home() {
                         </motion.button>
                     )}
 
+                    {solarSystemNodeId !== null && (
+                        <motion.button
+                            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                            key={'deep-focus'}
+                            onClick={() => setSolarSystemNodeId(null)}
+                            className="hover:cursor-pointer flex items-center gap-2 px-4 py-2 bg-amber-500/20 backdrop-blur-md border border-amber-500/50 rounded-full text-amber-300 hover:text-amber-500/40 hover:text-white shadow-[0_0_20px_rgba(245,158,11,0.3)]"
+                        >
+                            <Sun size={14} className="opacity-70" />
+                            <span className="text-sm font-medium">Exit Deep Focus</span>
+                            <X size={14} className="opacity-70" />
+                        </motion.button>
+                    )}
+
                     {highlightedNodes.length > 0 && (
                         <motion.button
                             initial={{ opacity: 0, y: -10, scale: 0.9 }}
@@ -455,9 +472,7 @@ export default function Home() {
                 node={contextMenu.node}
                 isZenModeActive={zenModeNodeId !== null}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
-                onFocus={(nodeId) => {
-                    setFocusedNodeId(nodeId);
-                }}
+                onDeepFocus={(nodeId) => setSolarSystemNodeId(nodeId)}
                 onZenMode={toggleZenMode}
                 onEdit={(node) => {
                     setSelectedNode(node);

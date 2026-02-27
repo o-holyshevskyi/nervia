@@ -2,7 +2,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Crosshair, Copy, Edit2, Trash2, Eye } from "lucide-react";
+import { Copy, Edit2, Trash2, Eye, Sun } from "lucide-react";
 import { useEffect } from "react";
 
 interface ContextMenuProps {
@@ -13,13 +13,13 @@ interface ContextMenuProps {
     isZenModeActive: boolean;
     isActiveTag: boolean;
     onClose: () => void;
-    onFocus: (nodeId: string) => void;
+    onDeepFocus: (nodeId: string) => void;
     onEdit: (node: any) => void;
     onDelete: (nodeId: string) => void;
     onZenMode: (nodeId: string) => void;
 }
 
-export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isActiveTag, onClose, onFocus, onEdit, onDelete, onZenMode }: ContextMenuProps) {
+export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isActiveTag, onClose, onDeepFocus, onEdit, onDelete, onZenMode }: ContextMenuProps) {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") onClose();
@@ -52,12 +52,12 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
 
                         <button
                             onClick={() => {
-                                onFocus(typeof node.id === 'string' ? node.id : node.id?.id);
+                                onDeepFocus(typeof node.id === 'string' ? node.id : node.id?.id);
                                 onClose();
                             }}
                             className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
-                            <Crosshair size={14} className="text-blue-400" /> Focus
+                            <Sun size={14} className="text-amber-400" /> Deep Focus
                         </button>
 
                         <button

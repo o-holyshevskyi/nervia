@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from 'next/dynamic';
-import { forceManyBody, forceX, forceY } from 'd3-force';
+import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
 import { FileText, Lightbulb, LinkIcon, Sparkles } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -143,6 +143,7 @@ interface GraphNetworkProps {
     pathLinks?: any[];
     flyToNodeId?: string | null;
     onFlyToComplete?: () => void;
+    solarSystemNodeId?: string | null;
     onNodeSelect: (node: any) => void;
     onNodeContextMenu?: (node: any, event: MouseEvent) => void; 
     onBackgroundClick?: () => void;
@@ -166,7 +167,8 @@ export default function GraphNetwork({
     pathNodes = [],
     pathLinks = [],
     flyToNodeId = null,
-    onFlyToComplete
+    onFlyToComplete,
+    solarSystemNodeId = null
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
@@ -190,6 +192,20 @@ export default function GraphNetwork({
         }
         return neighbors;
     }, [zenModeNodeId, graphData.links]);
+
+    const solarNeighbors = useMemo(() => {
+        const neighbors = new Set<string>();
+        if (solarSystemNodeId) {
+            neighbors.add(solarSystemNodeId);
+            graphData.links.forEach((link: any) => {
+                const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
+                const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
+                if (sourceId === solarSystemNodeId) neighbors.add(targetId);
+                if (targetId === solarSystemNodeId) neighbors.add(sourceId);
+            });
+        }
+        return neighbors;
+    }, [solarSystemNodeId, graphData.links]);
 
     const nodeIdToGroupMap = useMemo(() => {
         const m = new Map<string | number, number>();
@@ -307,6 +323,12 @@ export default function GraphNetwork({
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
         const tId = typeof link.target === 'string' ? link.target : link.target?.id;
 
+        // Solar System (Deep Focus): hide links where BOTH endpoints are outside the solar set
+        if (solarSystemNodeId) {
+            if (!solarNeighbors.has(sId) && !solarNeighbors.has(tId)) return true;
+            return false;
+        }
+
         // Pathfinder: show only path links; hide all others
         if (pathfinderActive) {
             return !isPathLink(link);
@@ -332,7 +354,7 @@ export default function GraphNetwork({
             }
         }
         return false;
-    }, [pathfinderActive, isPathLink, searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
+    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, isPathLink, searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
 
     const drawNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const x = Number(node.x);
@@ -344,36 +366,53 @@ export default function GraphNetwork({
         const rawSize = (node.val ?? 4) * 1;
         let size = Math.min(20, Math.max(6, rawSize));
 
-        // Pathfinder mode overrides Zen and search
-        const isPathNode = pathfinderActive && pathNodeSet.has(idStr);
-        const pathStartId = pathNodes[0];
-        const pathEndId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
-        const isPathStart = idStr === pathStartId;
-        const isPathEnd = pathEndId != null && idStr === pathEndId;
-
-        const isSearchHighlighted = !pathfinderActive && searchActive && highlightedSet.has(idStr);
-        if (searchActive && !pathfinderActive) {
-            if (isSearchHighlighted) size = Math.min(24, size * 1.2);
-        }
-        if (pathfinderActive && isPathNode) size = Math.min(24, size * 1.2);
-
-        // 1. Визначаємо стан прихованості (when search active, non-highlighted are dim)
-        const isZenHidden = !pathfinderActive && !searchActive && zenModeNodeId && !zenModeNeighbors.has(idStr);
-        const isTagHidden = !pathfinderActive && !searchActive && activeTag && (!node.tags || !node.tags.includes(activeTag));
-        const isDimmedBySearch = !pathfinderActive && searchActive && !isSearchHighlighted;
-        const isDimmedByPath = pathfinderActive && !isPathNode;
-        const isHidden = isZenHidden || isTagHidden || isDimmedBySearch || isDimmedByPath;
-
-        // Визначаємо колір: pathfinder start=cyan, end=orange, path=cyan; else group/search
+        // Solar System (Deep Focus): top priority
+        let isHidden = false;
         let baseColor: string;
-        if (pathfinderActive) {
-            if (isPathStart) baseColor = "#06b6d4";
-            else if (isPathEnd) baseColor = "#f97316";
-            else if (isPathNode) baseColor = "#06b6d4";
-            else baseColor = "rgba(50, 50, 50, 0.1)";
+        let strongGlow = false;
+        if (solarSystemNodeId) {
+            if (!solarNeighbors.has(idStr)) {
+                isHidden = true;
+                baseColor = "rgba(10, 10, 10, 0.05)";
+            } else if (idStr === solarSystemNodeId) {
+                baseColor = "#eab308";
+                size = Math.min(28, size * 1.3);
+                strongGlow = true;
+            } else {
+                const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
+                baseColor = groupColors[group] ?? "#06b6d4";
+                strongGlow = true;
+            }
         } else {
-            const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
-            baseColor = isSearchHighlighted ? "#a855f7" : (groupColors[group] ?? "#ec4899");
+            // Pathfinder mode overrides Zen and search
+            const isPathNode = pathfinderActive && pathNodeSet.has(idStr);
+            const pathStartId = pathNodes[0];
+            const pathEndId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
+            const isPathStart = idStr === pathStartId;
+            const isPathEnd = pathEndId != null && idStr === pathEndId;
+
+            const isSearchHighlighted = !pathfinderActive && searchActive && highlightedSet.has(idStr);
+            if (searchActive && !pathfinderActive) {
+                if (isSearchHighlighted) size = Math.min(24, size * 1.2);
+            }
+            if (pathfinderActive && isPathNode) size = Math.min(24, size * 1.2);
+
+            const isZenHidden = !pathfinderActive && !searchActive && zenModeNodeId && !zenModeNeighbors.has(idStr);
+            const isTagHidden = !pathfinderActive && !searchActive && activeTag && (!node.tags || !node.tags.includes(activeTag));
+            const isDimmedBySearch = !pathfinderActive && searchActive && !isSearchHighlighted;
+            const isDimmedByPath = pathfinderActive && !isPathNode;
+            isHidden = isZenHidden || isTagHidden || isDimmedBySearch || isDimmedByPath;
+
+            if (pathfinderActive) {
+                if (isPathStart) baseColor = "#06b6d4";
+                else if (isPathEnd) baseColor = "#f97316";
+                else if (isPathNode) baseColor = "#06b6d4";
+                else baseColor = "rgba(50, 50, 50, 0.1)";
+            } else {
+                const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
+                baseColor = isSearchHighlighted ? "#a855f7" : (groupColors[group] ?? "#ec4899");
+            }
+            strongGlow = (searchActive && highlightedSet.has(idStr)) || (pathfinderActive && pathNodeSet.has(idStr));
         }
 
         // Колір для контуру та тексту
@@ -387,8 +426,7 @@ export default function GraphNetwork({
         ctx.fillStyle = isHidden ? 'rgba(0, 0, 0, 0)' : 'rgba(0, 0, 0, 0.2)'; 
         ctx.fill();
 
-        // Налаштування бордера (stronger glow for search/path highlight)
-        const strongGlow = isSearchHighlighted || isPathNode;
+        // Налаштування бордера (stronger glow for search/path/solar highlight)
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = strongGlow ? 2.5 / globalScale : 2 / globalScale;
         ctx.shadowColor = strokeColor;
@@ -452,7 +490,7 @@ export default function GraphNetwork({
             ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)';
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
+    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -471,52 +509,86 @@ export default function GraphNetwork({
     }, []);
 
     useEffect(() => {
-        if (fgRef.current) {
-            const fg = fgRef.current;
-            const cx = dimensions.width / 2;
-            const cy = dimensions.height / 2;
-            const minDim = Math.min(dimensions.width, dimensions.height);
-            const radius = minDim * 0.35;
+        if (!fgRef.current) return;
+        const fg = fgRef.current;
+        const cx = dimensions.width / 2;
+        const cy = dimensions.height / 2;
+        const minDim = Math.min(dimensions.width, dimensions.height);
+        const radius = minDim * 0.35;
 
-            const groupIds = [...new Set(graphData.nodes.map((n: any) => getNodeGroup(n)))].sort((a, b) => a - b);
-            const clusterCenters: Record<number, { x: number; y: number }> = {};
-            groupIds.forEach((g, i) => {
-                const angle = (i / Math.max(1, groupIds.length)) * 2 * Math.PI;
-                clusterCenters[g] = {
-                    x: cx + radius * Math.cos(angle),
-                    y: cy + radius * Math.sin(angle),
-                };
-            });
-
-            const nodeIdToGroup = new Map<string | number, number>();
-            graphData.nodes.forEach((n: any) => {
-                const id = typeof n.id === 'string' ? n.id : n?.id;
-                if (id != null) nodeIdToGroup.set(id, getNodeGroup(n));
-            });
-
-            fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
-
-            const getGroupForNode = (node: any) => {
-                const id = typeof node.id === 'string' ? node.id : node?.id;
-                return id != null ? (nodeIdToGroup.get(id) ?? getNodeGroup(node)) : getNodeGroup(node);
+        const groupIds = [...new Set(graphData.nodes.map((n: any) => getNodeGroup(n)))].sort((a, b) => a - b);
+        const clusterCenters: Record<number, { x: number; y: number }> = {};
+        groupIds.forEach((g, i) => {
+            const angle = (i / Math.max(1, groupIds.length)) * 2 * Math.PI;
+            clusterCenters[g] = {
+                x: cx + radius * Math.cos(angle),
+                y: cy + radius * Math.sin(angle),
             };
-            fg.d3Force('center', null);
+        });
+
+        const nodeIdToGroup = new Map<string | number, number>();
+        graphData.nodes.forEach((n: any) => {
+            const id = typeof n.id === 'string' ? n.id : n?.id;
+            if (id != null) nodeIdToGroup.set(id, getNodeGroup(n));
+        });
+
+        const getGroupForNode = (node: any) => {
+            const id = typeof node.id === 'string' ? node.id : node?.id;
+            return id != null ? (nodeIdToGroup.get(id) ?? getNodeGroup(node)) : getNodeGroup(node);
+        };
+
+        const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
+
+        if (solarSystemNodeId && solarNeighbors.size > 0) {
+            // Solar System mode: lock sun at center, neighbors on radial ring
+            const centerNode = processedData.nodes.find(
+                (n: any) => getNodeIdStr(n) === solarSystemNodeId
+            );
+            if (centerNode) {
+                (centerNode as any).fx = cx;
+                (centerNode as any).fy = cy;
+            }
+            fg.d3Force('x', null);
+            fg.d3Force('y', null);
+            fg.d3Force('radial', forceRadial(250, cx, cy).strength((node: any) =>
+                solarNeighbors.has(getNodeIdStr(node)) ? 1 : 0
+            ));
+            fg.d3Force('collide', forceCollide(24).strength(1));
+        } else {
+            // Normal mode: clear all fx/fy so no node stays pinned
+            processedData.nodes.forEach((node: any) => {
+                delete (node as any).fx;
+                delete (node as any).fy;
+            });
+            fg.d3Force('radial', null);
+            fg.d3Force('collide', null);
             fg.d3Force('x', forceX((node: any) => clusterCenters[getGroupForNode(node)]?.x ?? cx).strength(0.08));
             fg.d3Force('y', forceY((node: any) => clusterCenters[getGroupForNode(node)]?.y ?? cy).strength(0.08));
-
-            const linkForce = fg.d3Force('link');
-            if (linkForce) {
-                linkForce.distance(physicsConfig.linkDistance);
-                linkForce.strength((link: any) => {
-                    const s = typeof link.source === 'object' ? getGroupForNode(link.source) : nodeIdToGroup.get(link.source);
-                    const t = typeof link.target === 'object' ? getGroupForNode(link.target) : nodeIdToGroup.get(link.target);
-                    return s !== undefined && t !== undefined && s === t ? 0.7 : 0.1;
-                });
-            }
-
-            fg.d3ReheatSimulation();
         }
-    }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes]);
+
+        fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
+        fg.d3Force('center', null);
+
+        const linkForce = fg.d3Force('link');
+        if (linkForce) {
+            linkForce.distance(physicsConfig.linkDistance);
+            linkForce.strength((link: any) => {
+                const s = typeof link.source === 'object' ? getGroupForNode(link.source) : nodeIdToGroup.get(link.source);
+                const t = typeof link.target === 'object' ? getGroupForNode(link.target) : nodeIdToGroup.get(link.target);
+                return s !== undefined && t !== undefined && s === t ? 0.7 : 0.1;
+            });
+        }
+
+        fg.d3ReheatSimulation();
+    }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes]);
+
+    useEffect(() => {
+        if (!solarSystemNodeId || !fgRef.current) return;
+        const cx = dimensions.width / 2;
+        const cy = dimensions.height / 2;
+        fgRef.current.centerAt(cx, cy, 800);
+        fgRef.current.zoom(3, 800);
+    }, [solarSystemNodeId, dimensions.width, dimensions.height]);
 
     const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
         lastTransformRef.current = { k: transform.k, x: transform.x, y: transform.y };
@@ -641,6 +713,12 @@ export default function GraphNetwork({
                 }}
                 nodeColor={(node: any) => {
                     const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                    if (solarSystemNodeId) {
+                        if (!solarNeighbors.has(nodeId)) return "rgba(10, 10, 10, 0.05)";
+                        if (nodeId === solarSystemNodeId) return "#eab308";
+                        const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
+                        return groupColors[group] ?? "#06b6d4";
+                    }
                     if (pathfinderActive) {
                         if (pathNodeSet.has(nodeId)) {
                             const startId = pathNodes[0];
@@ -662,6 +740,7 @@ export default function GraphNetwork({
                     return groupColors[group] ?? "#ec4899";
                 }}
                 linkWidth={(link: any) => {
+                    if (solarSystemNodeId && !isLinkHidden(link)) return 2;
                     if (pathfinderActive) return isPathLink(link) ? 4 : 0.5;
                     return link === hoveredLink ? 2 : link.weight || 1;
                 }}
@@ -675,6 +754,7 @@ export default function GraphNetwork({
                 linkDirectionalParticleColor={() => (pathfinderActive ? "#ffffff" : "#fafafa")}
                 linkColor={(link: any) => {
                     if (isLinkHidden(link)) return "rgba(0,0,0,0)";
+                    if (solarSystemNodeId) return "rgba(251, 191, 36, 0.9)";
                     if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
                     if (pathfinderActive) return "rgba(0,0,0,0)";
                     if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : "#ffffff";
