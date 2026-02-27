@@ -63,4 +63,13 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+
+    /* Scroll hint: hide scrollbar but keep scroll; use with scroll-shadow overlays in sidebars */
+    .scroll-hint::-webkit-scrollbar {
+        display: none;
+    }
+    .scroll-hint {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
 }

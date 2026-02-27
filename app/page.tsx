@@ -13,6 +13,7 @@ import PhysicsControl, { PhysicsConfig } from "@/src/components/PhysicsControl";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGraphData } from "@/src/hooks/useGraphData";
 import { useAIProcessor } from "@/src/hooks/useAIProcessor";
+import { useGroups } from "@/src/hooks/useGroups";
 import { createClient } from "@/src/lib/supabase/client";
 import AIStatusBar from "@/src/components/AIStatusBar";
 import NeuralSearch from "@/src/components/NeuralSearch";
@@ -41,8 +42,11 @@ export default function Home() {
         data.nodes
     );
 
+    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup } = useGroups(supabase);
+
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [addError, setAddError] = useState<string | null>(null);
     const [activeTag, setActiveTag] = useState<string | null>(null);
     const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
@@ -184,11 +188,19 @@ export default function Home() {
     }, [data.nodes]);
 
     const handleAddWithAI = async (nodeData: any) => {
+        setAddError(null);
         setAiTotal(1);
         setAiProgress(0);
         setIsAIProcessing(true);
 
-        const createdNode = await addNewNode(nodeData);
+        let createdNode: any;
+        try {
+            createdNode = await addNewNode(nodeData);
+        } catch (e) {
+            setAddError(e instanceof Error ? e.message : 'Failed to add neuron.');
+            setIsAIProcessing(false);
+            return;
+        }
         if (!createdNode) {
             setIsAIProcessing(false);
             return;
@@ -207,16 +219,16 @@ export default function Home() {
                 });
 
                 const aiResponse = await res.json();
-                const validGroup = typeof aiResponse.group === 'number' && aiResponse.group >= 1 && aiResponse.group <= 5 ? aiResponse.group : undefined;
+                const groupId = typeof aiResponse.group_id === 'string' && aiResponse.group_id.length > 0 ? aiResponse.group_id : undefined;
 
                 if (aiResponse.description && !nodeData.content) {
                     await updateNode(createdNode.id, {
                         content: aiResponse.description,
                         is_ai_processed: true,
-                        ...(validGroup !== undefined && { group: validGroup }),
+                        ...(groupId !== undefined && { group_id: groupId }),
                     });
-                } else if (validGroup !== undefined) {
-                    await updateNode(createdNode.id, { group: validGroup });
+                } else if (groupId !== undefined) {
+                    await updateNode(createdNode.id, { group_id: groupId });
                 }
 
                 if (Array.isArray(aiResponse.connections)) {
@@ -363,6 +375,7 @@ export default function Home() {
                 onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 solarSystemNodeId={solarSystemNodeId}
                 clusterMode={clusterMode}
+                groups={groups}
             />
             <div className="absolute top-10 left-10 pointer-events-none">
                 <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Synapse Bookmark</h1>
@@ -550,6 +563,9 @@ export default function Home() {
                 onOpenTimeline={() => setIsTimelineOpen(true)}
                 clusterMode={clusterMode}
                 onClusterModeChange={setClusterMode}
+                groups={groups}
+                onAddGroup={onAddGroup}
+                onDeleteGroup={onDeleteGroup}
             />
 
             <Sidebar 
@@ -559,14 +575,17 @@ export default function Home() {
                 allNodes={data}
                 onAddLink={addLink}
                 onDeleteLink={deleteLink}
+                groups={groups}
+                onAddGroup={onAddGroup}
             />
 
             <AddModal 
                 isOpen={isAddModalOpen} 
-                onClose={() => setIsAddModalOpen(false)}
+                onClose={() => { setIsAddModalOpen(false); setAddError(null); }}
                 onAdd={handleAddWithAI}
                 existingNodes={data.nodes}
                 allTags={allTags}
+                submitError={addError}
             />
 
             <CommandPalette onOpenSearch={openSearch} />

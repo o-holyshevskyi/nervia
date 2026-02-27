@@ -16,15 +16,23 @@ export interface NodeData {
     autoConnectAI: boolean;
 }
 
+function normalizeUrlForCompare(url: string | undefined): string {
+    if (url == null || typeof url !== 'string') return '';
+    const t = url.trim().toLowerCase();
+    if (!t) return '';
+    return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+
 interface AddModalProps {
     isOpen: boolean;
     existingNodes: any[];
     allTags: string[];
     onClose: () => void;
     onAdd: (data: NodeData) => void;
+    submitError?: string | null;
 }
 
-export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose }: AddModalProps) {
+export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError }: AddModalProps) {
     const [activeTab, setActiveTab] = useState<'link' | 'note' | 'idea'>('link');
     const [title, setTitle] = useState("");
     const [url, setUrl] = useState("");
@@ -46,13 +54,24 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
         const trimmedTitle = title.trim();
         if (!trimmedTitle) return;
 
-        const isDuplicate = existingNodes.some((n: any) =>
+        const isDuplicateTitle = existingNodes.some((n: any) =>
             (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase() === trimmedTitle.toLowerCase()
         );
-
-        if (isDuplicate) {
+        if (isDuplicateTitle) {
             setError(`A neuron named "${trimmedTitle}" already exists in your universe.`);
-            return; // Зупиняємо збереження!
+            return;
+        }
+
+        if (activeTab === 'link' && url.trim()) {
+            const urlNorm = normalizeUrlForCompare(url);
+            const isDuplicateUrl = existingNodes.some((n: any) => {
+                const u = (n.url ?? '').toString().trim();
+                return u && normalizeUrlForCompare(u) === urlNorm;
+            });
+            if (isDuplicateUrl) {
+                setError('A neuron with this URL already exists.');
+                return;
+            }
         }
 
         onAdd({
@@ -431,7 +450,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             </div>
 
                             <AnimatePresence>
-                                {error && (
+                                {(submitError || error) && (
                                     <motion.div
                                         initial={{ opacity: 0, height: 0, x: 0 }}
                                         animate={{ 
@@ -448,7 +467,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                     >
                                         <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-sm font-medium">
                                             <AlertCircle size={16} className="shrink-0" />
-                                            {error}
+                                            {submitError || error}
                                         </div>
                                     </motion.div>
                                 )}

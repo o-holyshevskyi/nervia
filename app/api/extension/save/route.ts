@@ -5,6 +5,13 @@ import { cookies } from 'next/headers';
 
 const EXTENSION_ORIGIN = 'chrome-extension://nfegmgojbdgmkphphhnkjonomeeffhkj';
 
+function normalizeUrl(url: string | undefined): string {
+  if (url == null || typeof url !== 'string') return '';
+  const t = url.trim().toLowerCase();
+  if (!t) return '';
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': EXTENSION_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -81,14 +88,45 @@ export async function POST(request: Request) {
     }
 
     const tagsArray = Array.isArray(tags) ? tags : [];
+    const trimmedTitle = title.trim();
+    const urlNorm = normalizeUrl(url);
+
+    const { data: existingNodes } = await supabase
+      .from('nodes')
+      .select('title, url')
+      .eq('user_id', user.id);
+
+    const duplicateTitle = (existingNodes ?? []).some(
+      (n: { title?: string; url?: string }) =>
+        (n.title ?? '').toString().trim().toLowerCase() === trimmedTitle.toLowerCase()
+    );
+    if (duplicateTitle) {
+      return NextResponse.json(
+        { error: `A neuron with the title "${trimmedTitle}" already exists.` },
+        { status: 409, headers: corsHeaders }
+      );
+    }
+
+    if (urlNorm) {
+      const duplicateUrl = (existingNodes ?? []).some((n: { title?: string; url?: string }) => {
+        const u = (n.url ?? '').toString().trim();
+        return u && normalizeUrl(u) === urlNorm;
+      });
+      if (duplicateUrl) {
+        return NextResponse.json(
+          { error: 'A neuron with this URL already exists.' },
+          { status: 409, headers: corsHeaders }
+        );
+      }
+    }
 
     const record = {
       id: crypto.randomUUID(),
-      title,
-      url,
+      title: trimmedTitle,
+      url: url.trim(),
       type: 'link',
       tags: tagsArray,
-      content: title,
+      content: trimmedTitle,
       user_id: user.id,
       created_at: new Date().toISOString(),
       is_ai_processed: false,

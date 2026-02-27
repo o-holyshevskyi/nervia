@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from "@/src/lib/supabase/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -28,21 +29,92 @@ function isRateLimitError(err: unknown): { retryAfterSeconds?: number } | null {
     return { retryAfterSeconds: parseRetryAfterSeconds(message) };
 }
 
-// Semantic groups for graph clustering (same as GraphNetwork groupNames)
-const GROUP_DEF = "1=Development/Tech, 2=AI/ML, 3=Finance/Business, 4=Design/Creative, 5=Research/Education";
+const DEFAULT_GROUP_COLOR = '#64748b';
 
-function validGroup(value: unknown): number | undefined {
-    const n = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(n) && n >= 1 && n <= 5 ? n : undefined;
+/** Palette of distinct colors for auto-created groups (AI-suggested). */
+const GROUP_COLOR_PALETTE = [
+    '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308',
+    '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#64748b', '#a855f7',
+];
+
+function randomGroupColor(): string {
+    return GROUP_COLOR_PALETTE[Math.floor(Math.random() * GROUP_COLOR_PALETTE.length)];
+}
+
+/** True if AI is saying "do not assign to any group" (node stays No Group, group_id null). */
+function isNoGroupResponse(groupName: string | undefined): boolean {
+    if (groupName == null || typeof groupName !== 'string') return true;
+    const t = groupName.trim().toLowerCase();
+    return !t || t === 'none' || t === 'no group' || t === 'n/a' || t === 'uncategorized' || t === 'general';
+}
+
+/**
+ * Resolve AI groupName to group_id.
+ * - If groupName is "No group" / empty / none → return null (node stays No Group).
+ * - If groupName matches an existing user group → return that group's id.
+ * - If groupName is a new category suggestion → create the group and return its id.
+ */
+async function resolveOrCreateGroupId(
+    groupName: string | undefined,
+    groups: { id: string; name: string }[],
+    userId: string,
+    supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+    if (isNoGroupResponse(groupName)) return null;
+
+    const trimmed = groupName!.trim();
+    const normalized = trimmed.toLowerCase();
+    const found = groups.find((g) => g.name.trim().toLowerCase() === normalized);
+    if (found) return found.id;
+
+    const { data: inserted, error } = await supabase
+        .from('groups')
+        .insert({
+            user_id: userId,
+            name: trimmed,
+            color: randomGroupColor(),
+            sort_order: groups.length,
+        })
+        .select('id')
+        .single();
+
+    if (error) {
+        if (error.code === '23505') {
+            const again = groups.find((g) => g.name.trim().toLowerCase() === normalized);
+            return again?.id ?? null;
+        }
+        console.error('resolveOrCreateGroupId insert error:', error);
+        return null;
+    }
+    return (inserted as { id: string })?.id ?? null;
 }
 
 export async function POST(req: Request) {
     try {
-        // Перевірка ключа (якщо його немає, сервер видасть 500 з цим повідомленням)
         if (!process.env.GEMINI_API_KEY) {
             console.error("🔴 GEMINI_API_KEY is missing in .env.local");
             return NextResponse.json({ error: "API Key missing" }, { status: 500 });
         }
+
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        let { data: groupsRows } = await supabase
+            .from('groups')
+            .select('id, name')
+            .eq('user_id', user.id)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true });
+
+        const groups = (groupsRows || []) as { id: string; name: string }[];
+        const categoryNames = groups.map((g) => g.name).join(', ');
+        const categoryInstruction = `CATEGORY (groupName): You MUST assign a category whenever the link is recognizable.
+- If the user has existing categories and one fits, return that exact name: ${categoryNames || '(user has no categories yet)'}.
+- Otherwise suggest a short new category (1-3 words). Examples: design tools (Canva, Figma) → "Design" or "Design Tools"; productivity (Notion, Todoist) → "Productivity"; dev tools → "Developer Tools"; AI products → "AI & ML"; learning → "Learning"; social → "Social"; finance → "Finance"; reading/news → "Reading". We will create the group and assign the node.
+- Return "No group" ONLY when the content is truly uncategorizable (e.g. random personal note with no clear domain). For any known product, brand, or topic, always suggest a category—e.g. Canva → "Design", Notion → "Productivity".`;
 
         const { mode, newNode, existingNodes } = await req.json();
         const model = genAI.getGenerativeModel({ model: "gemma-3-27b-it" });
@@ -74,12 +146,12 @@ export async function POST(req: Request) {
                 - If Context is empty, generate a 1-3 sentence description for the NEW neuron.
                 - If the TYPE is 'note' or 'idea' generate the content or suggestions based on the NEW neuron.
                 - RETURN EMPTY ARRAY if no strong (80%+) matches are found.
-                - Assign the NEW neuron to exactly one semantic group: ${GROUP_DEF}. Output "group" as a single number 1, 2, 3, 4, or 5 that best fits the neuron's topic.
+                - ${categoryInstruction}
                 
-                Return ONLY JSON (use a real number 1-5 for "group", not a placeholder):
+                Return ONLY JSON. For groupName use an existing category or suggest one (e.g. design tool → "Design", productivity → "Productivity"). Use "No group" only if truly uncategorizable:
                 {
                     "newNodeDescription": "Brief description",
-                    "group": 2,
+                    "groupName": "Design",
                     "connections": [
                         { "id": "Neuron Name", "accuracy": 95 }
                     ]
@@ -103,15 +175,15 @@ export async function POST(req: Request) {
             
             try {
                 const parsed = JSON.parse(text);
-                const group = validGroup(parsed.group);
+                const groupId = await resolveOrCreateGroupId(parsed.groupName, groups, user.id, supabase);
                 return NextResponse.json({
                     description: parsed.newNodeDescription || "",
                     connections: (parsed.connections || []).filter((c: any) => c.accuracy >= 80),
-                    ...(group !== undefined && { group }),
+                    group_id: groupId,
                 });
             } catch (e) {
                 console.error("🔴 Failed to parse Gemini JSON:", text);
-                return NextResponse.json([]);
+                return NextResponse.json({});
             }
         }
 
@@ -138,13 +210,13 @@ export async function POST(req: Request) {
 
                 TASK:
                 1. Find up to 3 connections from the EXISTING LIST. In "connections", each "id" must be EXACTLY the id part (the text before " | " on each line above). If no 80%+ match, return empty array.
-                2. Assign this neuron to exactly one semantic group: ${GROUP_DEF}. You MUST choose based on URL and content: e.g. developer/app/tech URLs → 1, AI/ML tools → 2, finance/taxes/invoicing → 3, design/canva/visual → 4, education/research → 5. Output "group" as a single number 1-5. Do not default to 1; pick the best fit.
+                2. ${categoryInstruction}
 
-                Return JSON (use a real number 1-5 for "group"):
+                Return JSON. For groupName use an existing category or suggest one from the link (e.g. Canva/Figma → "Design", Notion → "Productivity"). Use "No group" only if truly uncategorizable:
                 {
                     "summary": "1-sentence context",
                     "tags": ["tag1", "tag2"],
-                    "group": 2,
+                    "groupName": "Design",
                     "connections": [
                         { "id": "Exact string from the list", "accuracy": 90 }
                     ]
@@ -168,7 +240,7 @@ export async function POST(req: Request) {
             
             try {
                 const parsed = JSON.parse(text);
-                const group = validGroup(parsed.group);
+                const groupId = await resolveOrCreateGroupId(parsed.groupName, groups, user.id, supabase);
                 const idSet = new Set(existingIds);
                 const connections = (parsed.connections || [])
                     .filter((c: any) => c.accuracy >= 80 && c.id != null && idSet.has(String(c.id).trim()));
@@ -176,10 +248,16 @@ export async function POST(req: Request) {
                     summary: parsed.summary || "",
                     tags: parsed.tags || [],
                     connections,
-                    ...(group !== undefined && { group }),
+                    group_id: groupId,
                 });
             } catch (e) {
-                return NextResponse.json({ summary: newNode.url, tags: [], connections: [] });
+                console.error("🔴 Failed to parse Gemini JSON (analyze_link):", text?.slice?.(0, 200));
+                return NextResponse.json({
+                    summary: newNode.url,
+                    tags: [],
+                    connections: [],
+                    group_id: null,
+                });
             }
         }
 

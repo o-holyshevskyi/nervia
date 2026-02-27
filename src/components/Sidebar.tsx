@@ -2,20 +2,24 @@
 'use client';
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CloseButton from "./ui/CloseButton";
-import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle, Layers } from "lucide-react";
+import CreateGroupModal from "./CreateGroupModal";
+import type { Group } from "../hooks/useGroups";
 
 interface SidebarProps {
     selectedNode: any | null;
     onClose: () => void;
-    onUpdateNode: (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string }) => void;
+    onUpdateNode: (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, group_id?: string | null }) => void;
     allNodes: { nodes: any[], links: any[] };
     onDeleteLink: (sourceId: string, targetId: string) => void;
     onAddLink: (sourceId: string, targetId: string) => void;
+    groups: Group[];
+    onAddGroup: (name: string, color: string) => Promise<Group | null>;
 }
 
-export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode, onAddLink, onDeleteLink }: SidebarProps) {
+export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode, onAddLink, onDeleteLink, groups, onAddGroup }: SidebarProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const [editTitle, setEditTitle] = useState("");
@@ -30,9 +34,32 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
     const [connectionSearch, setConnectionSearch] = useState("");
     const [isConnListOpen, setIsConnListOpen] = useState(false);
+    const [editGroupId, setEditGroupId] = useState<string | null>(null);
+    const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
 
-    const minWidth = 320;
-    const maxWidth = typeof window !== 'undefined' ? window.innerWidth / 3 : 400;
+    const [scrollShadows, setScrollShadows] = useState({ top: false, bottom: false });
+    const [connScrollShadows, setConnScrollShadows] = useState({ top: false, bottom: false });
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const connScrollRef = useRef<HTMLDivElement>(null);
+
+    const updateScrollShadows = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const { scrollTop, scrollHeight, clientHeight } = el;
+        setScrollShadows({
+            top: scrollTop > 8,
+            bottom: scrollHeight - scrollTop - clientHeight > 8,
+        });
+    }, []);
+    const updateConnScrollShadows = useCallback(() => {
+        const el = connScrollRef.current;
+        if (!el) return;
+        const { scrollTop, scrollHeight, clientHeight } = el;
+        setConnScrollShadows({
+            top: scrollTop > 4,
+            bottom: scrollHeight - scrollTop - clientHeight > 4,
+        });
+    }, []);
 
     const nodeConnections = useMemo(() => {
         // Якщо нода не вибрана або у нас немає даних про лінки, повертаємо порожній масив
@@ -54,14 +81,37 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
     }, [selectedNode, allNodes.links]);
 
     useEffect(() => {
+        updateScrollShadows();
+        const el = scrollRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(updateScrollShadows);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [updateScrollShadows]);
+
+    useEffect(() => {
+        updateConnScrollShadows();
+        const el = connScrollRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(updateConnScrollShadows);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [updateConnScrollShadows, nodeConnections.length]);
+
+    const minWidth = 320;
+    const maxWidth = typeof window !== 'undefined' ? window.innerWidth / 3 : 400;
+
+    useEffect(() => {
         const displayTitle = selectedNode?.title ?? selectedNode?.content ?? selectedNode?.id ?? '';
         const titleChanged = editTitle !== displayTitle;
         const contentChanged = editContent !== (selectedNode?.content || "");
         const tagsChanged = JSON.stringify(editTags) !== JSON.stringify(selectedNode?.tags || []);
         const urlChanged = editUrl !== (selectedNode?.url || "");
+        const nodeGroupId = selectedNode?.group_id ?? null;
+        const groupChanged = editGroupId !== nodeGroupId;
 
-        setIsDirty(titleChanged || contentChanged || tagsChanged || urlChanged);
-    }, [editContent, editTitle, editTags, selectedNode, editUrl]);
+        setIsDirty(titleChanged || contentChanged || tagsChanged || urlChanged || groupChanged);
+    }, [editContent, editTitle, editTags, selectedNode, editUrl, editGroupId]);
 
     useEffect(() => {
         if (selectedNode) {
@@ -69,6 +119,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             setEditContent(selectedNode.content || "");
             setEditTags(selectedNode.tags || []);
             setEditUrl(selectedNode.url || "");
+            setEditGroupId(selectedNode.group_id ?? null);
             setError(null);
             setConnectionSearch("");
             setIsConnListOpen(false);
@@ -110,7 +161,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         fetchPreview();
     }, [selectedNode?.type, editUrl, editTitle]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!selectedNode || !isDirty) return;
 
         const trimmedTitle = editTitle.trim();
@@ -119,31 +170,19 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             return;
         }
 
-        const existingTitle = (selectedNode.title ?? selectedNode.content ?? selectedNode.id ?? '').toString().toLowerCase();
-
-        if (trimmedTitle.toLowerCase() !== existingTitle) {
-            const isDuplicate = allNodes.nodes.some((n: any) => {
-                const otherId = typeof n.id === 'string' ? n.id : n.id?.id;
-                if (otherId === selectedNode.id) return false;
-                const otherTitle = (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase();
-                return otherTitle === trimmedTitle.toLowerCase();
-            });
-
-            if (isDuplicate) {
-                setError(`A neuron named "${trimmedTitle}" already exists.`);
-                return;
-            }
-        }
-
         const nodeId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
-        onUpdateNode(nodeId, {
-            title: trimmedTitle,
-            content: editContent,
-            tags: editTags,
-            url: editUrl.trim()
-        });
-        
-        reset();
+        try {
+            await onUpdateNode(nodeId, {
+                title: trimmedTitle,
+                content: editContent,
+                tags: editTags,
+                url: editUrl.trim(),
+                group_id: editGroupId
+            });
+            reset();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to save.');
+        }
     };
 
     const handleClose = () => {
@@ -172,6 +211,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         <AnimatePresence>
             {selectedNode && (
                 <motion.div
+                    key="sidebar-panel"
                     initial={{ x: '100%', opacity: 0, width: minWidth }}
                     animate={{ 
                         x: 0, 
@@ -233,7 +273,12 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                         )}
                     </AnimatePresence>
 
-                    <div className="flex-1 overflow-y-auto space-y-8 simple-scrollbar">
+                    <div className="flex-1 min-h-0 flex flex-col relative">
+                        <div
+                            ref={scrollRef}
+                            onScroll={updateScrollShadows}
+                            className="flex-1 overflow-y-auto scroll-hint space-y-8"
+                        >
                         <div className="space-y-2">
                             <textarea
                                 value={editTitle}
@@ -337,9 +382,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                             </div>
                             
                             <div className="flex flex-wrap gap-2 items-center">
-                                {editTags.map((tag) => (
+                                {editTags.map((tag, tagIndex) => (
                                     <span 
-                                        key={tag} 
+                                        key={tag ? String(tag) : `tag-${tagIndex}`} 
                                         className="group flex items-center gap-1.5 px-3 py-1 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md text-[11px] text-neutral-600 dark:text-neutral-300 hover:border-red-500/50 hover:text-red-400 transition-all cursor-pointer"
                                         onClick={() => removeTag(tag)}
                                     >
@@ -360,6 +405,42 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 </div>
                             </div>
 
+                            <div className="space-y-2 pt-4">
+                                <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-mono uppercase tracking-widest border-b border-black/10 dark:border-white/5 pb-2">
+                                    <span className="flex items-center gap-2">
+                                        <Layers size={12} />
+                                        Category
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreateGroupOpen(true)}
+                                        className="hover:cursor-pointer flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium text-indigo-600 dark:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 transition-colors"
+                                    >
+                                        <Plus size={12} /> New group
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2 items-center">
+                                    {groups.map((g, groupIndex) => (
+                                        <button
+                                            key={g?.id ? String(g.id) : `group-${groupIndex}`}
+                                            type="button"
+                                            onClick={() => setEditGroupId(g.id)}
+                                            className={`hover:cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl border text-left text-sm transition-colors ${
+                                                editGroupId === g.id
+                                                    ? "bg-indigo-500/15 dark:bg-purple-500/15 border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300"
+                                                    : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-neutral-600 dark:text-neutral-400 hover:bg-black/10 dark:hover:bg-white/10"
+                                            }`}
+                                        >
+                                            <span
+                                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                                style={{ backgroundColor: g.color }}
+                                            />
+                                            <span className="truncate max-w-[140px]">{g.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="space-y-4 pt-6">
                                 <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-mono uppercase tracking-widest border-b border-black/10 dark:border-white/5 pb-2">
                                     <span>Connections</span>
@@ -367,7 +448,12 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 </div>
 
                                 {/* Список існуючих зв'язків */}
-                                <div className="space-y-2 max-h-40 overflow-y-auto simple-scrollbar">
+                                <div className="relative max-h-40">
+                                    <div
+                                        ref={connScrollRef}
+                                        onScroll={updateConnScrollShadows}
+                                        className="space-y-2 max-h-40 overflow-y-auto scroll-hint"
+                                    >
                                     {nodeConnections.map((connId: any, index) => {
                                         const connNode = allNodes.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n.id?.id) === connId);
                                         const connLabel = connNode ? (connNode.title ?? connNode.content ?? connId) : connId;
@@ -389,6 +475,19 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                             </div>
                                         );
                                     })}
+                                    </div>
+                                    {connScrollShadows.top && (
+                                        <div
+                                            className="absolute left-0 right-0 top-0 h-4 bg-gradient-to-b from-white/90 to-transparent dark:from-neutral-950/90 pointer-events-none z-10 rounded-t-xl"
+                                            aria-hidden
+                                        />
+                                    )}
+                                    {connScrollShadows.bottom && (
+                                        <div
+                                            className="absolute left-0 right-0 bottom-0 h-4 bg-gradient-to-t from-white/90 to-transparent dark:from-neutral-950/90 pointer-events-none z-10 rounded-b-xl"
+                                            aria-hidden
+                                        />
+                                    )}
                                 </div>
 
                                 {/* Кастомний Select / Пошук нових зв'язків */}
@@ -423,7 +522,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                                 initial={{ opacity: 0, y: -10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 exit={{ opacity: 0, y: -10 }}
-                                                className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-60 overflow-y-auto simple-scrollbar backdrop-blur-xl"
+                                                className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-60 overflow-y-auto scroll-hint backdrop-blur-xl"
                                             >
                                                 {allNodes.nodes
                                                     .filter(n => {
@@ -486,10 +585,31 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 </div>
                             </div>
                         </div>
+                        </div>
+                        {scrollShadows.top && (
+                            <div
+                                className="absolute left-0 right-0 top-0 h-6 bg-gradient-to-b from-white/90 to-transparent dark:from-neutral-950/90 pointer-events-none z-10"
+                                aria-hidden
+                            />
+                        )}
+                        {scrollShadows.bottom && (
+                            <div
+                                className="absolute left-0 right-0 bottom-0 h-6 bg-gradient-to-t from-white/90 to-transparent dark:from-neutral-950/90 pointer-events-none z-10"
+                                aria-hidden
+                            />
+                        )}
                     </div>
-                    <div className="absolute bottom-0 left-0 w-full h-20 bg-gradient-to-t from-white dark:from-neutral-950 pointer-events-none z-10" />
                 </motion.div>
             )}
+            <CreateGroupModal
+                key="sidebar-create-group-modal"
+                isOpen={isCreateGroupOpen}
+                onClose={() => setIsCreateGroupOpen(false)}
+                onCreate={async (name, color) => {
+                    const newGroup = await onAddGroup(name, color);
+                    if (newGroup) setEditGroupId(newGroup.id);
+                }}
+            />
         </AnimatePresence>
     );
 }

@@ -2,10 +2,12 @@
 "use client";
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
-import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2 } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
+import CreateGroupModal from "./CreateGroupModal";
+import type { Group } from "../hooks/useGroups";
 import { createClient } from "../lib/supabase/client";
 import { useRouter } from "next/navigation";
 import ImportExport from "./ImportExport";
@@ -30,6 +32,9 @@ interface LeftSidebarProps {
   onOpenTimeline?: () => void;
   clusterMode: 'group' | 'tag';
   onClusterModeChange: (mode: 'group' | 'tag') => void;
+  groups: Group[];
+  onAddGroup: (name: string, color: string) => void;
+  onDeleteGroup: (id: string) => void;
 }
 
 export default function LeftSidebar({ 
@@ -46,10 +51,36 @@ export default function LeftSidebar({
   onOpenPathfinder,
   onOpenTimeline,
   clusterMode,
-  onClusterModeChange
+  onClusterModeChange,
+  groups,
+  onAddGroup,
+  onDeleteGroup,
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [scrollShadows, setScrollShadows] = useState({ top: false, bottom: false });
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const updateScrollShadows = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const showTop = scrollTop > 8;
+    const showBottom = scrollHeight - scrollTop - clientHeight > 8;
+    setScrollShadows((prev) =>
+      prev.top !== showTop || prev.bottom !== showBottom ? { top: showTop, bottom: showBottom } : prev
+    );
+  }, []);
+
+  useEffect(() => {
+    updateScrollShadows();
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(updateScrollShadows);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [updateScrollShadows, openAccordion]);
   const extensionDetected = useExtensionDetected();
   const supabase = createClient();
   const router = useRouter();
@@ -92,6 +123,54 @@ export default function LeftSidebar({
       label: "Collections",
       icon: <Layers size={14} className="text-neutral-500" />,
       items: [
+        {
+          id: 'groups',
+          title: 'Groups',
+          icon: <Layers size={16} />,
+          content: (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Categories</span>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateGroupOpen(true)}
+                  className="hover:cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 transition-colors"
+                  title="Create group"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              {groups.length === 0 ? (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 italic py-2">No groups yet</p>
+              ) : (
+                <ul className="space-y-1">
+                  {groups.map((g) => (
+                    <li
+                      key={g.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 group/list"
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: g.color }}
+                      />
+                      <span className="flex-1 min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">
+                        {g.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteGroup(g.id)}
+                        className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all"
+                        title="Delete group"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        },
         {
           id: 'filters',
           title: 'Filters',
@@ -151,6 +230,7 @@ export default function LeftSidebar({
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          key="left-sidebar"
           initial={{ x: '-100%', opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '-100%', opacity: 0 }}
@@ -167,7 +247,12 @@ export default function LeftSidebar({
           </div>
 
           {/* Grouped Content */}
-          <div className="flex-1 overflow-y-auto simple-scrollbar space-y-8 pr-2">
+          <div className="flex-1 min-h-0 flex flex-col relative">
+            <div
+              ref={scrollRef}
+              onScroll={updateScrollShadows}
+              className="flex-1 overflow-y-auto scroll-hint space-y-8 pr-2"
+            >
             {sections.map((section) => (
               <div key={section.label} className="space-y-3">
                 {/* Section Header */}
@@ -304,6 +389,20 @@ export default function LeftSidebar({
                 </div>
               </div>
             ))}
+            </div>
+            {/* Scroll hints: fade when content is scrollable */}
+            {scrollShadows.top && (
+              <div
+                className="absolute left-0 right-2 top-0 h-6 bg-gradient-to-b from-white/90 to-transparent dark:from-neutral-950/90 pointer-events-none z-10"
+                aria-hidden
+              />
+            )}
+            {scrollShadows.bottom && (
+              <div
+                className="absolute left-0 right-2 bottom-0 h-6 bg-gradient-to-t from-white/90 to-transparent dark:from-neutral-950/90 pointer-events-none z-10"
+                aria-hidden
+              />
+            )}
           </div>
 
           {/* System Telemetry – companion + universe stats */}
@@ -414,6 +513,12 @@ export default function LeftSidebar({
           </div>
         </motion.div>
       )}
+      <CreateGroupModal
+        key="create-group-modal"
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onCreate={onAddGroup}
+      />
     </AnimatePresence>
   );
 }

@@ -38,7 +38,7 @@ export default function FilterPanel({ tags, activeTag, onTagSelect, onClose }: F
             {tags.length === 0 ? (
                 <p className="text-[10px] text-neutral-500 dark:text-neutral-400 italic px-1">No available tags</p>
             ) : (
-                <div className="max-h-[40vh] overflow-y-auto simple-scrollbar space-y-0.5">
+                <div className="max-h-[40vh] overflow-y-auto scroll-hint space-y-0.5">
                     {tags.map((tag) => (
                         <button
                             key={tag}

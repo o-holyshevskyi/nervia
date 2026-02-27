@@ -16,14 +16,14 @@ const imgCache: { [key: string]: HTMLImageElement } = {};
 const iconCache: Record<string, HTMLImageElement> = {};
 
 const groupColors: Record<number, string> = {
-    1: "#3b82f6",
+    1: "#64748b",
     2: "#10b981",
     3: "#a855f7",
     4: "#f97316",
     5: "#06b6d4",
 };
 const groupNames: Record<number, string> = {
-    1: "Development",
+    1: "No Group",
     2: "AI",
     3: "Finance",
     4: "Design",
@@ -50,7 +50,7 @@ function hashStr(s: string): number {
     return (h % 1e6) / 1e6;
 }
 
-/** Derive stable group from node data so colors are always based on group/type, not insertion order. */
+/** Legacy: derive numeric group (1-5) from node when group_id is not set. */
 function getNodeGroup(node: any): number {
     if (node.group != null) {
         const g = typeof node.group === 'number' ? node.group : Number(node.group);
@@ -59,6 +59,12 @@ function getNodeGroup(node: any): number {
     if (node.type === 'note') return 2;
     if (node.type === 'idea') return 3;
     return 1; // link or default
+}
+
+/** Cluster key for group mode: group_id (string) or legacy number. */
+function getNodeGroupKey(node: any): string | number {
+    if (node.group_id != null && typeof node.group_id === 'string') return node.group_id;
+    return getNodeGroup(node);
 }
 
 /** Read graph theme from CSS variables (no re-render on theme switch). */
@@ -82,13 +88,23 @@ function hexToRgba(hex: string, alpha: number): string {
     return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function getClusterKeyForDraw(node: any, clusterMode: 'group' | 'tag', nodeIdToGroup: Map<string | number, number>): number | string | null {
+function getClusterKeyForDraw(node: any, clusterMode: 'group' | 'tag', nodeIdToGroupKey: Map<string | number, string | number>): number | string | null {
     if (clusterMode === 'group') {
         const nodeId = typeof node.id === 'string' ? node.id : node?.id;
-        const g = nodeId != null ? (nodeIdToGroup.get(nodeId) ?? getNodeGroup(node)) : getNodeGroup(node);
-        return g ?? null;
+        const key = nodeId != null ? (nodeIdToGroupKey.get(nodeId) ?? getNodeGroupKey(node)) : getNodeGroupKey(node);
+        return key ?? null;
     }
     return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
+}
+
+function getGroupColor(key: string | number, groupColorsById: Record<string, string>): string | undefined {
+    if (typeof key === 'string') return groupColorsById[key];
+    return groupColors[key];
+}
+
+function getGroupLabel(key: string | number, groupNamesById: Record<string, string>): string {
+    if (typeof key === 'string') return groupNamesById[key] ?? key;
+    return groupNames[key] ?? `Group ${key}`;
 }
 
 function drawGroupAreas(
@@ -96,13 +112,15 @@ function drawGroupAreas(
     nodes: any[],
     dimensions: { width: number; height: number },
     _globalScale: number,
-    nodeIdToGroup: Map<string | number, number>,
+    nodeIdToGroupKey: Map<string | number, string | number>,
     clusterMode: 'group' | 'tag',
-    container: HTMLElement | null
+    container: HTMLElement | null,
+    groupColorsById: Record<string, string>,
+    groupNamesById: Record<string, string>
 ) {
     const byCluster: Record<string, { x: number; y: number }[]> = {};
     for (const node of nodes) {
-        const key = getClusterKeyForDraw(node, clusterMode, nodeIdToGroup);
+        const key = getClusterKeyForDraw(node, clusterMode, nodeIdToGroupKey);
         if (key == null) continue;
         const keyStr = String(key);
         const x = Number(node.x);
@@ -126,8 +144,9 @@ function drawGroupAreas(
         const radius = Math.min(dimensions.width + dimensions.height, Math.max(80, maxDist * 1.2));
         if (!isFinite(radius) || radius <= 0) continue;
 
+        const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
         const color = clusterMode === 'group'
-            ? groupColors[Number(keyStr)]
+            ? (getGroupColor(key, groupColorsById) ?? groupColors[Number(keyStr)])
             : getColorForTag(keyStr);
         if (!color) continue;
         const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
@@ -148,8 +167,9 @@ function drawGroupAreas(
         const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
         const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
         if (!isFinite(centerX) || !isFinite(centerY)) continue;
+        const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
         const label = clusterMode === 'group'
-            ? (groupNames[Number(keyStr)] ?? `Group ${keyStr}`)
+            ? getGroupLabel(key, groupNamesById)
             : `#${keyStr}`;
         const themeColors = getGraphThemeColors(container);
         const labelColor = themeColors.nodeColor.startsWith('#')
@@ -184,6 +204,12 @@ const createIconImage = (IconComponent: any, color: string, strokeWidth: number 
     return img;
 };
 
+export interface GraphGroup {
+    id: string;
+    name: string;
+    color: string;
+}
+
 interface GraphNetworkProps {
     graphData: { nodes: any[]; links: any[] };
     timelineDate?: number;
@@ -198,6 +224,7 @@ interface GraphNetworkProps {
     onFlyToComplete?: () => void;
     solarSystemNodeId?: string | null;
     clusterMode?: 'group' | 'tag';
+    groups?: GraphGroup[];
     onNodeSelect: (node: any) => void;
     onNodeContextMenu?: (node: any, event: MouseEvent) => void; 
     onBackgroundClick?: () => void;
@@ -223,13 +250,25 @@ export default function GraphNetwork({
     flyToNodeId = null,
     onFlyToComplete,
     solarSystemNodeId = null,
-    clusterMode = 'group'
+    clusterMode = 'group',
+    groups = []
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
     const lastTransformRef = useRef<{ k: number; x: number; y: number } | null>(null);
     const prevNodeCountRef = useRef(0);
+
+    const groupColorsById = useMemo(() => {
+        const out: Record<string, string> = {};
+        for (const g of groups) out[g.id] = g.color;
+        return out;
+    }, [groups]);
+    const groupNamesById = useMemo(() => {
+        const out: Record<string, string> = {};
+        for (const g of groups) out[g.id] = g.name;
+        return out;
+    }, [groups]);
 
     const [hoveredLink, setHoveredLink] = useState<any | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -262,11 +301,11 @@ export default function GraphNetwork({
         return neighbors;
     }, [solarSystemNodeId, graphData.links]);
 
-    const nodeIdToGroupMap = useMemo(() => {
-        const m = new Map<string | number, number>();
+    const nodeIdToGroupKeyMap = useMemo(() => {
+        const m = new Map<string | number, string | number>();
         graphData.nodes.forEach((n: any) => {
             const id = typeof n.id === 'string' ? n.id : n?.id;
-            if (id != null) m.set(id, getNodeGroup(n));
+            if (id != null) m.set(id, getNodeGroupKey(n));
         });
         return m;
     }, [graphData.nodes]);
@@ -435,8 +474,8 @@ export default function GraphNetwork({
                 size = Math.min(28, size * 1.3);
                 strongGlow = true;
             } else {
-                const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
-                baseColor = groupColors[group] ?? "#06b6d4";
+                const groupKey = nodeIdToGroupKeyMap.get(idStr) ?? getNodeGroupKey(node);
+                baseColor = getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#06b6d4";
                 strongGlow = true;
             }
         } else {
@@ -465,8 +504,8 @@ export default function GraphNetwork({
                 else if (isPathNode) baseColor = "#06b6d4";
                 else baseColor = themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor;
             } else {
-                const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
-                baseColor = isSearchHighlighted ? "#a855f7" : (groupColors[group] ?? "#ec4899");
+                const groupKey = nodeIdToGroupKeyMap.get(idStr) ?? getNodeGroupKey(node);
+                baseColor = isSearchHighlighted ? "#a855f7" : (getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899");
             }
             strongGlow = (searchActive && highlightedSet.has(idStr)) || (pathfinderActive && pathNodeSet.has(idStr));
         }
@@ -569,14 +608,14 @@ export default function GraphNetwork({
                 : themeColors.nodeColor;
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
+    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupKeyMap, groupColorsById]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
             if (solarSystemNodeId) return;
-            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupMap, clusterMode, containerRef.current);
+            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, containerRef.current, groupColorsById, groupNamesById);
         },
-        [processedData.nodes, dimensions, nodeIdToGroupMap, clusterMode, solarSystemNodeId]
+        [processedData.nodes, dimensions, nodeIdToGroupKeyMap, clusterMode, solarSystemNodeId, groupColorsById, groupNamesById]
     );
 
     useEffect(() => {
@@ -598,14 +637,14 @@ export default function GraphNetwork({
 
         const getClusterKey = (node: any): string | number => {
             if (clusterMode === 'group') {
-                return getNodeGroup(node);
+                return getNodeGroupKey(node);
             }
             return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
         };
 
         const rawKeys = [...new Set(processedData.nodes.map((n: any) => getClusterKey(n)))];
         const uniqueKeys = clusterMode === 'group'
-            ? (rawKeys as number[]).sort((a, b) => (a as number) - (b as number))
+            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
             : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
 
         const clusterCenters: Record<string | number, { x: number; y: number }> = {};
@@ -615,12 +654,6 @@ export default function GraphNetwork({
                 x: cx + radius * Math.cos(angle),
                 y: cy + radius * Math.sin(angle),
             };
-        });
-
-        const nodeIdToGroup = new Map<string | number, number>();
-        graphData.nodes.forEach((n: any) => {
-            const id = typeof n.id === 'string' ? n.id : n?.id;
-            if (id != null) nodeIdToGroup.set(id, getNodeGroup(n));
         });
 
         const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
@@ -807,8 +840,8 @@ export default function GraphNetwork({
                     if (solarSystemNodeId) {
                         if (!solarNeighbors.has(nodeId)) return dimColor;
                         if (nodeId === solarSystemNodeId) return "#eab308";
-                        const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
-                        return groupColors[group] ?? "#06b6d4";
+                        const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
+                        return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#06b6d4";
                     }
                     if (pathfinderActive) {
                         if (pathNodeSet.has(nodeId)) {
@@ -827,8 +860,8 @@ export default function GraphNetwork({
                     if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return dimColor;
                     if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return dimColor;
                     if (nodeId === focusedNodeId) return "#fbbf24";
-                    const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
-                    return groupColors[group] ?? "#ec4899";
+                    const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
+                    return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899";
                 }}
                 linkWidth={(link: any) => {
                     if (solarSystemNodeId && !isLinkHidden(link)) return 2;

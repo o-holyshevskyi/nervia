@@ -121,15 +121,17 @@ export function useAIProcessor(
                     }
                 }
 
-                // 1. Оновлюємо основні дані ноди в БД (включаючи AI-призначену групу)
+                // 1. Оновлюємо основні дані ноди в БД (включаючи AI-призначену групу по group_id)
                 const finalTags = [...new Set([...(node.tags || []), ...(aiData.tags || [])])];
-                const validGroup = typeof aiData.group === 'number' && aiData.group >= 1 && aiData.group <= 5 ? aiData.group : undefined;
+                const groupId = Object.prototype.hasOwnProperty.call(aiData, 'group_id')
+                    ? (typeof aiData.group_id === 'string' && aiData.group_id.length > 0 ? aiData.group_id : null)
+                    : undefined;
                 const dbUpdate: Record<string, unknown> = {
                     content: aiData.summary,
                     tags: finalTags,
                     is_ai_processed: true,
                 };
-                if (validGroup !== undefined) dbUpdate.group = validGroup;
+                if (groupId !== undefined) dbUpdate.group_id = groupId;
 
                 await supabase.from('nodes')
                     .update(dbUpdate)
@@ -140,7 +142,7 @@ export function useAIProcessor(
                     content: aiData.summary,
                     tags: finalTags,
                     is_ai_processed: true,
-                    ...(validGroup !== undefined && { group: validGroup }),
+                    ...(groupId !== undefined && { group_id: groupId }),
                 });
 
                 await sleep(350);

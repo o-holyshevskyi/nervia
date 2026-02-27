@@ -1,0 +1,115 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState, useEffect, useCallback } from 'react';
+
+const DEFAULT_GENERAL_COLOR = '#64748b';
+
+export interface Group {
+    id: string;
+    user_id: string;
+    name: string;
+    color: string;
+    sort_order: number;
+    created_at?: string;
+}
+
+export function useGroups(supabase: any) {
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchGroups = useCallback(async (userId: string): Promise<{ data: Group[]; ok: boolean }> => {
+        const { data, error } = await supabase
+            .from('groups')
+            .select('*')
+            .eq('user_id', userId)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true });
+
+        if (error) {
+            const msg = (error as { message?: string })?.message ?? String(error);
+            const code = (error as { code?: string })?.code;
+            console.error('useGroups fetch error:', code ? `${code}: ${msg}` : msg);
+            return { data: [], ok: false };
+        }
+        return { data: (data || []) as Group[], ok: true };
+    }, [supabase]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const init = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user?.id) {
+                    setGroups([]);
+                    return;
+                }
+
+                const { data: listData, ok: fetchOk } = await fetchGroups(user.id);
+                let list = listData;
+                if (fetchOk) {
+                    const hasGeneral = list.some((g: Group) => g.name.trim().toLowerCase() === 'general');
+                    if (!hasGeneral) {
+                        const { data: inserted, error: insertErr } = await supabase
+                            .from('groups')
+                            .insert({
+                                user_id: user.id,
+                                name: 'No Group',
+                                color: DEFAULT_GENERAL_COLOR,
+                                sort_order: 0,
+                            })
+                            .select()
+                            .single();
+                        if (!insertErr && inserted && !cancelled) {
+                            list = [inserted as Group, ...list.filter((g: Group) => g.id !== inserted.id)];
+                        }
+                    }
+                }
+
+                if (!cancelled) setGroups(list);
+            } catch (e) {
+                console.error('useGroups init error:', e);
+                if (!cancelled) setGroups([]);
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        };
+
+        init();
+        return () => { cancelled = true; };
+    }, [supabase, fetchGroups]);
+
+    const addGroup = useCallback(async (name: string, color: string): Promise<Group | null> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return null;
+
+        const { data: inserted, error } = await supabase
+            .from('groups')
+            .insert({
+                user_id: user.id,
+                name: name.trim(),
+                color: color || DEFAULT_GENERAL_COLOR,
+                sort_order: groups.length,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('useGroups addGroup error:', error);
+            return null;
+        }
+        const newGroup = inserted as Group;
+        setGroups((prev) => [...prev, newGroup].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)));
+        return newGroup;
+    }, [supabase, groups.length]);
+
+    const deleteGroup = useCallback(async (id: string) => {
+        const { error } = await supabase.from('groups').delete().eq('id', id);
+        if (error) {
+            console.error('useGroups deleteGroup error:', error);
+            return;
+        }
+        setGroups((prev) => prev.filter((g) => g.id !== id));
+    }, [supabase]);
+
+    return { groups, isLoading, addGroup, deleteGroup, refetch: fetchGroups };
+}

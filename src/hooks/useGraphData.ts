@@ -5,6 +5,15 @@ import { NodeData } from '../components/AddModal';
 
 const NEW_NODE_PING_DURATION_MS = 4000;
 
+/** Normalize URL for duplicate check: lowercase, trim, default to https. */
+function normalizeUrl(url: string | undefined): string {
+    if (url == null || typeof url !== 'string') return '';
+    const t = url.trim().toLowerCase();
+    if (!t) return '';
+    if (!/^https?:\/\//i.test(t)) return `https://${t}`;
+    return t;
+}
+
 export function useGraphData(supabase: any) {
     const [user, setUser] = useState<any>(null);
     const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
@@ -140,6 +149,26 @@ export function useGraphData(supabase: any) {
     const addNewNode = async (nodeData: NodeData): Promise<any> => {
         if (!user) return undefined;
 
+        const titleLower = (nodeData.title ?? '').toString().trim().toLowerCase();
+        const urlNorm = normalizeUrl(nodeData.url);
+
+        const duplicateTitle = data.nodes.some(
+            (n: any) => (n.title ?? n.content ?? n.id ?? '').toString().trim().toLowerCase() === titleLower
+        );
+        if (duplicateTitle) {
+            throw new Error(`A neuron with the title "${(nodeData.title ?? '').toString().trim()}" already exists.`);
+        }
+
+        if (urlNorm) {
+            const duplicateUrl = data.nodes.some((n: any) => {
+                const u = (n.url ?? '').toString().trim();
+                return u && normalizeUrl(u) === urlNorm;
+            });
+            if (duplicateUrl) {
+                throw new Error('A neuron with this URL already exists.');
+            }
+        }
+
         let group = 1;
         if (nodeData.type === 'link') group = 1;
         if (nodeData.type === 'note') group = 2;
@@ -249,8 +278,32 @@ export function useGraphData(supabase: any) {
         });
     };
 
-    const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, is_ai_processed?: boolean, group?: number }) => {
+    const updateNode = async (nodeId: string, newData: { title?: string, content?: string, tags?: string[], url?: string, is_ai_processed?: boolean, group?: number, group_id?: string | null }) => {
         if (!user) return;
+
+        if (newData.title !== undefined) {
+            const titleLower = newData.title.trim().toLowerCase();
+            const duplicateTitle = data.nodes.some((n: any) => {
+                const id = typeof n.id === 'string' ? n.id : n.id?.id;
+                if (id === nodeId) return false;
+                return (n.title ?? n.content ?? n.id ?? '').toString().trim().toLowerCase() === titleLower;
+            });
+            if (duplicateTitle) {
+                throw new Error(`A neuron with the title "${newData.title.trim()}" already exists.`);
+            }
+        }
+        if (newData.url !== undefined && newData.url.trim()) {
+            const urlNorm = normalizeUrl(newData.url);
+            const duplicateUrl = data.nodes.some((n: any) => {
+                const id = typeof n.id === 'string' ? n.id : n.id?.id;
+                if (id === nodeId) return false;
+                const u = (n.url ?? '').toString().trim();
+                return u && normalizeUrl(u) === urlNorm;
+            });
+            if (duplicateUrl) {
+                throw new Error('A neuron with this URL already exists.');
+            }
+        }
 
         setData((prev) => {
             const newNodes = prev.nodes.map((node) => {
@@ -263,6 +316,7 @@ export function useGraphData(supabase: any) {
                         url: newData.url ?? node.url,
                         is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
                         group: newData.group ?? node.group,
+                        group_id: newData.group_id !== undefined ? newData.group_id : node.group_id,
                     };
                 }
                 return node;
@@ -277,6 +331,7 @@ export function useGraphData(supabase: any) {
         if (newData.url !== undefined) dbUpdate.url = newData.url;
         if (newData.is_ai_processed !== undefined) dbUpdate.is_ai_processed = newData.is_ai_processed;
         if (newData.group !== undefined) dbUpdate.group = newData.group;
+        if (newData.group_id !== undefined) dbUpdate.group_id = newData.group_id;
 
         if (Object.keys(dbUpdate).length === 0) return;
 
