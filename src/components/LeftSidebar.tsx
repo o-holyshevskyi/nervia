@@ -2,12 +2,15 @@
 "use client";
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2 } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
+import ShareModal from "./ShareModal";
 import type { Group } from "../hooks/useGroups";
+import { useSharing } from "../hooks/useSharing";
+import type { ShareScope } from "../hooks/useSharing";
 import { createClient } from "../lib/supabase/client";
 import { useRouter } from "next/navigation";
 import ImportExport from "./ImportExport";
@@ -60,7 +63,11 @@ export default function LeftSidebar({
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareInitial, setShareInitial] = useState<{ scope: ShareScope; groupIds: string[] }>({ scope: 'ALL', groupIds: [] });
   const [user, setUser] = useState<any>(null);
+  const supabase = useMemo(() => createClient(), []);
+  const { createShare } = useSharing(supabase);
   const [scrollShadows, setScrollShadows] = useState({ top: false, bottom: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +91,6 @@ export default function LeftSidebar({
     return () => ro.disconnect();
   }, [updateScrollShadows, openAccordion]);
   const extensionDetected = useExtensionDetected();
-  const supabase = createClient();
   const router = useRouter();
   const { nodesCount, linksCount, topTag, isLoading: isStatsLoading } = useUniverseStats(nodes);
 
@@ -161,6 +167,17 @@ export default function LeftSidebar({
                       </span>
                       <button
                         type="button"
+                        onClick={() => {
+                          setShareInitial({ scope: 'GROUPS', groupIds: [g.id] });
+                          setIsShareModalOpen(true);
+                        }}
+                        className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all"
+                        title="Share this group"
+                      >
+                        <Share2 size={12} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onDeleteGroup(g.id)}
                         className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all"
                         title="Delete group"
@@ -192,6 +209,16 @@ export default function LeftSidebar({
       label: "Management",
       icon: <Settings2 size={14} className="text-neutral-500" />,
       items: [
+        {
+          id: 'share-universe',
+          title: 'Share Universe',
+          icon: <Share2 size={16} />,
+          shortcut: 'Share',
+          onClick: () => {
+            setShareInitial({ scope: 'ALL', groupIds: [] });
+            setIsShareModalOpen(true);
+          }
+        },
         {
           id: 'import-export',
           title: 'Data Transfer',
@@ -521,6 +548,18 @@ export default function LeftSidebar({
         isOpen={isCreateGroupOpen}
         onClose={() => setIsCreateGroupOpen(false)}
         onCreate={onAddGroup}
+      />
+      <ShareModal
+        key="share-modal"
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        groups={groups}
+        initialScope={shareInitial.scope}
+        initialGroupIds={shareInitial.groupIds}
+        onCreateShare={async (scope, groupIds) => {
+          const result = await createShare(scope, groupIds);
+          return result ? { slug: result.slug, url: result.url } : null;
+        }}
       />
     </AnimatePresence>
   );

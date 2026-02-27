@@ -227,8 +227,9 @@ interface GraphNetworkProps {
     clusterMode?: 'group' | 'tag';
     groups?: GraphGroup[];
     onNodeSelect: (node: any) => void;
-    onNodeContextMenu?: (node: any, event: MouseEvent) => void; 
+    onNodeContextMenu?: (node: any, event: MouseEvent) => void;
     onBackgroundClick?: () => void;
+    readOnly?: boolean;
 }
 
 function getLinkEnd(linkEnd: any): string | undefined {
@@ -253,7 +254,8 @@ export default function GraphNetwork({
     onFlyToComplete,
     solarSystemNodeId = null,
     clusterMode = 'group',
-    groups = []
+    groups = [],
+    readOnly = false
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
@@ -864,10 +866,10 @@ export default function GraphNetwork({
                         fgRef.current.centerAt(node.x, node.y, 800);
                         fgRef.current.zoom(4, 800);
                     }
-                    onNodeSelect(node);
+                    if (!readOnly) onNodeSelect(node);
                 }}
                 onNodeRightClick={(node, event) => {
-                    if (onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
+                    if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
                 }}
                 onBackgroundClick={() => {
                     if (onBackgroundClick) onBackgroundClick();
