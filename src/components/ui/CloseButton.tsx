@@ -7,7 +7,7 @@ interface CloseButtonProps {
 
 const CloseButton = ({ onClose, size = 24 }: CloseButtonProps) => <button 
     onClick={onClose}
-    className="hover:cursor-pointer top-6 right-6 text-neutral-400 hover:text-white transition-colors"
+    className="hover:cursor-pointer top-6 right-6 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
 >
     <X size={size} />
 </button>;

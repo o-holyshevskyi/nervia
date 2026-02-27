@@ -54,25 +54,25 @@ export default function LoginPage() {
     };
 
     return (
-        <main className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <main className="min-h-screen bg-neutral-100 dark:bg-neutral-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
             {/* Фоновий ефект */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
 
             <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
-                className="w-full max-w-md bg-neutral-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl relative z-10"
+                className="w-full max-w-md bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 p-8 rounded-3xl shadow-xl dark:shadow-2xl relative z-10"
             >
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
-                        <Sparkles className="text-purple-400" size={32} />
+                    <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] dark:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+                        <Sparkles className="text-indigo-600 dark:text-purple-400" size={32} />
                     </div>
                 </div>
 
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">Welcome to Synapse Bookmark</h1>
-                    <p className="text-neutral-400 text-sm">Sign in to access your visual bookmarks</p>
+                    <h1 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 tracking-tight">Welcome to Synapse Bookmark</h1>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">Sign in to access your visual bookmarks</p>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -81,7 +81,7 @@ export default function LoginPage() {
                             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                             className="overflow-hidden mb-6"
                         >
-                            <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-sm font-medium">
+                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-sm font-medium">
                                 <AlertCircle size={16} className="shrink-0" />
                                 {error}
                             </div>
@@ -94,12 +94,12 @@ export default function LoginPage() {
                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center justify-center text-center p-4 bg-green-500/10 border border-green-500/20 rounded-2xl"
                     >
-                        <CheckCircle2 size={40} className="text-green-400 mb-3" />
-                        <h3 className="text-white font-medium mb-1">Check your email</h3>
-                        <p className="text-neutral-400 text-sm">We sent a magic link to <strong>{email}</strong></p>
+                        <CheckCircle2 size={40} className="text-green-600 dark:text-green-400 mb-3" />
+                        <h3 className="text-neutral-900 dark:text-white font-medium mb-1">Check your email</h3>
+                        <p className="text-neutral-500 dark:text-neutral-400 text-sm">We sent a magic link to <strong>{email}</strong></p>
                         <button 
                             onClick={() => setIsSuccess(false)}
-                            className="mt-6 text-sm text-purple-400 hover:text-purple-300 font-medium transition-colors"
+                            className="cursor-pointer mt-6 text-sm text-indigo-600 dark:text-purple-400 hover:text-indigo-700 dark:hover:text-purple-300 font-medium transition-colors"
                         >
                             Try another way
                         </button>
@@ -109,7 +109,7 @@ export default function LoginPage() {
                         <button
                             onClick={() => handleOAuth('google')}
                             disabled={isLoading !== null}
-                            className="hover:cursor-pointer relative flex items-center justify-center w-full gap-3 px-4 py-3 bg-white text-neutral-900 font-semibold rounded-xl hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="hover:cursor-pointer relative flex items-center justify-center w-full gap-3 px-4 py-3 bg-white text-neutral-900 font-semibold rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-black/10 dark:border-white/10"
                         >
                             {isLoading === 'google' ? <Loader2 size={18} className="animate-spin" /> : (
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -125,16 +125,16 @@ export default function LoginPage() {
                         <button
                             onClick={() => handleOAuth('github')}
                             disabled={isLoading !== null}
-                            className="hover:cursor-pointer relative flex items-center justify-center w-full gap-3 px-4 py-3 bg-[#24292F] text-white font-semibold rounded-xl hover:bg-[#24292F]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
+                            className="hover:cursor-pointer relative flex items-center justify-center w-full gap-3 px-4 py-3 bg-[#24292F] text-white font-semibold rounded-xl hover:bg-[#24292F]/90 dark:hover:bg-[#24292F]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-black/10 dark:border-white/10"
                         >
                             {isLoading === 'github' ? <Loader2 size={18} className="animate-spin" /> : <Github size={18} />}
                             Continue with GitHub
                         </button>
 
                         <div className="flex items-center gap-3 my-6">
-                            <div className="h-px flex-1 bg-white/10" />
+                            <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
                             <span className="text-xs font-medium text-neutral-500 uppercase tracking-widest">Or</span>
-                            <div className="h-px flex-1 bg-white/10" />
+                            <div className="h-px flex-1 bg-black/10 dark:bg-white/10" />
                         </div>
 
                         <form onSubmit={handleMagicLink} className="space-y-3">
@@ -148,14 +148,14 @@ export default function LoginPage() {
                                         if (error) setError(null);
                                     }}
                                     placeholder="name@example.com"
-                                    className="w-full bg-black/50 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50 transition-colors"
+                                    className="w-full bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-10 pr-4 text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 focus:outline-none focus:border-indigo-500/50 dark:focus:border-purple-500/50 transition-colors"
                                     required
                                 />
                             </div>
                             <button
                                 type="submit"
                                 disabled={isLoading !== null || !email}
-                                className="group relative flex items-center justify-center w-full gap-2 px-4 py-3 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+                                className="cursor-pointer group relative flex items-center justify-center w-full gap-2 px-4 py-3 bg-indigo-600 dark:bg-purple-600 text-white font-semibold rounded-xl hover:bg-indigo-500 dark:hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(99,102,241,0.2)] dark:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
                             >
                                 {isLoading === 'email' ? <Loader2 size={18} className="animate-spin" /> : (
                                     <>

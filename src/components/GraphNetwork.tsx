@@ -61,6 +61,27 @@ function getNodeGroup(node: any): number {
     return 1; // link or default
 }
 
+/** Read graph theme from CSS variables (no re-render on theme switch). */
+function getGraphThemeColors(container: HTMLElement | null): { nodeColor: string; linkColor: string; graphBg: string } {
+    const el = container ?? (typeof document !== 'undefined' ? document.documentElement : null);
+    if (!el) return { nodeColor: '#1f2937', linkColor: 'rgba(55, 65, 81, 0.5)', graphBg: '#f9fafb' };
+    const style = getComputedStyle(el);
+    return {
+        nodeColor: style.getPropertyValue('--node-color').trim() || '#1f2937',
+        linkColor: style.getPropertyValue('--link-color').trim() || 'rgba(55, 65, 81, 0.5)',
+        graphBg: style.getPropertyValue('--graph-bg').trim() || '#f9fafb',
+    };
+}
+
+/** Hex to rgba with alpha for dimmed states. */
+function hexToRgba(hex: string, alpha: number): string {
+    if (!hex.startsWith('#')) return hex;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function getClusterKeyForDraw(node: any, clusterMode: 'group' | 'tag', nodeIdToGroup: Map<string | number, number>): number | string | null {
     if (clusterMode === 'group') {
         const nodeId = typeof node.id === 'string' ? node.id : node?.id;
@@ -76,7 +97,8 @@ function drawGroupAreas(
     dimensions: { width: number; height: number },
     _globalScale: number,
     nodeIdToGroup: Map<string | number, number>,
-    clusterMode: 'group' | 'tag'
+    clusterMode: 'group' | 'tag',
+    container: HTMLElement | null
 ) {
     const byCluster: Record<string, { x: number; y: number }[]> = {};
     for (const node of nodes) {
@@ -129,12 +151,16 @@ function drawGroupAreas(
         const label = clusterMode === 'group'
             ? (groupNames[Number(keyStr)] ?? `Group ${keyStr}`)
             : `#${keyStr}`;
+        const themeColors = getGraphThemeColors(container);
+        const labelColor = themeColors.nodeColor.startsWith('#')
+            ? themeColors.nodeColor
+            : themeColors.nodeColor.replace(/,\s*[\d.]+\)$/, ', 0.9)');
         ctx.font = "600 14px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
         ctx.shadowBlur = 4;
-        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        ctx.fillStyle = labelColor;
         ctx.fillText(label, centerX, centerY);
         ctx.shadowBlur = 0;
     }
@@ -390,6 +416,7 @@ export default function GraphNetwork({
         const y = Number(node.y);
         if (!isFinite(x) || !isFinite(y)) return;
 
+        const themeColors = getGraphThemeColors(containerRef.current);
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
         const label = node.title ?? node.content ?? idStr ?? '';
         const rawSize = (node.val ?? 4) * 1;
@@ -436,7 +463,7 @@ export default function GraphNetwork({
                 if (isPathStart) baseColor = "#06b6d4";
                 else if (isPathEnd) baseColor = "#f97316";
                 else if (isPathNode) baseColor = "#06b6d4";
-                else baseColor = "rgba(50, 50, 50, 0.1)";
+                else baseColor = themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor;
             } else {
                 const group = nodeIdToGroupMap.get(idStr) ?? getNodeGroup(node);
                 baseColor = isSearchHighlighted ? "#a855f7" : (groupColors[group] ?? "#ec4899");
@@ -444,8 +471,9 @@ export default function GraphNetwork({
             strongGlow = (searchActive && highlightedSet.has(idStr)) || (pathfinderActive && pathNodeSet.has(idStr));
         }
 
-        // Колір для контуру та тексту
-        const strokeColor = isHidden ? 'rgba(100, 100, 100, 0.1)' : baseColor;
+        const strokeColor = isHidden
+            ? (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor)
+            : baseColor;
 
         // New-node ping: glowing circle behind the node that fades out over a few seconds
         if (node.isNew && node.newPingAt) {
@@ -471,8 +499,8 @@ export default function GraphNetwork({
         ctx.beginPath();
         ctx.arc(x, y, size, 0, 2 * Math.PI, false);
         
-        // Внутрішня частина (прозора або ледь помітна заливка)
-        ctx.fillStyle = isHidden ? 'rgba(0, 0, 0, 0)' : 'rgba(0, 0, 0, 0.2)'; 
+        const innerFill = isHidden ? 'rgba(0, 0, 0, 0)' : (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.18) : 'rgba(0, 0, 0, 0.2)');
+        ctx.fillStyle = innerFill;
         ctx.fill();
 
         // Налаштування бордера (stronger glow for search/path/solar highlight)
@@ -530,13 +558,15 @@ export default function GraphNetwork({
             }
         }
 
-        // 4. Текст під нодою
+        // 4. Текст під нодою (theme-aware)
         if (globalScale > 1.5) {
             const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillStyle = isHidden ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)';
+            ctx.fillStyle = isHidden
+                ? (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.08) : 'rgba(255,255,255,0.05)')
+                : themeColors.nodeColor;
             ctx.fillText(label, x, y + size + 4);
         }
     }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupMap]);
@@ -544,7 +574,7 @@ export default function GraphNetwork({
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
             if (solarSystemNodeId) return;
-            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupMap, clusterMode);
+            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupMap, clusterMode, containerRef.current);
         },
         [processedData.nodes, dimensions, nodeIdToGroupMap, clusterMode, solarSystemNodeId]
     );
@@ -724,7 +754,8 @@ export default function GraphNetwork({
     return (
         <div 
             ref={containerRef} 
-            className="w-full h-screen bg-neutral-950" 
+            className="w-full h-screen"
+            style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
             <ForceGraph2D
@@ -770,9 +801,11 @@ export default function GraphNetwork({
                     ctx.fill();
                 }}
                 nodeColor={(node: any) => {
+                    const theme = getGraphThemeColors(containerRef.current);
                     const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                    const dimColor = theme.nodeColor.startsWith('#') ? hexToRgba(theme.nodeColor, 0.12) : theme.nodeColor;
                     if (solarSystemNodeId) {
-                        if (!solarNeighbors.has(nodeId)) return "rgba(10, 10, 10, 0.05)";
+                        if (!solarNeighbors.has(nodeId)) return dimColor;
                         if (nodeId === solarSystemNodeId) return "#eab308";
                         const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
                         return groupColors[group] ?? "#06b6d4";
@@ -785,15 +818,15 @@ export default function GraphNetwork({
                             if (endId != null && nodeId === endId) return "#f97316";
                             return "#06b6d4";
                         }
-                        return "rgba(50, 50, 50, 0.1)";
+                        return dimColor;
                     }
                     if (searchActive) {
                         if (highlightedSet.has(nodeId)) return "#a855f7";
-                        return "rgba(50, 50, 50, 0.1)";
+                        return dimColor;
                     }
-                    if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return "rgba(30, 30, 30, 0.1)"; 
-                    if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return "rgba(50, 50, 50, 0.2)"; 
-                    if (nodeId === focusedNodeId) return "#fbbf24"; 
+                    if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return dimColor;
+                    if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return dimColor;
+                    if (nodeId === focusedNodeId) return "#fbbf24";
                     const group = nodeIdToGroupMap.get(nodeId) ?? getNodeGroup(node);
                     return groupColors[group] ?? "#ec4899";
                 }}
@@ -809,16 +842,20 @@ export default function GraphNetwork({
                 }}
                 linkDirectionalParticleSpeed={pathfinderActive ? 0.01 : 0.005}
                 linkDirectionalParticleWidth={4}
-                linkDirectionalParticleColor={() => (pathfinderActive ? "#ffffff" : "#fafafa")}
+                linkDirectionalParticleColor={() => {
+                    const theme = getGraphThemeColors(containerRef.current);
+                    return pathfinderActive ? theme.nodeColor : theme.nodeColor;
+                }}
                 linkColor={(link: any) => {
+                    const theme = getGraphThemeColors(containerRef.current);
                     if (isLinkHidden(link)) return "rgba(0,0,0,0)";
                     if (solarSystemNodeId) return "rgba(251, 191, 36, 0.9)";
                     if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
                     if (pathfinderActive) return "rgba(0,0,0,0)";
-                    if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : "#ffffff";
-                    return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : "rgba(255, 255, 255, 0.15)";
+                    if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : theme.nodeColor;
+                    return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : theme.linkColor;
                 }}
-                backgroundColor="#0a0a0a"
+                backgroundColor="transparent"
                 enablePointerInteraction={true}
             />
             <AnimatePresence>
@@ -827,17 +864,17 @@ export default function GraphNetwork({
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className="absolute z-50 pointer-events-none bg-neutral-900/80 backdrop-blur-md border border-white/10 px-4 py-3 rounded-xl shadow-2xl flex flex-col gap-1 min-w-[200px]"
+                        className="absolute z-50 pointer-events-none bg-white/95 dark:bg-neutral-900/90 backdrop-blur-md border border-black/10 dark:border-white/10 px-4 py-3 rounded-xl shadow-xl dark:shadow-2xl flex flex-col gap-1 min-w-[200px]"
                         style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
                     >
                         <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider mb-1">
                             {hoveredLink.relationType === 'ai' ? (
-                                <><Sparkles size={12} className="text-purple-400" /> <span className="text-purple-400">AI Connection</span></>
+                                <><Sparkles size={12} className="text-indigo-600 dark:text-purple-400" /> <span className="text-indigo-600 dark:text-purple-400">AI Connection</span></>
                             ) : (
-                                <><LinkIcon size={12} className="text-neutral-400" /> <span className="text-neutral-400">Logical connection</span></>
+                                <><LinkIcon size={12} className="text-neutral-500 dark:text-neutral-400" /> <span className="text-neutral-600 dark:text-neutral-400">Logical connection</span></>
                             )}
                         </div>
-                        <p className="text-sm font-medium text-white">{hoveredLink.label || "Communication"}</p>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-white">{hoveredLink.label || "Communication"}</p>
                     </motion.div>
                 )}
             </AnimatePresence>

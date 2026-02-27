@@ -45,11 +45,11 @@ export default function ImportExport({ onImport, onExport }: ImportExportProps) 
 
     return (
         <div className="space-y-2">
-            <div className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1 px-0">
+            <div className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-1 px-0">
                 Data Management
             </div>
 
-            <label className={`hover:cursor-pointer flex items-center gap-2.5 px-3 py-2 bg-white/5 border border-dashed border-white/10 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors group ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+            <label className={`hover:cursor-pointer flex items-center gap-2.5 px-3 py-2 bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors group ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
                 {isImporting ? <Loader2 size={16} className="animate-spin shrink-0" /> : <Upload size={16} className="shrink-0" />}
                 <span>{isImporting ? 'Processing...' : 'Import HTML Bookmarks'}</span>
                 <input type="file" accept=".html" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
@@ -57,7 +57,7 @@ export default function ImportExport({ onImport, onExport }: ImportExportProps) 
 
             <button
                 onClick={onExport}
-                className="hover:cursor-pointer w-full flex items-center gap-2.5 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
+                className="hover:cursor-pointer w-full flex items-center gap-2.5 px-3 py-2 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
                 <Download size={16} className="shrink-0" />
                 <span>Export to JSON</span>

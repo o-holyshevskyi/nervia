@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ExtensionTokenBroadcast from "@/src/components/ExtensionTokenBroadcast";
+import ThemeProvider from "@/src/components/ThemeProvider";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -25,12 +26,31 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
+            <head>
+                <script
+                    suppressHydrationWarning
+                    dangerouslySetInnerHTML={{
+                        __html: `
+(function() {
+  try {
+    var t = localStorage.getItem('theme');
+    var isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var root = document.documentElement;
+    if (isDark) root.classList.add('dark'); else root.classList.remove('dark');
+  } catch (e) {}
+})();
+`,
+                    }}
+                />
+            </head>
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
                 suppressHydrationWarning
             >
-                <ExtensionTokenBroadcast />
-                {children}
+                <ThemeProvider>
+                    <ExtensionTokenBroadcast />
+                    {children}
+                </ThemeProvider>
             </body>
         </html>
     );

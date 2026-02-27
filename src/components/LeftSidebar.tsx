@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import { createClient } from "../lib/supabase/client";
@@ -13,6 +13,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useExtensionDetected } from "../hooks/useExtensionDetected";
 import { useUniverseStats } from "../hooks/useUniverseStats";
+import ThemeToggle from "./ThemeToggle";
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -67,7 +68,7 @@ export default function LeftSidebar({
     router.refresh();
   };
 
-  const kbdClass = "text-xs font-mono text-neutral-500 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded";
+  const kbdClass = "text-xs font-mono text-neutral-500 dark:text-neutral-400 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 px-1.5 py-0.5 rounded";
 
   const sections = [
     {
@@ -83,6 +84,7 @@ export default function LeftSidebar({
       label: "View Options",
       icon: <LayoutGrid size={14} className="text-neutral-500" />,
       items: [
+        { id: 'theme', title: 'Theme', icon: <Sun size={16} />, isThemeToggle: true },
         { id: 'gravity-shift', title: 'Gravity Shift', icon: <Globe size={16} />, isToggle: true },
       ]
     },
@@ -95,8 +97,8 @@ export default function LeftSidebar({
           title: 'Filters',
           icon: <Filter size={16} />,
           content: tags.length === 0 ? (
-            <div className="py-3 px-2 text-center bg-white/5 rounded-md border border-white/10">
-              <p className="text-xs text-neutral-500 italic">No tags yet</p>
+            <div className="py-3 px-2 text-center bg-black/5 dark:bg-white/5 rounded-md border border-black/10 dark:border-white/10">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 italic">No tags yet</p>
             </div>
           ) : (
             <FilterPanel activeTag={activeTag} tags={tags} onClose={onClose} onTagSelect={onTagSelect} />
@@ -139,7 +141,7 @@ export default function LeftSidebar({
     }, [active, value, spring]);
 
     return (
-      <motion.span className="font-mono text-white/70">
+      <motion.span className="font-mono text-neutral-700 dark:text-white/70">
         {display}
       </motion.span>
     );
@@ -153,25 +155,25 @@ export default function LeftSidebar({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '-100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-          className="fixed top-0 left-0 h-full w-80 bg-neutral-950/80 backdrop-blur-2xl border-r border-white/10 p-8 shadow-2xl z-50 flex flex-col"
+          className="fixed top-0 left-0 h-full w-80 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-2xl border-r border-black/10 dark:border-white/10 p-8 shadow-2xl z-50 flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-              <span className="text-xs font-mono text-neutral-400 uppercase tracking-[0.2em]">Dashboard</span>
+              <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400 uppercase tracking-[0.2em]">Dashboard</span>
             </div>
             <CloseButton onClose={onClose} />
           </div>
 
           {/* Grouped Content */}
-          <div className="flex-1 overflow-y-auto no-scrollbar space-y-8 pr-2">
+          <div className="flex-1 overflow-y-auto simple-scrollbar space-y-8 pr-2">
             {sections.map((section) => (
               <div key={section.label} className="space-y-3">
                 {/* Section Header */}
                 <div className="flex items-center gap-2">
                   {section.icon}
-                  <span className="text-xs font-semibold tracking-widest text-neutral-500 uppercase">
+                  <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">
                     {section.label}
                   </span>
                 </div>
@@ -181,6 +183,22 @@ export default function LeftSidebar({
                   {section.items.map((item: any) => {
                     const isAction = item.onClick != null && item.shortcut != null;
                     const isToggle = item.isToggle === true;
+                    const isThemeToggle = item.isThemeToggle === true;
+
+                    if (isThemeToggle && item.id === 'theme') {
+                      return (
+                        <div
+                          key={item.id}
+                          className="w-full h-10 flex items-center justify-between px-3 rounded-md"
+                        >
+                          <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                            <span className="text-neutral-500 dark:text-neutral-500 shrink-0">{item.icon}</span>
+                            <span>{item.title}</span>
+                          </div>
+                          <ThemeToggle />
+                        </div>
+                      );
+                    }
 
                     if (isAction) {
                       return (
@@ -188,10 +206,10 @@ export default function LeftSidebar({
                           key={item.id}
                           type="button"
                           onClick={item.onClick}
-                          className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
+                          className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className="text-neutral-500 shrink-0">{item.icon}</span>
+                            <span className="text-neutral-500 dark:text-neutral-500 shrink-0">{item.icon}</span>
                             <span>{item.title}</span>
                           </div>
                           <kbd className={kbdClass}>{item.shortcut}</kbd>
@@ -205,14 +223,14 @@ export default function LeftSidebar({
                           key={item.id}
                           className="w-full h-10 flex items-center justify-between px-3 rounded-md"
                         >
-                          <div className="flex items-center gap-2.5 text-sm text-neutral-400">
-                            <span className="text-neutral-500 shrink-0">{item.icon}</span>
+                          <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                            <span className="text-neutral-500 dark:text-neutral-500 shrink-0">{item.icon}</span>
                             <span>{item.title}</span>
                           </div>
                           <div
                             role="group"
                             aria-label="Cluster by category or tag"
-                            className="flex h-8 w-16 rounded-full bg-white/5 border border-white/10 p-0.5 shrink-0"
+                            className="flex h-8 w-16 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
                           >
                             <button
                               type="button"
@@ -220,8 +238,8 @@ export default function LeftSidebar({
                               onClick={() => onClusterModeChange('group')}
                               className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
                                 clusterMode === 'group'
-                                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_12px_rgba(168,85,247,0.15)]'
-                                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'
+                                  ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]'
+                                  : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'
                               }`}
                             >
                               <Globe size={14} />
@@ -232,8 +250,8 @@ export default function LeftSidebar({
                               onClick={() => onClusterModeChange('tag')}
                               className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
                                 clusterMode === 'tag'
-                                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_12px_rgba(168,85,247,0.15)]'
-                                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'
+                                  ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]'
+                                  : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'
                               }`}
                             >
                               <Tag size={14} />
@@ -247,19 +265,19 @@ export default function LeftSidebar({
                       <div key={item.id} className="overflow-hidden">
                         <button
                           onClick={() => toggleAccordion(item.id)}
-                          className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors group ${
-                            openAccordion === item.id ? 'bg-white/5 text-white' : ''
+                          className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors group ${
+                            openAccordion === item.id ? 'bg-black/5 dark:bg-white/5 text-neutral-900 dark:text-white' : ''
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className={`shrink-0 ${openAccordion === item.id ? 'text-purple-400' : 'text-neutral-500 group-hover:text-white'}`}>
+                            <span className={`shrink-0 ${openAccordion === item.id ? 'text-indigo-600 dark:text-purple-400' : 'text-neutral-500 dark:text-neutral-500 group-hover:text-neutral-900 dark:group-hover:text-white'}`}>
                               {item.icon}
                             </span>
                             <span>{item.title}</span>
                           </div>
                           <motion.div
                             animate={{ rotate: openAccordion === item.id ? 180 : 0 }}
-                            className="text-neutral-500 shrink-0"
+                            className="text-neutral-500 dark:text-neutral-500 shrink-0"
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                               <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -289,18 +307,18 @@ export default function LeftSidebar({
           </div>
 
           {/* System Telemetry – companion + universe stats */}
-          <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
+          <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/5 space-y-3">
             {/* Companion – system status */}
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <Puzzle size={14} className="text-neutral-500" />
-                <span className="text-xs font-semibold tracking-widest text-neutral-500 uppercase">
+                <Puzzle size={14} className="text-neutral-500 dark:text-neutral-500" />
+                <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">
                   System Telemetry
                 </span>
               </div>
               <div className="space-y-1">
                 {extensionDetected ? (
-                  <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-400 hover:text-white hover:bg-white/5 transition-colors">
+                  <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <motion.div
                         className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-400"
@@ -313,7 +331,7 @@ export default function LeftSidebar({
                         }}
                         transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
                       />
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono truncate">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 dark:text-white/40 font-mono truncate">
                         SYNC: ONLINE
                       </span>
                     </div>
@@ -321,40 +339,40 @@ export default function LeftSidebar({
                 ) : (
                   <Link
                     href="/extension"
-                    className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-white/5 transition-colors group"
+                    className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
                   >
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-mono truncate">
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/30 font-mono truncate">
                       CLIPPER: OFFLINE
                     </span>
-                    <Plus size={14} className="shrink-0 text-neutral-500 group-hover:text-white/60 transition-colors" />
+                    <Plus size={14} className="shrink-0 text-neutral-500 dark:text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-white/60 transition-colors" />
                   </Link>
                 )}
               </div>
             </div>
 
             {/* Universe Statistics */}
-            <div className="mt-3 pt-3 border-t border-white/5 space-y-1">
+            <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/5 space-y-1">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/30">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
                   <span>NODES:</span>
                   {isStatsLoading ? (
-                    <span className="font-mono text-white/30">…</span>
+                    <span className="font-mono text-neutral-400 dark:text-white/30">…</span>
                   ) : (
                     <AnimatedNumber value={nodesCount} active={isOpen} />
                   )}
-                  <span className="text-white/20">//</span>
+                  <span className="text-neutral-400 dark:text-white/20">//</span>
                   <span>LINKS:</span>
                   {isStatsLoading ? (
-                    <span className="font-mono text-white/30">…</span>
+                    <span className="font-mono text-neutral-400 dark:text-white/30">…</span>
                   ) : (
                     <AnimatedNumber value={linksCount} active={isOpen} />
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/30">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
                 <span>FOCUS:</span>
-                <div className="h-3 w-px bg-white/5" />
-                <span className="font-mono text-white/70">
+                <div className="h-3 w-px bg-black/10 dark:bg-white/5" />
+                <span className="font-mono text-neutral-700 dark:text-white/70">
                   {topTag ? `#${topTag}` : '—'}
                 </span>
               </div>
@@ -362,24 +380,24 @@ export default function LeftSidebar({
           </div>
 
           {/* User Profile Card */}
-          <div className="mt-6 pt-6 border-t border-white/5">
-            <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between group border border-white/5 hover:border-white/10 transition-colors">
+          <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/5">
+            <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center justify-between group border border-black/10 dark:border-white/5 hover:border-black/20 dark:hover:border-white/10 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 overflow-hidden flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 overflow-hidden flex items-center justify-center">
                     {user?.user_metadata?.avatar_url ? (
                       <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" width={50} height={50} />
                     ) : (
-                      <UserIcon size={20} className="text-purple-400" />
+                      <UserIcon size={20} className="text-indigo-600 dark:text-purple-400" />
                     )}
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-neutral-900 rounded-full" />
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full" />
                 </div>
                 <div className="flex flex-col max-w-[120px]">
-                  <span className="text-sm font-semibold text-white truncate">
+                  <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                     {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
                   </span>
-                  <span className="text-[10px] text-neutral-500 font-mono truncate">
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
                     {user?.email}
                   </span>
                 </div>
@@ -387,7 +405,7 @@ export default function LeftSidebar({
 
               <button 
                 onClick={handleSignOut}
-                className="hover:cursor-pointer p-2 text-neutral-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                className="hover:cursor-pointer p-2 text-neutral-500 dark:text-neutral-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
                 title="Sign Out"
               >
                 <LogOut size={18} />

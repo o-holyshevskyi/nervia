@@ -143,11 +143,11 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             delay: 0.1,
                             ease: [0, 0.71, 0.2, 1.01] 
                         }}
-                        className="relative w-full max-w-md p-6 bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl"
+                        className="relative w-full max-w-md p-6 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-2xl shadow-2xl"
                     >
                         <div className="flex flex-row items-center justify-between">
-                            <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-                                <Sparkles className="text-purple-500" size={24} />
+                            <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 flex items-center gap-2">
+                                <Sparkles className="text-indigo-600 dark:text-purple-500" size={24} />
                                 New Neuron
                             </h2>
 
@@ -156,7 +156,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             </div>
                         </div>
 
-                        <div className="flex p-1 mb-6 bg-black/50 rounded-xl mt-6 relative">
+                        <div className="flex p-1 mb-6 bg-black/10 dark:bg-black/50 rounded-xl mt-6 relative">
                             {[
                                 { id: 'link', icon: LinkIcon, label: 'Link' },
                                 { id: 'note', icon: FileText, label: 'Note' },
@@ -168,15 +168,15 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                     onClick={() => setActiveTab(tab.id as any)}
                                     className={`relative hover:cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg z-10 transition-colors duration-300 ${
                                         activeTab === tab.id 
-                                        ? 'text-white' 
-                                        : 'text-neutral-500 hover:text-neutral-300'
+                                        ? 'text-neutral-900 dark:text-white' 
+                                        : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
                                     }`}
                                 >
                                     {/* 🔥 Анімований фон для активного таба */}
                                     {activeTab === tab.id && (
                                         <motion.div
                                             layoutId="activeTabIndicator" // Це магічний ключ для плавної анімації між кнопками
-                                            className="absolute inset-0 bg-neutral-800 rounded-lg shadow-sm"
+                                            className="absolute inset-0 bg-neutral-200 dark:bg-neutral-800 rounded-lg shadow-sm"
                                             initial={false} // Забороняємо анімацію при першому рендері
                                             transition={{ 
                                                 type: "spring", 
@@ -197,14 +197,14 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-neutral-300 mb-1">
+                                <label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-1">
                                     {activeTab === 'link' ? 'Display Name' : 'Title'}
                                 </label>
                                 <input
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder={activeTab === 'link' ? "e.g. My Portfolio" : "Title..."}
-                                    className="w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white outline-none focus:border-purple-500/50"
+                                    className="w-full px-4 py-3 bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white outline-none focus:border-indigo-500/50 dark:focus:border-purple-500/50"
                                     autoFocus
                                 />
                             </div>
@@ -216,15 +216,15 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                         animate={{ opacity: 1, height: "auto" }}
                                         exit={{ opacity: 0, height: 0 }}
                                     >
-                                        <label className="block text-sm font-medium text-neutral-300 mb-1">URL</label>
+                                        <label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-1">URL</label>
                                         <div className="relative">
-                                            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-600" size={16} />
+                                            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-600" size={16} />
                                             <input
                                                 type="url"
                                                 value={url}
                                                 onChange={(e) => setUrl(e.target.value)}
                                                 placeholder="https://example.com"
-                                                className="w-full pl-11 pr-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white outline-none focus:border-indigo-500/50 transition-all font-mono text-sm"
+                                                className="w-full pl-11 pr-4 py-3 bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white outline-none focus:border-indigo-500/50 transition-all font-mono text-sm"
                                             />
                                         </div>
                                     </motion.div>
@@ -239,7 +239,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                         exit={{ opacity: 0, height: 0 }}
                                         className="overflow-hidden"
                                     >
-                                        <label htmlFor="title-input" className="block text-sm font-medium text-neutral-300 mb-1">
+                                        <label htmlFor="title-input" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-1">
                                             <AnimatePresence mode="wait">
                                                 <motion.span
                                                     key={`label-${activeTab}`}
@@ -259,26 +259,26 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                             onChange={(e) => setContent(e.target.value)}
                                             placeholder="Write in more detail..."
                                             rows={3}
-                                            className="mt-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white placeholder-neutral-600 focus:outline-none focus:border-purple-500/50 transition-colors resize-none mt-1 no-scrollbar"
+                                            className="mt-1 w-full px-4 py-3 bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 focus:outline-none focus:border-indigo-500/50 dark:focus:border-purple-500/50 transition-colors resize-none mt-1 simple-scrollbar"
                                         />
                                     </motion.div>
                                 )}
                             </AnimatePresence>
 
-                            <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+                            <div className="flex items-center justify-between bg-indigo-500/10 dark:bg-purple-500/10 border border-indigo-500/20 dark:border-purple-500/20 rounded-xl p-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-500/20 rounded-lg">
-                                        <Sparkles size={16} className="text-purple-400" />
+                                    <div className="p-2 bg-indigo-500/20 dark:bg-purple-500/20 rounded-lg">
+                                        <Sparkles size={16} className="text-indigo-600 dark:text-purple-400" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-purple-100">AI Synchronization</p>
-                                        <p className="text-xs text-purple-300/60">AI will analyze the content and find connections</p>
+                                        <p className="text-sm font-medium text-indigo-900 dark:text-purple-100">AI Synchronization</p>
+                                        <p className="text-xs text-indigo-700/80 dark:text-purple-300/60">AI will analyze the content and find connections</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setAutoConnectAI(!autoConnectAI)}
-                                    className={`hover:cursor-pointer relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${autoConnectAI ? 'bg-purple-500' : 'bg-neutral-600'}`}
+                                    className={`hover:cursor-pointer relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${autoConnectAI ? 'bg-indigo-500 dark:bg-purple-500' : 'bg-neutral-400 dark:bg-neutral-600'}`}
                                 >
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoConnectAI ? 'translate-x-6' : 'translate-x-1'}`} />
                                 </button>
@@ -292,19 +292,19 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                         exit={{ opacity: 0, height: 0, overflow: "hidden" }}
                                     >
                                         <div className="pt-4 pb-1"> 
-                                            <label htmlFor="link-input" className="block text-sm font-medium text-neutral-300">
+                                            <label htmlFor="link-input" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
                                                 Link
                                             </label>
-                                            <div id="link-input" className="mt-1 relative bg-black/50 border border-white/10 rounded-xl p-2 focus-within:border-blue-500/50 transition-colors">
+                                            <div id="link-input" className="mt-1 relative bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl p-2 focus-within:border-blue-500/50 transition-colors">
                                                 <div className="flex flex-wrap gap-2 mb-2">
                                                     {connections.map(connId => {
                                                         const node = existingNodes.find((n: any) => getNodeId(n) === connId);
                                                         const label = node ? getNodeLabel(node) : connId;
                                                         return (
-                                                            <span key={connId} className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-xs text-blue-300 border border-blue-500/30 rounded-md">
+                                                            <span key={connId} className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-xs text-blue-700 dark:text-blue-300 border border-blue-500/30 rounded-md">
                                                                 <GitMerge size={12} />
                                                                 {label}
-                                                                <button type="button" onClick={() => setConnections(connections.filter(c => c !== connId))} className="ml-1 hover:text-white">
+                                                                <button type="button" onClick={() => setConnections(connections.filter(c => c !== connId))} className="ml-1 hover:text-neutral-900 dark:hover:text-white">
                                                                     <X size={12} />
                                                                 </button>
                                                             </span>
@@ -312,7 +312,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                                     })}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <GitMerge size={16} className="text-neutral-500 ml-2" />
+                                                    <GitMerge size={16} className="text-neutral-500 dark:text-neutral-500 ml-2" />
                                                     <input
                                                         type="text"
                                                         value={connectionSearch}
@@ -323,16 +323,15 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                                         onFocus={() => setShowConnectionDropdown(true)}
                                                         onBlur={() => setTimeout(() => setShowConnectionDropdown(false), 200)}
                                                         placeholder="Link with... (enter existing neuron name)"
-                                                        className="w-full bg-transparent text-sm text-white placeholder-neutral-600 focus:outline-none py-1"
+                                                        className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 focus:outline-none py-1"
                                                     />
                                                 </div>
                                                 
-                                                {/* Внутрішній AnimatePresence для дропдауну залишається */}
                                                 <AnimatePresence>
                                                     {showConnectionDropdown && filteredNodes.length > 0 && (
                                                         <motion.div 
                                                             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                                                            className="absolute left-0 right-0 top-[105%] mt-1 bg-neutral-800 border border-white/10 rounded-xl shadow-xl z-50 max-h-40 overflow-y-auto no-scrollbar"
+                                                            className="absolute left-0 right-0 top-[105%] mt-1 bg-white dark:bg-neutral-800 border border-black/10 dark:border-white/10 rounded-xl shadow-xl z-50 max-h-40 overflow-y-auto simple-scrollbar"
                                                         >
                                                             {filteredNodes.map((n: any) => (
                                                                 <button
@@ -342,7 +341,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                                                         setConnections([...connections, getNodeId(n)]);
                                                                         setConnectionSearch("");
                                                                     }}
-                                                                    className="w-full text-left px-4 py-2 text-sm text-neutral-300 hover:bg-white/10 hover:text-white transition-colors border-b border-white/5 last:border-0"
+                                                                    className="w-full text-left px-4 py-2 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 hover:text-neutral-900 dark:hover:text-white transition-colors border-b border-black/10 dark:border-white/5 last:border-0"
                                                                 >
                                                                     {getNodeLabel(n)}
                                                                 </button>
@@ -360,13 +359,13 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                 <label htmlFor="tags-input" className="block text-sm font-medium text-neutral-300">
                                     Tags
                                 </label>
-                                <div className="mt-1 relative bg-black/50 border border-white/10 rounded-xl p-2 focus-within:border-purple-500/50 transition-colors">
+                                <div className="mt-1 relative bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl p-2 focus-within:border-indigo-500/50 dark:focus-within:border-purple-500/50 transition-colors">
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {tags.map(tag => (
-                                            <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-white/10 text-xs text-white rounded-md border border-white/5">
-                                                <Hash size={12} className="text-purple-400" />
+                                            <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-black/10 dark:bg-white/10 text-xs text-neutral-900 dark:text-white rounded-md border border-black/10 dark:border-white/5">
+                                                <Hash size={12} className="text-indigo-600 dark:text-purple-400" />
                                                 {tag}
-                                                <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-red-400 transition-colors">
+                                                <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                                                     <X size={12} />
                                                 </button>
                                             </span>
@@ -386,7 +385,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                             onBlur={() => setTimeout(() => setShowTagDropdown(false), 200)}
                                             onKeyDown={handleKeyDown}
                                             placeholder="Search or create tag (press Enter)..."
-                                            className="w-full bg-transparent text-sm text-white placeholder-neutral-600 focus:outline-none py-1"
+                                            className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 focus:outline-none py-1"
                                             autoComplete="off"
                                         />
                                     </div>
@@ -395,13 +394,13 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                         {showTagDropdown && (tagInput || filteredTags.length > 0) && (
                                             <motion.div 
                                                 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                                                className="absolute left-0 right-0 top-[105%] mt-1 bg-neutral-800 border border-white/10 rounded-xl shadow-xl z-50 max-h-40 overflow-y-auto no-scrollbar"
+                                                className="absolute left-0 right-0 top-[105%] mt-1 bg-white dark:bg-neutral-800 border border-black/10 dark:border-white/10 rounded-xl shadow-xl z-50 max-h-40 overflow-y-auto simple-scrollbar"
                                             >
                                                 {isTagNew && (
                                                     <button
                                                         type="button"
                                                         onClick={() => addTag(tagInput)}
-                                                        className="hover:cursor-pointer w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-purple-400 hover:bg-white/10 transition-colors border-b border-white/5"
+                                                        className="hover:cursor-pointer w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-indigo-600 dark:text-purple-400 hover:bg-black/5 dark:hover:bg-white/10 transition-colors border-b border-black/10 dark:border-white/5"
                                                     >
                                                         <Plus size={14} />
                                                         Create &quot;{tagInput.toLowerCase()}&quot;
@@ -413,15 +412,15 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                                         key={tag}
                                                         type="button"
                                                         onClick={() => addTag(tag)}
-                                                        className="hover:cursor-pointer w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-neutral-300 hover:bg-white/10 hover:text-white transition-colors border-b border-white/5 last:border-0"
+                                                        className="hover:cursor-pointer w-full flex items-center gap-2 text-left px-4 py-2 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/10 hover:text-neutral-900 dark:hover:text-white transition-colors border-b border-black/10 dark:border-white/5 last:border-0"
                                                     >
-                                                        <Hash size={14} className="text-neutral-500" />
+                                                        <Hash size={14} className="text-neutral-500 dark:text-neutral-500" />
                                                         {tag}
                                                     </button>
                                                 ))}
                                                 
                                                 {filteredTags.length === 0 && !isTagNew && tagInput === "" && (
-                                                    <div className="px-4 py-3 text-sm text-neutral-500 text-center italic">
+                                                    <div className="px-4 py-3 text-sm text-neutral-500 dark:text-neutral-500 text-center italic">
                                                         No tags available
                                                     </div>
                                                 )}
@@ -458,7 +457,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             <button
                                 type="submit"
                                 disabled={!title.trim()}
-                                className="hover:cursor-pointer w-full mt-4 py-3 bg-white text-black font-semibold rounded-xl hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="hover:cursor-pointer w-full mt-4 py-3 bg-neutral-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg dark:shadow-none"
                             >
                                 Save to universe
                             </button>

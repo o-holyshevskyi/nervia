@@ -1,33 +1,59 @@
 @import "tailwindcss";
 
-@tailwind base; 
-@tailwind components; 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@tailwind base;
+@tailwind components;
 @tailwind utilities;
 
+/* Graph theme variables – read by GraphNetwork via getComputedStyle (no re-render on theme switch) */
+:root {
+    --graph-bg: #f9fafb;
+    --node-color: #1f2937;
+    --link-color: rgba(55, 65, 81, 0.5);
+}
+
+.dark {
+    --graph-bg: #0a0a0a;
+    --node-color: #fafafa;
+    --link-color: rgba(255, 255, 255, 0.15);
+}
+
 @layer utilities {
-    /* Firefox */
+    /* Theme-aware scrollbars: light thumb in light theme, dark thumb in dark theme */
     .simple-scrollbar {
         scrollbar-width: thin;
-        scrollbar-color: #525252 transparent; /* thumb color, track color */
+        scrollbar-color: #d4d4d4 transparent;
     }
 
-    /* WebKit (Chrome, Safari, Edge) */
+    .dark .simple-scrollbar {
+        scrollbar-color: #525252 transparent;
+    }
+
     .simple-scrollbar::-webkit-scrollbar {
-        width: 6px; /* Makes the scrollbar slim */
+        width: 6px;
     }
 
     .simple-scrollbar::-webkit-scrollbar-track {
-        background: transparent; /* Hides the track for a cleaner look */
+        background: transparent;
         border-radius: 10px;
     }
 
     .simple-scrollbar::-webkit-scrollbar-thumb {
-        background-color: #525252; /* Tailwind's neutral-600 */
+        background-color: #d4d4d4;
         border-radius: 10px;
     }
 
     .simple-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: #737373; /* Tailwind's neutral-500 for hover state */
+        background-color: #a3a3a3;
+    }
+
+    .dark .simple-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #525252;
+    }
+
+    .dark .simple-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: #737373;
     }
 
     .no-scrollbar::-webkit-scrollbar {

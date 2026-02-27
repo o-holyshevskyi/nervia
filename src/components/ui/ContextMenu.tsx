@@ -41,11 +41,11 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: -10 }}
                         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                        className="fixed z-[101] w-48 bg-neutral-900/80 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl flex flex-col p-1.5"
+                        className="fixed z-[101] w-48 bg-white/95 dark:bg-neutral-900/80 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-xl shadow-2xl flex flex-col p-1.5"
                         style={{ left: menuX, top: menuY }}
                     >
-                        <div className="px-3 py-2 border-b border-white/10 mb-1">
-                            <p className="text-xs font-medium text-neutral-400 truncate">
+                        <div className="px-3 py-2 border-b border-black/10 dark:border-white/10 mb-1">
+                            <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400 truncate">
                                 {node.title ?? node.content ?? (typeof node.id === 'string' ? node.id : node.id?.id)}
                             </p>
                         </div>
@@ -55,9 +55,9 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
                                 onDeepFocus(typeof node.id === 'string' ? node.id : node.id?.id);
                                 onClose();
                             }}
-                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
-                            <Sun size={14} className="text-amber-400" /> Deep Focus
+                            <Sun size={14} className="text-amber-500 dark:text-amber-400" /> Deep Focus
                         </button>
 
                         <button
@@ -66,9 +66,9 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
                                 onClose();
                             }}
                             disabled={isActiveTag}
-                            className={`${isActiveTag && 'opacity-50'} ${!isActiveTag && 'hover:cursor-pointer hover:text-white hover:bg-white/10'} flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 rounded-lg transition-colors text-left`}
+                            className={`${isActiveTag && 'opacity-50'} ${!isActiveTag && 'hover:cursor-pointer hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10'} flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 dark:text-neutral-300 rounded-lg transition-colors text-left`}
                         >
-                            <Eye size={14} className={isZenModeActive ? "text-purple-400" : "text-white"} /> 
+                            <Eye size={14} className={isZenModeActive ? "text-indigo-600 dark:text-purple-400" : "text-neutral-900 dark:text-white"} /> 
                             {isZenModeActive ? "Disable Zen Mode" : "Zen Mode (Isolate)"}
                         </button>
 
@@ -78,9 +78,9 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
                                 navigator.clipboard.writeText(name ?? '');
                                 onClose();
                             }}
-                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
-                            <Copy size={14} className="text-green-400" /> Copy Name
+                            <Copy size={14} className="text-green-600 dark:text-green-400" /> Copy Name
                         </button>
 
                         <button
@@ -88,12 +88,12 @@ export default function ContextMenu({ isOpen, x, y, node, isZenModeActive, isAct
                                 onEdit(node);
                                 onClose();
                             }}
-                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-left"
+                            className="hover:cursor-pointer flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors text-left"
                         >
-                            <Edit2 size={14} className="text-yellow-400" /> Edit
+                            <Edit2 size={14} className="text-amber-600 dark:text-yellow-400" /> Edit
                         </button>
 
-                        <div className="h-px bg-white/10 my-1" />
+                        <div className="h-px bg-black/10 dark:bg-white/10 my-1" />
 
                         <button
                             onClick={() => {

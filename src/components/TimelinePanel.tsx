@@ -59,18 +59,18 @@ export default function TimelinePanel({
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: "100%", opacity: 0 }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed bottom-8 right-8 z-[80] w-[360px] rounded-2xl bg-neutral-900/80 backdrop-blur-2xl border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.2)] p-5"
+                className="fixed bottom-8 right-8 z-[80] w-[360px] rounded-2xl bg-white/90 dark:bg-neutral-900/80 backdrop-blur-2xl border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.15)] dark:shadow-[0_0_40px_rgba(245,158,11,0.2)] p-5"
             >
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <Clock size={20} className="text-amber-400" />
-                        <span className="text-sm font-semibold text-white">Time Machine</span>
+                        <Clock size={20} className="text-amber-500 dark:text-amber-400" />
+                        <span className="text-sm font-semibold text-neutral-900 dark:text-white">Time Machine</span>
                     </div>
                     <CloseButton onClose={onClose} size={20} />
                 </div>
 
-                <p className="text-xs text-neutral-400 mb-4">
-                    Replay how your knowledge graph grew over time. <span className="font-mono text-[10px] text-neutral-500">Ctrl+Alt+T</span>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
+                    Replay how your knowledge graph grew over time. <span className="font-mono text-[10px] text-neutral-500 dark:text-neutral-500">Ctrl+Alt+T</span>
                 </p>
 
                 <div className="space-y-4">
@@ -79,27 +79,27 @@ export default function TimelinePanel({
                             type="button"
                             onClick={onTogglePlay}
                             disabled={hasNoPoints || isSinglePoint}
-                            className="cursor-pointer flex-shrink-0 w-10 h-10 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 flex items-center justify-center text-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500/20"
+                            className="cursor-pointer flex-shrink-0 w-10 h-10 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-500/20"
                             aria-label={isPlaying ? "Pause" : "Play"}
                         >
                             {isPlaying ? (
-                                <Pause size={20} className="text-amber-300" />
+                                <Pause size={20} className="text-amber-700 dark:text-amber-300" />
                             ) : (
-                                <Play size={20} className="text-amber-300 ml-0.5" />
+                                <Play size={20} className="text-amber-700 dark:text-amber-300 ml-0.5" />
                             )}
                         </button>
                         <div className="flex-1 min-w-0">
-                            <label className="block text-xs font-medium text-amber-400/90 mb-1.5">
+                            <label className="block text-xs font-medium text-amber-600/90 dark:text-amber-400/90 mb-1.5">
                                 Current date
                             </label>
-                            <span className="text-sm font-medium text-white tabular-nums">
+                            <span className="text-sm font-medium text-neutral-900 dark:text-white tabular-nums">
                                 {displayDate}
                             </span>
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-amber-400/90 mb-1.5">
+                        <label className="block text-xs font-medium text-amber-600/90 dark:text-amber-400/90 mb-1.5">
                             Playback speed
                         </label>
                         <div className="flex flex-wrap gap-1.5">
@@ -110,8 +110,8 @@ export default function TimelinePanel({
                                     onClick={() => onPlaybackDurationChange(seconds)}
                                     className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                         playbackDurationSeconds === seconds
-                                            ? "bg-amber-500/30 text-amber-200 border border-amber-500/50"
-                                            : "bg-black/40 text-neutral-400 border border-amber-500/20 hover:text-amber-300 hover:border-amber-500/30"
+                                            ? "bg-amber-500/30 text-amber-800 dark:text-amber-200 border border-amber-500/50"
+                                            : "bg-black/20 dark:bg-black/40 text-neutral-600 dark:text-neutral-400 border border-amber-500/20 hover:text-amber-700 dark:hover:text-amber-300 hover:border-amber-500/30"
                                     }`}
                                 >
                                     {label}
@@ -121,7 +121,7 @@ export default function TimelinePanel({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-amber-400/90 mb-1.5">
+                        <label className="block text-xs font-medium text-amber-600/90 dark:text-amber-400/90 mb-1.5">
                             Scrub timeline
                         </label>
                         <input
@@ -139,7 +139,7 @@ export default function TimelinePanel({
                             className="w-full h-2 bg-black/40 rounded-lg appearance-none cursor-pointer border border-amber-500/20 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(245,158,11,0.5)]"
                         />
                         {!hasNoPoints && (
-                            <p className="text-[10px] text-neutral-500 mt-1">
+                            <p className="text-[10px] text-neutral-500 dark:text-neutral-500 mt-1">
                                 {datePoints.length} date point{datePoints.length !== 1 ? "s" : ""}
                             </p>
                         )}

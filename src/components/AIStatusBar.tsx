@@ -101,22 +101,22 @@ export default function AIStatusBar({ isVisible, current, total, label, failed }
                     exit={{ y: 100, opacity: 0 }}
                     className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4 pointer-events-none"
                 >
-                    <div className="bg-neutral-900/95 backdrop-blur-2xl border border-purple-500/30 p-4 rounded-2xl shadow-[0_0_50px_rgba(168,85,247,0.4)] pointer-events-auto relative overflow-hidden">
+                    <div className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border border-indigo-500/30 dark:border-purple-500/30 p-4 rounded-2xl shadow-[0_0_50px_rgba(99,102,241,0.2)] dark:shadow-[0_0_50px_rgba(168,85,247,0.4)] pointer-events-auto relative overflow-hidden">
                         
                         <div className="flex items-center justify-between mb-3 relative z-10">
                             <div className="flex items-center gap-2">
                                 {isDone ? (
                                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                                        <CheckCircle2 className="text-green-400" size={18} />
+                                        <CheckCircle2 className="text-green-600 dark:text-green-400" size={18} />
                                     </motion.div>
                                 ) : (
-                                    <Sparkles className="text-purple-400 animate-pulse" size={16} />
+                                    <Sparkles className="text-indigo-600 dark:text-purple-400 animate-pulse" size={16} />
                                 )}
-                                <span className="text-xs font-bold text-white uppercase tracking-widest leading-none">
+                                <span className="text-xs font-bold text-neutral-900 dark:text-white uppercase tracking-widest leading-none">
                                     {isDone ? 'Sync Complete' : (label || 'Neural Processing')}
                                 </span>
                             </div>
-                            <span className="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                            <span className="text-[10px] font-mono text-indigo-700 dark:text-purple-300 bg-indigo-500/10 dark:bg-purple-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 dark:border-purple-500/20">
                                 {Math.floor(displayPercent)}% {total > 1 && !isDone && `(${current}/${total})`}
                             </span>
                             {/* {failed !== undefined && failed > 0 && (
@@ -130,7 +130,7 @@ export default function AIStatusBar({ isVisible, current, total, label, failed }
                             )} */}
                         </div>
                         
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden relative">
+                        <div className="h-1.5 w-full bg-black/10 dark:bg-white/5 rounded-full overflow-hidden relative">
                             {/* Смужка прогресу */}
                             <motion.div 
                                 className={`h-full relative ${isDone ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-gradient-to-r from-purple-600 via-purple-400 to-indigo-500'}`}
@@ -169,7 +169,7 @@ export default function AIStatusBar({ isVisible, current, total, label, failed }
                                 initial={{ opacity: 0, y: 5 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -5 }}
-                                className="mt-3 text-[14px] text-neutral-400 text-center italic font-medium"
+                                className="mt-3 text-[14px] text-neutral-500 dark:text-neutral-400 text-center italic font-medium"
                             >
                                 {isDone 
                                     ? (failed && failed > 0 
