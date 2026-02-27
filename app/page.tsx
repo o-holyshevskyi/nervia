@@ -19,6 +19,7 @@ import AIStatusBar from "@/src/components/AIStatusBar";
 import NeuralSearch from "@/src/components/NeuralSearch";
 import PathfinderPanel from "@/src/components/PathfinderPanel";
 import TimelinePanel from "@/src/components/TimelinePanel";
+import UniverseHistory from "@/src/components/UniverseHistory";
 import NeuralChat from "@/src/components/NeuralChat";
 import OnboardingTour from "@/src/components/OnboardingTour";
 import { useOnboarding } from "@/src/hooks/useOnboarding";
@@ -162,6 +163,7 @@ export default function Home() {
     const [pathData, setPathData] = useState<{ nodes: string[]; links: any[] }>({ nodes: [], links: [] });
     const [isPathfinderOpen, setIsPathfinderOpen] = useState(false);
     const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [contextNodeIds, setContextNodeIds] = useState<string[]>([]);
     const [clusterMode, setClusterMode] = useState<'group' | 'tag'>('group');
@@ -431,6 +433,10 @@ export default function Home() {
             if (e.key === "t" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
                 setIsTimelineOpen(true);
+            }
+            if (e.key === "h" && (e.metaKey || e.ctrlKey) && e.altKey) {
+                e.preventDefault();
+                setIsHistoryOpen(true);
             }
             if (e.key === "c" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
@@ -705,6 +711,7 @@ export default function Home() {
                 onOpenSearch={openSearch}
                 onOpenPathfinder={() => setIsPathfinderOpen(true)}
                 onOpenTimeline={() => setIsTimelineOpen(true)}
+                onOpenHistory={() => setIsHistoryOpen(true)}
                 onOpenChat={() => setIsChatOpen(true)}
                 clusterMode={clusterMode}
                 onClusterModeChange={setClusterMode}
@@ -759,6 +766,15 @@ export default function Home() {
                         setIsPlaying(false);
                         setTimelineDate(timelineMaxDate);
                     }}
+                />
+            )}
+
+            {isHistoryOpen && (
+                <UniverseHistory
+                    nodes={data.nodes}
+                    groups={groups}
+                    supabase={supabase}
+                    onClose={() => setIsHistoryOpen(false)}
                 />
             )}
 

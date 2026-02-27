@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -33,6 +33,7 @@ interface LeftSidebarProps {
   onOpenSearch?: () => void;
   onOpenPathfinder?: () => void;
   onOpenTimeline?: () => void;
+  onOpenHistory?: () => void;
   onOpenChat?: () => void;
   clusterMode: 'group' | 'tag';
   onClusterModeChange: (mode: 'group' | 'tag') => void;
@@ -59,6 +60,7 @@ export default function LeftSidebar({
   onOpenSearch,
   onOpenPathfinder,
   onOpenTimeline,
+  onOpenHistory,
   onOpenChat,
   clusterMode,
   onClusterModeChange,
@@ -141,6 +143,7 @@ export default function LeftSidebar({
         { id: 'search', title: 'Search', icon: <Search size={16} />, shortcut: 'Ctrl+K', onClick: () => onOpenSearch?.() },
         { id: 'pathfinder', title: 'Pathfinder', icon: <Route size={16} />, shortcut: 'Ctrl+Alt+P', onClick: () => onOpenPathfinder?.() },
         { id: 'timeline', title: 'Time Machine', icon: <Clock size={16} />, shortcut: 'Ctrl+Alt+T', onClick: () => onOpenTimeline?.() },
+        { id: 'history', title: 'Evolution Journal', icon: <History size={16} />, shortcut: 'Ctrl+Alt+H', onClick: () => onOpenHistory?.() },
         { id: 'chat', title: 'Neural Chat', icon: <MessageCircle size={16} />, shortcut: 'Ctrl+Alt+C', onClick: () => onOpenChat?.() },
       ]
     },
