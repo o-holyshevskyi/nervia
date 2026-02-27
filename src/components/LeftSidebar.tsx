@@ -249,7 +249,7 @@ export default function LeftSidebar({
                 <div className="relative">
                   <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 overflow-hidden flex items-center justify-center">
                     {user?.user_metadata?.avatar_url ? (
-                      <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                      <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" width={50} height={50} />
                     ) : (
                       <UserIcon size={20} className="text-purple-400" />
                     )}
