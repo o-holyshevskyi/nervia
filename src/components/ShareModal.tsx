@@ -131,7 +131,7 @@ export default function ShareModal({
                           : "text-neutral-600 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-white/5"
                       }`}
                     >
-                      All Nodes
+                      All Neurons
                     </button>
                     <button
                       type="button"
