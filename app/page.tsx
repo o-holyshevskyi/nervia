@@ -68,6 +68,7 @@ export default function Home() {
     const [isPathfinderOpen, setIsPathfinderOpen] = useState(false);
     const [isTimelineOpen, setIsTimelineOpen] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [contextNodeIds, setContextNodeIds] = useState<string[]>([]);
     const [clusterMode, setClusterMode] = useState<'group' | 'tag'>('group');
 
     const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
@@ -373,6 +374,7 @@ export default function Home() {
                 zenModeNodeId={zenModeNodeId}
                 physicsConfig={physicsConfig}
                 highlightedNodes={highlightedNodes}
+                contextNodeIds={contextNodeIds}
                 pathNodes={pathData.nodes}
                 pathLinks={pathData.links}
                 flyToNodeId={flyToNodeId}
@@ -544,9 +546,13 @@ export default function Home() {
 
             <NeuralChat
                 isOpen={isChatOpen}
-                onClose={() => setIsChatOpen(false)}
+                onClose={() => {
+                    setIsChatOpen(false);
+                    setContextNodeIds([]);
+                }}
                 nodes={data.nodes}
                 isPremium={false}
+                setContextNodeIds={setContextNodeIds}
             />
 
             {isPathfinderOpen && (

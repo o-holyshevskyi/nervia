@@ -19,6 +19,7 @@ interface NeuralChatProps {
   onClose: () => void;
   nodes: any[];
   isPremium?: boolean;
+  setContextNodeIds?: (ids: string[]) => void;
 }
 
 function getNodeId(node: any): string {
@@ -33,11 +34,14 @@ function renderFormattedContent(text: string) {
   );
 }
 
+const CONTEXT_HIGHLIGHT_DURATION_MS = 4000;
+
 export default function NeuralChat({
   isOpen,
   onClose,
   nodes,
   isPremium = false,
+  setContextNodeIds,
 }: NeuralChatProps) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -77,6 +81,7 @@ export default function NeuralChat({
 
     setInput("");
     setError(null);
+    setContextNodeIds?.([]);
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -104,6 +109,7 @@ export default function NeuralChat({
           searchResults = Array.isArray(searchData.results) ? searchData.results.slice(0, 7) : [];
         }
       }
+      setContextNodeIds?.(searchResults.map((r) => r.id));
 
       const contextNodesForChat = searchResults
         .map((r) => nodeById.get(r.id))
@@ -136,6 +142,7 @@ export default function NeuralChat({
         content: reply,
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      setTimeout(() => setContextNodeIds?.([]), CONTEXT_HIGHLIGHT_DURATION_MS);
     } catch (err) {
       console.error("Neural chat error:", err);
       const errMessage = err instanceof Error ? err.message : "Something went wrong.";

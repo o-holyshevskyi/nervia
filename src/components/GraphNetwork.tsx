@@ -218,6 +218,7 @@ interface GraphNetworkProps {
     zenModeNodeId: string | null;
     physicsConfig: { repulsion: number; linkDistance: number };
     highlightedNodes?: string[];
+    contextNodeIds?: string[];
     pathNodes?: string[];
     pathLinks?: any[];
     flyToNodeId?: string | null;
@@ -245,6 +246,7 @@ export default function GraphNetwork({
     zenModeNodeId,
     physicsConfig,
     highlightedNodes = [],
+    contextNodeIds = [],
     pathNodes = [],
     pathLinks = [],
     flyToNodeId = null,
@@ -311,6 +313,7 @@ export default function GraphNetwork({
     }, [graphData.nodes]);
 
     const highlightedSet = useMemo(() => new Set(highlightedNodes), [highlightedNodes]);
+    const contextNodeSet = useMemo(() => new Set(contextNodeIds), [contextNodeIds]);
     const searchActive = highlightedSet.size > 0;
 
     const pathfinderActive = pathNodes.length > 0;
@@ -514,6 +517,29 @@ export default function GraphNetwork({
             ? (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor)
             : baseColor;
 
+        // Neural Chat context halo: pulsing semi-transparent ring (cyan/purple) when node is in RAG context
+        const isContextNode = contextNodeSet.has(idStr);
+        if (isContextNode) {
+            const t = Date.now() / 500;
+            const pulse = 0.35 + 0.25 * Math.sin(t);
+            const haloRadius = size * 2.2;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, haloRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = `rgba(6, 182, 212, ${pulse * 0.9})`;
+            ctx.lineWidth = 3 / globalScale;
+            ctx.shadowColor = "rgba(168, 85, 247, 0.8)";
+            ctx.shadowBlur = 20 / globalScale;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(x, y, haloRadius + 2 / globalScale, 0, 2 * Math.PI);
+            ctx.strokeStyle = `rgba(168, 85, 247, ${pulse * 0.5})`;
+            ctx.lineWidth = 2 / globalScale;
+            ctx.stroke();
+            ctx.restore();
+        }
+
         // New-node ping: glowing circle behind the node that fades out over a few seconds
         if (node.isNew && node.newPingAt) {
             const elapsed = Date.now() - (node.newPingAt as number);
@@ -608,7 +634,7 @@ export default function GraphNetwork({
                 : themeColors.nodeColor;
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupKeyMap, groupColorsById]);
+    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, contextNodeSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupKeyMap, groupColorsById]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -710,6 +736,35 @@ export default function GraphNetwork({
         fgRef.current.centerAt(cx, cy, 800);
         fgRef.current.zoom(3, 800);
     }, [solarSystemNodeId, dimensions.width, dimensions.height]);
+
+    useEffect(() => {
+        if (!fgRef.current || contextNodeIds.length === 0) return;
+        const nodes = processedData.nodes.filter((n: any) => {
+            const id = typeof n.id === "string" ? n.id : n?.id;
+            return id != null && contextNodeSet.has(id);
+        });
+        if (nodes.length === 0) return;
+        const padding = 100;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        nodes.forEach((n: any) => {
+            const nx = Number(n.x);
+            const ny = Number(n.y);
+            if (isFinite(nx) && isFinite(ny)) {
+                minX = Math.min(minX, nx);
+                minY = Math.min(minY, ny);
+                maxX = Math.max(maxX, nx);
+                maxY = Math.max(maxY, ny);
+            }
+        });
+        if (!isFinite(minX) || !isFinite(maxX)) return;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const boxW = maxX - minX + 2 * padding;
+        const boxH = maxY - minY + 2 * padding;
+        const k = Math.min(dimensions.width / boxW, dimensions.height / boxH, 4);
+        fgRef.current.centerAt(centerX, centerY, 400);
+        fgRef.current.zoom(k, 400);
+    }, [contextNodeIds.length, contextNodeSet, processedData.nodes, dimensions.width, dimensions.height]);
 
     const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
         lastTransformRef.current = { k: transform.k, x: transform.x, y: transform.y };
