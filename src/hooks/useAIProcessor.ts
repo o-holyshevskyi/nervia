@@ -1,18 +1,35 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+
+const MAX_NODES_PER_RUN = 25;
 
 export function useAIProcessor(
-    supabase: any, 
+    supabase: any,
     onNodeUpdate: (id: string, data: any) => void,
-    onAddLink: (sourceId: string, targetId: string, type: string, label: string) => Promise<void>
+    onAddLink: (sourceId: string, targetId: string, type: string, label: string) => Promise<void>,
+    nodes: any[] = []
 ) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [total, setTotal] = useState(0);
     const [failed, setFailed] = useState(0);
 
+    const nodesRef = useRef(nodes);
+    nodesRef.current = nodes;
+
     const getNodeTitle = (n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? '';
     const getNodeId = (n: any) => typeof n.id === 'string' ? n.id : n.id?.id;
+
+    const pendingUnprocessedKey = useMemo(
+        () =>
+            nodes
+                .filter((n: any) => n.is_ai_processed === false)
+                .map((n: any) => getNodeId(n))
+                .filter(Boolean)
+                .sort()
+                .join(','),
+        [nodes]
+    );
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -143,6 +160,17 @@ export function useAIProcessor(
             }, 500);
         }, 2500);
     };
-    
+
+    // Auto-trigger: when there are unprocessed nodes and we're not already processing, run the queue
+    useEffect(() => {
+        if (!pendingUnprocessedKey || isProcessing) return;
+        const currentNodes = nodesRef.current;
+        if (currentNodes.length === 0) return;
+        const pending = currentNodes.filter((n: any) => n.is_ai_processed === false);
+        if (pending.length === 0) return;
+        console.log(`🚀 Found ${pending.length} unprocessed nodes. Resuming AI sync...`);
+        processQueue(pending.slice(0, MAX_NODES_PER_RUN), currentNodes);
+    }, [pendingUnprocessedKey, isProcessing]);
+
     return { isProcessing, progress, total, failed, processQueue };
 }

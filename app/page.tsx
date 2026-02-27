@@ -35,9 +35,10 @@ export default function Home() {
     } = useGraphData(supabase);
 
     const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
-        supabase, 
-        updateNode, 
-        addLink
+        supabase,
+        updateNode,
+        addLink,
+        data.nodes
     );
 
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
@@ -330,21 +331,6 @@ export default function Home() {
             links: prev.links,
         }));
     }, [data.nodes.length, nodeIdsSet]);
-
-    useEffect(() => {
-        // Чекаємо, поки завантажаться основні дані нод
-        if (!isLoading && data.nodes.length > 0 && !isProcessing) {
-            
-            // Знаходимо ноди, які ще не обробив ШІ
-            const pendingNodes = data.nodes.filter((n: any) => n.is_ai_processed === false);
-
-            if (pendingNodes.length > 0) {
-                console.log(`🚀 Found ${pendingNodes.length} unprocessed nodes. Resuming AI sync...`);
-                const MAX_NODES_PER_RUN = 25;
-                processQueue(pendingNodes.slice(0, MAX_NODES_PER_RUN), data.nodes);
-            }
-        }
-    }, [isLoading, data.nodes.length]);
 
     if (isLoading) {
         return (

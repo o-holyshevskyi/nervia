@@ -1,12 +1,48 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ParsedBookmark } from '../lib/bookmarkParser';
 import { NodeData } from '../components/AddModal';
+
+const NEW_NODE_PING_DURATION_MS = 4000;
 
 export function useGraphData(supabase: any) {
     const [user, setUser] = useState<any>(null);
     const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
     const [isLoading, setIsLoading] = useState(true);
+
+    const notificationSound = useRef<HTMLAudioElement | null>(null);
+    const audioUnlocked = useRef(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (!notificationSound.current) {
+            notificationSound.current = new Audio('/sounds/notification.mp3');
+        }
+    }, []);
+
+    // Unlock audio on first user interaction (browsers block programmatic play() otherwise)
+    useEffect(() => {
+        if (typeof window === 'undefined' || audioUnlocked.current) return;
+        const unlock = () => {
+            if (audioUnlocked.current || !notificationSound.current) return;
+            audioUnlocked.current = true;
+            const a = notificationSound.current;
+            a.volume = 0; // silent unlock so user doesn't hear a blip
+            a.play().then(() => {
+                a.pause();
+                a.currentTime = 0;
+                a.volume = 0.5; // restore volume for real notifications
+            }).catch(() => {});
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('keydown', unlock);
+        };
+        document.addEventListener('click', unlock, { once: true });
+        document.addEventListener('keydown', unlock, { once: true });
+        return () => {
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('keydown', unlock);
+        };
+    }, []);
 
     useEffect(() => {
         const initSession = async () => {
@@ -53,6 +89,53 @@ export function useGraphData(supabase: any) {
 
         initSession();
     }, [supabase]);
+
+    // Realtime: when a new node is inserted (e.g. via extension), add it to local state so the graph updates without refresh
+    useEffect(() => {
+        if (!user?.id || !supabase) return;
+
+        const channel = supabase
+            .channel('nodes-insert')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'nodes' }, (payload: { new: Record<string, unknown> }) => {
+                const row = payload.new;
+                if (row.user_id !== user?.id) return;
+                const nodeId = row.id as string;
+
+                if (notificationSound.current) {
+                    notificationSound.current.volume = 0.5;
+                    notificationSound.current.currentTime = 0;
+                    notificationSound.current.play().catch((e) => console.log('Audio blocked by browser', e));
+                }
+
+                setData((prev) => {
+                    if (prev.nodes.some((n: any) => (n.id ?? n.id?.id) === nodeId)) return prev;
+                    const n = row;
+                    const normalized = {
+                        ...n,
+                        group: n.group != null ? n.group : (n.type === 'note' ? 2 : n.type === 'idea' ? 3 : 1),
+                        isNew: true,
+                        newPingAt: Date.now(),
+                    };
+                    return { ...prev, nodes: [...prev.nodes, normalized] };
+                });
+
+                setTimeout(() => {
+                    setData((prev) => ({
+                        ...prev,
+                        nodes: prev.nodes.map((n: any) => {
+                            const id = typeof n.id === 'string' ? n.id : n.id?.id;
+                            if (id === nodeId) return { ...n, isNew: false, newPingAt: undefined };
+                            return n;
+                        }),
+                    }));
+                }, NEW_NODE_PING_DURATION_MS);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [supabase, user?.id]);
 
     const addNewNode = async (nodeData: NodeData): Promise<any> => {
         if (!user) return undefined;

@@ -447,6 +447,26 @@ export default function GraphNetwork({
         // Колір для контуру та тексту
         const strokeColor = isHidden ? 'rgba(100, 100, 100, 0.1)' : baseColor;
 
+        // New-node ping: glowing circle behind the node that fades out over a few seconds
+        if (node.isNew && node.newPingAt) {
+            const elapsed = Date.now() - (node.newPingAt as number);
+            const duration = 4000;
+            const alpha = Math.max(0, 1 - elapsed / duration);
+            if (alpha > 0) {
+                ctx.save();
+                const pingRadius = size * 2.5;
+                ctx.beginPath();
+                ctx.arc(x, y, pingRadius, 0, 2 * Math.PI);
+                const gradient = ctx.createRadialGradient(x, y, size, x, y, pingRadius);
+                gradient.addColorStop(0, `rgba(168, 85, 247, ${alpha * 0.5})`);
+                gradient.addColorStop(0.6, `rgba(168, 85, 247, ${alpha * 0.2})`);
+                gradient.addColorStop(1, 'rgba(168, 85, 247, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
         // 2. Малюємо порожнє коло (Border)
         ctx.beginPath();
         ctx.arc(x, y, size, 0, 2 * Math.PI, false);
