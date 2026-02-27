@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import { createClient } from "../lib/supabase/client";
@@ -24,6 +24,8 @@ interface LeftSidebarProps {
   onOpenSearch?: () => void;
   onOpenPathfinder?: () => void;
   onOpenTimeline?: () => void;
+  clusterMode: 'group' | 'tag';
+  onClusterModeChange: (mode: 'group' | 'tag') => void;
 }
 
 export default function LeftSidebar({ 
@@ -38,7 +40,9 @@ export default function LeftSidebar({
   onExport,
   onOpenSearch,
   onOpenPathfinder,
-  onOpenTimeline
+  onOpenTimeline,
+  clusterMode,
+  onClusterModeChange
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [user, setUser] = useState<any>(null);
@@ -58,72 +62,23 @@ export default function LeftSidebar({
     router.refresh();
   };
 
-  // Логічне групування елементів
+  const kbdClass = "text-xs font-mono text-neutral-500 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded";
+
   const sections = [
     {
       label: "Discovery",
       icon: <Compass size={14} className="text-neutral-500" />,
       items: [
-        {
-          id: 'search',
-          title: 'Search',
-          icon: <Search size={18} />,
-          content: (
-            <div className="py-2 space-y-2">
-              <p className="text-xs text-neutral-400">
-                Search by name or meaning. Press Enter for semantic (AI) search.
-              </p>
-              <button
-                type="button"
-                onClick={() => onOpenSearch?.()}
-                className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 hover:text-white transition-colors text-sm font-medium"
-              >
-                <Search size={16} />
-                Open Search (Ctrl+K)
-              </button>
-            </div>
-          )
-        },
-        {
-          id: 'pathfinder',
-          title: 'Pathfinder',
-          icon: <Route size={18} />,
-          content: (
-            <div className="py-2 space-y-2">
-              <p className="text-xs text-neutral-400">
-                Find and visualize the shortest path between two nodes (Thought Chains).
-              </p>
-              <button
-                type="button"
-                onClick={() => onOpenPathfinder?.()}
-                className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/30 hover:text-white transition-colors text-sm font-medium"
-              >
-                <Route size={16} />
-                Open Pathfinder (Ctrl+Alt+P)
-              </button>
-            </div>
-          )
-        },
-        {
-          id: 'timeline',
-          title: 'Time Machine',
-          icon: <Clock size={18} />,
-          content: (
-            <div className="py-2 space-y-2">
-              <p className="text-xs text-neutral-400">
-                Replay how your knowledge graph grew over time.
-              </p>
-              <button
-                type="button"
-                onClick={() => onOpenTimeline?.()}
-                className="hover:cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 hover:text-white transition-colors text-sm font-medium"
-              >
-                <Clock size={16} />
-                Open Time Machine (Ctrl+Alt+T)
-              </button>
-            </div>
-          )
-        }
+        { id: 'search', title: 'Search', icon: <Search size={16} />, shortcut: 'Ctrl+K', onClick: () => onOpenSearch?.() },
+        { id: 'pathfinder', title: 'Pathfinder', icon: <Route size={16} />, shortcut: 'Ctrl+Alt+P', onClick: () => onOpenPathfinder?.() },
+        { id: 'timeline', title: 'Time Machine', icon: <Clock size={16} />, shortcut: 'Ctrl+Alt+T', onClick: () => onOpenTimeline?.() },
+      ]
+    },
+    {
+      label: "View Options",
+      icon: <LayoutGrid size={14} className="text-neutral-500" />,
+      items: [
+        { id: 'gravity-shift', title: 'Gravity Shift', icon: <Globe size={16} />, isToggle: true },
       ]
     },
     {
@@ -133,10 +88,10 @@ export default function LeftSidebar({
         {
           id: 'filters',
           title: 'Filters',
-          icon: <Filter size={18} />,
+          icon: <Filter size={16} />,
           content: tags.length === 0 ? (
-            <div className="py-4 px-2 text-center bg-white/5 rounded-xl border border-white/5">
-              <p className="text-xs text-neutral-500 italic">No tags available yet</p>
+            <div className="py-3 px-2 text-center bg-white/5 rounded-md border border-white/10">
+              <p className="text-xs text-neutral-500 italic">No tags yet</p>
             </div>
           ) : (
             <FilterPanel activeTag={activeTag} tags={tags} onClose={onClose} onTagSelect={onTagSelect} />
@@ -151,7 +106,7 @@ export default function LeftSidebar({
         {
           id: 'import-export',
           title: 'Data Transfer',
-          icon: <ImportIcon size={18} />,
+          icon: <ImportIcon size={16} />,
           content: <ImportExport onImport={onImport} onExport={onExport} />
         }
       ]
@@ -188,55 +143,118 @@ export default function LeftSidebar({
                 {/* Section Header */}
                 <div className="flex items-center gap-2">
                   {section.icon}
-                  <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">
+                  <span className="text-xs font-semibold tracking-widest text-neutral-500 uppercase">
                     {section.label}
                   </span>
                 </div>
 
                 {/* Items in Section */}
                 <div className="space-y-1">
-                  {section.items.map((item) => (
-                    <div key={item.id} className="overflow-hidden">
-                      <button
-                        onClick={() => toggleAccordion(item.id)}
-                        className={`hover:cursor-pointer w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all group ${
-                          openAccordion === item.id ? 'bg-white/5 shadow-inner' : 'hover:bg-white/5'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`${openAccordion === item.id ? 'text-purple-400' : 'text-neutral-500 group-hover:text-white'} transition-colors`}>
-                            {item.icon}
-                          </span>
-                          <span className={`text-sm font-medium ${openAccordion === item.id ? 'text-white' : 'text-neutral-400 group-hover:text-white'}`}>
-                            {item.title}
-                          </span>
-                        </div>
-                        <motion.div
-                          animate={{ rotate: openAccordion === item.id ? 180 : 0 }}
-                          className="text-neutral-600"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </motion.div>
-                      </button>
+                  {section.items.map((item: any) => {
+                    const isAction = item.onClick != null && item.shortcut != null;
+                    const isToggle = item.isToggle === true;
 
-                      <AnimatePresence initial={false}>
-                        {openAccordion === item.id && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                    if (isAction) {
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={item.onClick}
+                          className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-neutral-500 shrink-0">{item.icon}</span>
+                            <span>{item.title}</span>
+                          </div>
+                          <kbd className={kbdClass}>{item.shortcut}</kbd>
+                        </button>
+                      );
+                    }
+
+                    if (isToggle && item.id === 'gravity-shift') {
+                      return (
+                        <div
+                          key={item.id}
+                          className="w-full h-10 flex items-center justify-between px-3 rounded-md"
+                        >
+                          <div className="flex items-center gap-2.5 text-sm text-neutral-400">
+                            <span className="text-neutral-500 shrink-0">{item.icon}</span>
+                            <span>{item.title}</span>
+                          </div>
+                          <div
+                            role="group"
+                            aria-label="Cluster by category or tag"
+                            className="flex h-8 w-16 rounded-full bg-white/5 border border-white/10 p-0.5 shrink-0"
                           >
-                            <div className="px-4 py-3">
-                              {item.content}
-                            </div>
+                            <button
+                              type="button"
+                              title="Cluster by Category"
+                              onClick={() => onClusterModeChange('group')}
+                              className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
+                                clusterMode === 'group'
+                                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_12px_rgba(168,85,247,0.15)]'
+                                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'
+                              }`}
+                            >
+                              <Globe size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Cluster by Tag"
+                              onClick={() => onClusterModeChange('tag')}
+                              className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
+                                clusterMode === 'tag'
+                                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_12px_rgba(168,85,247,0.15)]'
+                                  : 'text-neutral-500 hover:text-neutral-300 hover:bg-white/5'
+                              }`}
+                            >
+                              <Tag size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={item.id} className="overflow-hidden">
+                        <button
+                          onClick={() => toggleAccordion(item.id)}
+                          className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors group ${
+                            openAccordion === item.id ? 'bg-white/5 text-white' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className={`shrink-0 ${openAccordion === item.id ? 'text-purple-400' : 'text-neutral-500 group-hover:text-white'}`}>
+                              {item.icon}
+                            </span>
+                            <span>{item.title}</span>
+                          </div>
+                          <motion.div
+                            animate={{ rotate: openAccordion === item.id ? 180 : 0 }}
+                            className="text-neutral-500 shrink-0"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
                           </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ))}
+                        </button>
+                        <AnimatePresence initial={false}>
+                          {openAccordion === item.id && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3, ease: "easeInOut" }}
+                            >
+                              <div className="px-0 pt-1.5 pb-2">
+                                {item.content}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

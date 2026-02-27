@@ -44,23 +44,23 @@ export default function ImportExport({ onImport, onExport }: ImportExportProps) 
     };
 
     return (
-        <div className="space-y-3 p-2">
-            <div className="text-xs font-mono text-neutral-500 uppercase tracking-wider mb-2">
+        <div className="space-y-2">
+            <div className="text-[10px] font-mono text-neutral-500 uppercase tracking-wider mb-1 px-0">
                 Data Management
             </div>
-            
-            <label className={`hover:cursor-pointer flex items-center gap-3 px-4 py-3 bg-white/5 border border-dashed border-white/10 rounded-xl text-neutral-400 hover:text-white hover:bg-white/10 transition-all group ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
-                {isImporting ? <Loader2 size={18} className="animate-spin text-neutral-400" /> : <Upload size={18} className="text-neutral-400 group-hover:text-neutral-400" />}
-                <span className="text-sm font-medium">{isImporting ? 'Processing...' : 'Import HTML Bookmarks'}</span>
+
+            <label className={`hover:cursor-pointer flex items-center gap-2.5 px-3 py-2 bg-white/5 border border-dashed border-white/10 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors group ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+                {isImporting ? <Loader2 size={16} className="animate-spin shrink-0" /> : <Upload size={16} className="shrink-0" />}
+                <span>{isImporting ? 'Processing...' : 'Import HTML Bookmarks'}</span>
                 <input type="file" accept=".html" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
             </label>
 
-            <button 
+            <button
                 onClick={onExport}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-neutral-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                className="hover:cursor-pointer w-full flex items-center gap-2.5 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-sm text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
             >
-                <Download size={18} />
-                <span className="text-sm font-medium">Export to JSON</span>
+                <Download size={16} className="shrink-0" />
+                <span>Export to JSON</span>
             </button>
 
             <ConfirmModal 

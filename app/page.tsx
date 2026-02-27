@@ -61,6 +61,7 @@ export default function Home() {
     const [pathData, setPathData] = useState<{ nodes: string[]; links: any[] }>({ nodes: [], links: [] });
     const [isPathfinderOpen, setIsPathfinderOpen] = useState(false);
     const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+    const [clusterMode, setClusterMode] = useState<'group' | 'tag'>('group');
 
     const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
         const nodes = data.nodes;
@@ -340,6 +341,7 @@ export default function Home() {
                 onNodeContextMenu={handleNodeContextMenu}
                 onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 solarSystemNodeId={solarSystemNodeId}
+                clusterMode={clusterMode}
             />
             <div className="absolute top-10 left-10 pointer-events-none">
                 <h1 className="text-4xl font-bold text-white tracking-tighter">Synapse Bookmark</h1>
@@ -512,11 +514,11 @@ export default function Home() {
                 />
             )}
 
-            <LeftSidebar 
+            <LeftSidebar
                 isOpen={isLeftSidebarOpen}
                 onClose={() => setIsLeftSidebarOpen(false)}
-                tags={allTags} 
-                activeTag={activeTag} 
+                tags={allTags}
+                activeTag={activeTag}
                 onTagSelect={setActiveTag}
                 nodes={data.nodes}
                 onSelect={handleSearchSelect}
@@ -525,6 +527,8 @@ export default function Home() {
                 onOpenSearch={openSearch}
                 onOpenPathfinder={() => setIsPathfinderOpen(true)}
                 onOpenTimeline={() => setIsTimelineOpen(true)}
+                clusterMode={clusterMode}
+                onClusterModeChange={setClusterMode}
             />
 
             <Sidebar 

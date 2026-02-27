@@ -30,6 +30,19 @@ const groupNames: Record<number, string> = {
     5: "Research",
 };
 
+/** Neon palette for tag-based clusters (cinematic, consistent per tag). */
+const tagNeonPalette = [
+    "#06b6d4", "#a855f7", "#f97316", "#10b981", "#ec4899",
+    "#eab308", "#6366f1", "#14b8a6", "#f43f5e", "#8b5cf6",
+];
+
+function getColorForTag(tag: string): string {
+    let h = 0;
+    for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+    const idx = Math.abs(h) % tagNeonPalette.length;
+    return tagNeonPalette[idx] ?? tagNeonPalette[0];
+}
+
 /** Deterministic hash from string for reproducible initial positions. */
 function hashStr(s: string): number {
     let h = 0;
@@ -48,30 +61,40 @@ function getNodeGroup(node: any): number {
     return 1; // link or default
 }
 
+function getClusterKeyForDraw(node: any, clusterMode: 'group' | 'tag', nodeIdToGroup: Map<string | number, number>): number | string | null {
+    if (clusterMode === 'group') {
+        const nodeId = typeof node.id === 'string' ? node.id : node?.id;
+        const g = nodeId != null ? (nodeIdToGroup.get(nodeId) ?? getNodeGroup(node)) : getNodeGroup(node);
+        return g ?? null;
+    }
+    return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
+}
+
 function drawGroupAreas(
     ctx: CanvasRenderingContext2D,
     nodes: any[],
     dimensions: { width: number; height: number },
     _globalScale: number,
-    nodeIdToGroup: Map<string | number, number>
+    nodeIdToGroup: Map<string | number, number>,
+    clusterMode: 'group' | 'tag'
 ) {
-    const byGroup: Record<number, { x: number; y: number }[]> = {};
+    const byCluster: Record<string, { x: number; y: number }[]> = {};
     for (const node of nodes) {
-        const nodeId = typeof node.id === 'string' ? node.id : node?.id;
-        const g = nodeId != null ? (nodeIdToGroup.get(nodeId) ?? getNodeGroup(node)) : getNodeGroup(node);
-        if (g == null) continue;
+        const key = getClusterKeyForDraw(node, clusterMode, nodeIdToGroup);
+        if (key == null) continue;
+        const keyStr = String(key);
         const x = Number(node.x);
         const y = Number(node.y);
         if (!isFinite(x) || !isFinite(y)) continue;
-        if (!byGroup[g]) byGroup[g] = [];
-        byGroup[g].push({ x, y });
+        if (!byCluster[keyStr]) byCluster[keyStr] = [];
+        byCluster[keyStr].push({ x, y });
     }
 
     const prevComposite = ctx.globalCompositeOperation;
     ctx.globalCompositeOperation = "screen";
 
-    for (const g of Object.keys(byGroup).map(Number)) {
-        const points = byGroup[g];
+    for (const keyStr of Object.keys(byCluster)) {
+        const points = byCluster[keyStr];
         if (!points?.length) continue;
         const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
         const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
@@ -81,7 +104,9 @@ function drawGroupAreas(
         const radius = Math.min(dimensions.width + dimensions.height, Math.max(80, maxDist * 1.2));
         if (!isFinite(radius) || radius <= 0) continue;
 
-        const color = groupColors[g];
+        const color = clusterMode === 'group'
+            ? groupColors[Number(keyStr)]
+            : getColorForTag(keyStr);
         if (!color) continue;
         const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
         gradient.addColorStop(0, color + "19");
@@ -95,13 +120,15 @@ function drawGroupAreas(
 
     ctx.globalCompositeOperation = prevComposite;
 
-    for (const g of Object.keys(byGroup).map(Number)) {
-        const points = byGroup[g];
+    for (const keyStr of Object.keys(byCluster)) {
+        const points = byCluster[keyStr];
         if (!points?.length) continue;
         const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
         const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
         if (!isFinite(centerX) || !isFinite(centerY)) continue;
-        const label = groupNames[g] ?? `Group ${g}`;
+        const label = clusterMode === 'group'
+            ? (groupNames[Number(keyStr)] ?? `Group ${keyStr}`)
+            : `#${keyStr}`;
         ctx.font = "600 14px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -144,6 +171,7 @@ interface GraphNetworkProps {
     flyToNodeId?: string | null;
     onFlyToComplete?: () => void;
     solarSystemNodeId?: string | null;
+    clusterMode?: 'group' | 'tag';
     onNodeSelect: (node: any) => void;
     onNodeContextMenu?: (node: any, event: MouseEvent) => void; 
     onBackgroundClick?: () => void;
@@ -168,7 +196,8 @@ export default function GraphNetwork({
     pathLinks = [],
     flyToNodeId = null,
     onFlyToComplete,
-    solarSystemNodeId = null
+    solarSystemNodeId = null,
+    clusterMode = 'group'
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
@@ -494,9 +523,10 @@ export default function GraphNetwork({
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
-            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupMap);
+            if (solarSystemNodeId) return;
+            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupMap, clusterMode);
         },
-        [processedData.nodes, dimensions, nodeIdToGroupMap]
+        [processedData.nodes, dimensions, nodeIdToGroupMap, clusterMode, solarSystemNodeId]
     );
 
     useEffect(() => {
@@ -516,11 +546,22 @@ export default function GraphNetwork({
         const minDim = Math.min(dimensions.width, dimensions.height);
         const radius = minDim * 0.35;
 
-        const groupIds = [...new Set(graphData.nodes.map((n: any) => getNodeGroup(n)))].sort((a, b) => a - b);
-        const clusterCenters: Record<number, { x: number; y: number }> = {};
-        groupIds.forEach((g, i) => {
-            const angle = (i / Math.max(1, groupIds.length)) * 2 * Math.PI;
-            clusterCenters[g] = {
+        const getClusterKey = (node: any): string | number => {
+            if (clusterMode === 'group') {
+                return getNodeGroup(node);
+            }
+            return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
+        };
+
+        const rawKeys = [...new Set(processedData.nodes.map((n: any) => getClusterKey(n)))];
+        const uniqueKeys = clusterMode === 'group'
+            ? (rawKeys as number[]).sort((a, b) => (a as number) - (b as number))
+            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
+
+        const clusterCenters: Record<string | number, { x: number; y: number }> = {};
+        uniqueKeys.forEach((key, i) => {
+            const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
+            clusterCenters[key] = {
                 x: cx + radius * Math.cos(angle),
                 y: cy + radius * Math.sin(angle),
             };
@@ -531,11 +572,6 @@ export default function GraphNetwork({
             const id = typeof n.id === 'string' ? n.id : n?.id;
             if (id != null) nodeIdToGroup.set(id, getNodeGroup(n));
         });
-
-        const getGroupForNode = (node: any) => {
-            const id = typeof node.id === 'string' ? node.id : node?.id;
-            return id != null ? (nodeIdToGroup.get(id) ?? getNodeGroup(node)) : getNodeGroup(node);
-        };
 
         const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
 
@@ -562,8 +598,8 @@ export default function GraphNetwork({
             });
             fg.d3Force('radial', null);
             fg.d3Force('collide', null);
-            fg.d3Force('x', forceX((node: any) => clusterCenters[getGroupForNode(node)]?.x ?? cx).strength(0.08));
-            fg.d3Force('y', forceY((node: any) => clusterCenters[getGroupForNode(node)]?.y ?? cy).strength(0.08));
+            fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? cx).strength(0.15));
+            fg.d3Force('y', forceY((node: any) => clusterCenters[getClusterKey(node)]?.y ?? cy).strength(0.15));
         }
 
         fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
@@ -573,14 +609,16 @@ export default function GraphNetwork({
         if (linkForce) {
             linkForce.distance(physicsConfig.linkDistance);
             linkForce.strength((link: any) => {
-                const s = typeof link.source === 'object' ? getGroupForNode(link.source) : nodeIdToGroup.get(link.source);
-                const t = typeof link.target === 'object' ? getGroupForNode(link.target) : nodeIdToGroup.get(link.target);
+                const sNode = typeof link.source === 'object' ? link.source : processedData.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.source);
+                const tNode = typeof link.target === 'object' ? link.target : processedData.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.target);
+                const s = sNode != null ? getClusterKey(sNode) : undefined;
+                const t = tNode != null ? getClusterKey(tNode) : undefined;
                 return s !== undefined && t !== undefined && s === t ? 0.7 : 0.1;
             });
         }
 
         fg.d3ReheatSimulation();
-    }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes]);
+    }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
 
     useEffect(() => {
         if (!solarSystemNodeId || !fgRef.current) return;
