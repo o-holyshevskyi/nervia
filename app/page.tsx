@@ -516,8 +516,8 @@ export default function Home() {
             />
             </div>
             <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
-                <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Synapse Bookmark</h1>
-                <p className="text-neutral-500 dark:text-neutral-400 mt-2">Your visual thoughts universe</p>
+                <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Nervia</h1>
+                <p className="text-neutral-500 dark:text-neutral-400 mt-2">Your Visual Intelligence Universe</p>
             </div>
 
             <AnimatePresence>
@@ -534,7 +534,7 @@ export default function Home() {
                                 </div>
                                 <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-3 tracking-tight">Nothing here yet</h2>
                                 <p className="text-neutral-500 dark:text-neutral-400 mb-8 text-sm leading-relaxed">
-                                    Start building your knowledge graph. Add a note, idea, or link to create your first connection.
+                                    Start building your knowledge graph. Add a Source, Memory, or Impulse to create your first neural link.
                                 </p>
                                 <button
                                     data-tour-id="tour-new-neuron"
@@ -542,7 +542,7 @@ export default function Home() {
                                     className="hover:cursor-pointer flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 dark:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-full font-semibold transition-all shadow-lg shadow-indigo-900/20 dark:shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-xl hover:shadow-indigo-900/25 dark:hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:-translate-y-1"
                                 >
                                     <Plus size={18} />
-                                    Create First Node
+                                    Create First Neuron
                                 </button>
                             </div>
                         </div>
@@ -660,7 +660,7 @@ export default function Home() {
                 current={isAIProcessing ? aiProgress : progress} 
                 failed={isAIProcessing ? 0 : failed}
                 total={isAIProcessing ? aiTotal : total}
-                label={isAIProcessing ? "Neural Syncing" : "Batch Importing"} 
+                label={isAIProcessing ? "Neural Core syncing" : "Batch Importing"} 
             />
 
             <NeuralSearch

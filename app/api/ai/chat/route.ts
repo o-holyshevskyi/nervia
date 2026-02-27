@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-const SYSTEM_PROMPT = `You are the Synapse Neural Core. Use the provided context from the user's personal knowledge base to answer the question. If the answer is not in the context, say so, but try to find connections. Be concise and insightful.`;
+const SYSTEM_PROMPT = `You are the Nervia Neural Core. Use the provided context from the user's personal knowledge base to answer the question. If the answer is not in the context, say so, but try to find connections. Be concise and insightful.`;
 
 export interface ChatContextNode {
   title: string;

@@ -110,7 +110,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
         id: "big_bang",
         kind: "big_bang",
         title: "The Big Bang",
-        description: `Your first neuron sparked into existence: “${getNodeLabel(firstNode.n)}”.`,
+        description: `The Big Bang: Nervia is born. Your first neuron: “${getNodeLabel(firstNode.n)}”.`,
         timestamp: firstNode.ts,
       });
     }
@@ -122,7 +122,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
         id: "first_intelligence",
         kind: "first_intelligence",
         title: "First Intelligence",
-        description: `The universe gained pattern recognition — AI analyzed “${getNodeLabel(firstAi.n)}”.`,
+        description: `The universe gained pattern recognition — Neural Core analyzed “${getNodeLabel(firstAi.n)}”.`,
         timestamp: firstAi.ts,
       });
     }
@@ -138,7 +138,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
         id: `expansion_${id}`,
         kind: "expansion",
         title: "Expansion",
-        description: `A new constellation formed: “${name}”.`,
+        description: `A new cluster formed: “${name}”.`,
         timestamp: ts,
       });
     }
@@ -195,7 +195,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
             </div>
             <p className="text-sm font-medium text-neutral-900 dark:text-white">No milestones yet</p>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              Add a node, create a group, run Neural Sync, or share a link to begin.
+              Add a neuron, create a cluster, run Neural Core sync, or share a link to begin.
             </p>
           </div>
         ) : (

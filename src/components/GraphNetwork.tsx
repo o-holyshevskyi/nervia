@@ -519,7 +519,7 @@ export default function GraphNetwork({
             ? (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor)
             : baseColor;
 
-        // Neural Chat context halo: pulsing semi-transparent ring (cyan/purple) when node is in RAG context
+        // Neural Core context halo: pulsing semi-transparent ring (cyan/purple) when node is in context
         const isContextNode = contextNodeSet.has(idStr);
         if (isContextNode) {
             const t = Date.now() / 500;

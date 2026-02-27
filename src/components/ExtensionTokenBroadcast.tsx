@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 /**
  * When the user is logged in, fetches the session token (same-origin, so cookies are sent)
- * and posts it to the page so the Synapse extension's content script can store it.
+ * and posts it to the page so the Nervia extension's content script can store it.
  * The extension then sends this token with save requests (cookies are not sent from extension origin).
  */
 export default function ExtensionTokenBroadcast() {

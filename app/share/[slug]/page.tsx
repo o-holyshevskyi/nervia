@@ -148,7 +148,7 @@ export default function ShareViewPage() {
             href="/"
             className="mt-4 inline-block text-sm text-indigo-600 dark:text-purple-400 hover:underline"
           >
-            Go to Synapse
+            Go to Nervia
           </Link>
         </div>
       </main>
@@ -243,7 +243,7 @@ export default function ShareViewPage() {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-md border border-black/10 dark:border-white/10 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 text-xs font-medium transition-colors"
         >
           <Sparkles size={12} className="text-indigo-500 dark:text-purple-400" />
-          Created with Synapse
+          Intelligence Shared via Nervia
         </Link>
       </div>
     </main>

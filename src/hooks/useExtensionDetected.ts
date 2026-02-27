@@ -11,7 +11,7 @@ function isExtensionDetected(): boolean {
 }
 
 /**
- * Reactive hook that detects the Synapse Web Clipper extension via the
+ * Reactive hook that detects the Nervia Web Clipper extension via the
  * data-synapse-extension attribute on document.documentElement.
  * Uses MutationObserver so the UI updates the moment the extension injects the attribute.
  */

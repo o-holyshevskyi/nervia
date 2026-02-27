@@ -144,7 +144,7 @@ export default function LeftSidebar({
         { id: 'pathfinder', title: 'Pathfinder', icon: <Route size={16} />, shortcut: 'Ctrl+Alt+P', onClick: () => onOpenPathfinder?.() },
         { id: 'timeline', title: 'Time Machine', icon: <Clock size={16} />, shortcut: 'Ctrl+Alt+T', onClick: () => onOpenTimeline?.() },
         { id: 'history', title: 'Evolution Journal', icon: <History size={16} />, shortcut: 'Ctrl+Alt+H', onClick: () => onOpenHistory?.() },
-        { id: 'chat', title: 'Neural Chat', icon: <MessageCircle size={16} />, shortcut: 'Ctrl+Alt+C', onClick: () => onOpenChat?.() },
+        { id: 'chat', title: 'Neural Core', icon: <MessageCircle size={16} />, shortcut: 'Ctrl+Alt+C', onClick: () => onOpenChat?.() },
       ]
     },
     {
@@ -161,23 +161,23 @@ export default function LeftSidebar({
       items: [
         {
           id: 'groups',
-          title: 'Groups',
+          title: 'Clusters',
           icon: <Layers size={16} />,
           content: (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">Categories</span>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">Clusters</span>
                 <button
                   type="button"
                   onClick={() => setIsCreateGroupOpen(true)}
                   className="hover:cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 transition-colors"
-                  title="Create group"
+                  title="Create cluster"
                 >
                   <Plus size={14} />
                 </button>
               </div>
               {groups.length === 0 ? (
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 italic py-2">No groups yet</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 italic py-2">No clusters yet</p>
               ) : (
                 <ul className="space-y-1">
                   {groups.map((g) => (
@@ -199,7 +199,7 @@ export default function LeftSidebar({
                           setIsShareModalOpen(true);
                         }}
                         className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all"
-                        title="Share this group"
+                        title="Share this cluster"
                       >
                         <Share2 size={12} />
                       </button>
@@ -207,7 +207,7 @@ export default function LeftSidebar({
                         type="button"
                         onClick={() => onDeleteGroup(g.id)}
                         className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all"
-                        title="Delete group"
+                        title="Delete cluster"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -388,12 +388,12 @@ export default function LeftSidebar({
                           </div>
                           <div
                             role="group"
-                            aria-label="Cluster by category or tag"
+                            aria-label="By cluster or tag"
                             className="flex h-8 w-16 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
                           >
                             <button
                               type="button"
-                              title="Cluster by Category"
+                              title="By Cluster"
                               onClick={() => onClusterModeChange('group')}
                               className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
                                 clusterMode === 'group'
@@ -405,7 +405,7 @@ export default function LeftSidebar({
                             </button>
                             <button
                               type="button"
-                              title="Cluster by Tag"
+                              title="By Tag"
                               onClick={() => onClusterModeChange('tag')}
                               className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
                                 clusterMode === 'tag'
@@ -523,18 +523,18 @@ export default function LeftSidebar({
               </div>
             </div>
 
-            {/* Universe Statistics */}
+            {/* Universe Telemetry */}
             <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/5 space-y-1">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
-                  <span>NODES:</span>
+                  <span>NEURONS:</span>
                   {isStatsLoading ? (
                     <span className="font-mono text-neutral-400 dark:text-white/30">…</span>
                   ) : (
                     <AnimatedNumber value={nodesCount} active={isOpen} />
                   )}
                   <span className="text-neutral-400 dark:text-white/20">//</span>
-                  <span>LINKS:</span>
+                  <span>NEURAL LINKS:</span>
                   {isStatsLoading ? (
                     <span className="font-mono text-neutral-400 dark:text-white/30">…</span>
                   ) : (

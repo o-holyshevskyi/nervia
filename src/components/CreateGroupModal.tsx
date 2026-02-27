@@ -52,7 +52,7 @@ export default function CreateGroupModal({ isOpen, onClose, onCreate }: CreateGr
                     >
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-semibold tracking-widest text-neutral-700 dark:text-neutral-300 uppercase">
-                                Create group
+                                Create cluster
                             </h3>
                             <CloseButton onClose={handleClose} size={18} />
                         </div>

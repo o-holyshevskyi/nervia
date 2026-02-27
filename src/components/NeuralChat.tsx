@@ -191,7 +191,7 @@ export default function NeuralChat({
               <div className="flex items-center gap-2 min-w-0">
                 <MessageCircle size={20} className="text-indigo-600 dark:text-purple-400 shrink-0" />
                 <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                  Neural Chat
+                  Neural Core
                 </span>
                 {!isPremium && (
                   <span className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">

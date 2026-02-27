@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Please log in to the Synapse web app first. Open the Synapse app in a tab and refresh, then try again.' },
+        { error: 'Please log in to the Nervia web app first. Open the Nervia app in a tab and refresh, then try again.' },
         { status: 401, headers: corsHeaders }
       );
     }

@@ -26,7 +26,7 @@ export default function FilterPanel({ tags, activeTag, onTagSelect, onClose }: F
                 }`}
             >
                 <Globe size={16} className="mr-2.5 shrink-0" />
-                <span>All Neurones</span>
+                <span>All Neurons</span>
             </button>
 
             <div className="h-px w-full bg-black/10 dark:bg-white/10 my-1.5" />

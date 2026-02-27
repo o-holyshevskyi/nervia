@@ -67,8 +67,8 @@ export default function ImportExport({ onImport, onExport }: ImportExportProps) 
                 isOpen={isConfirmOpen}
                 onClose={() => setIsConfirmOpen(false)}
                 onConfirm={confirmImport}
-                title="Ready to Synapse?"
-                description={`We found ${pendingData.length} bookmarks. They will be added to your graph and AI will assign tags, connections, and semantic groups (e.g. Development, AI, Finance).`}
+                title="Ready for Nervia?"
+                description={`We found ${pendingData.length} bookmarks. They will be added to your graph and Neural Core will assign tags, neural links, and clusters (e.g. Development, AI, Finance).`}
                 confirmText="Import Now"
             />
         </div>

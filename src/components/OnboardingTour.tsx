@@ -6,7 +6,7 @@ import Joyride, { ACTIONS, EVENTS, STATUS } from 'react-joyride';
 const ONBOARDING_STEPS = [
     {
         target: '[data-tour-id="tour-welcome"]',
-        content: 'Welcome to Synapse. Your intellectual universe begins here.',
+        content: 'Welcome to Nervia. Your Visual Intelligence Universe begins here.',
         disableBeacon: true,
     },
     {
@@ -16,7 +16,7 @@ const ONBOARDING_STEPS = [
     },
     {
         target: '[data-tour-id="tour-new-neuron"]',
-        content: 'Add your first link or thought.',
+        content: 'Add your first Source, Memory, or Impulse.',
         disableBeacon: true,
     },
     {

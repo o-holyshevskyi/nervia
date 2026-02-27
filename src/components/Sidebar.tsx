@@ -4,7 +4,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CloseButton from "./ui/CloseButton";
-import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle, Layers } from "lucide-react";
+import { ChevronLeft, ChevronRight, Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle, Layers, Tag } from "lucide-react";
 import CreateGroupModal from "./CreateGroupModal";
 import type { Group } from "../hooks/useGroups";
 
@@ -289,7 +289,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                 }}
                                 className="no-scrollbar w-full bg-transparent text-4xl font-bold text-neutral-900 dark:text-white outline-none border-none p-0 resize-none placeholder-neutral-500 dark:placeholder-neutral-600 leading-tight"
-                                placeholder="Node Name"
+                                placeholder="Neuron Name"
                                 rows={2}
                             />
 
@@ -377,8 +377,11 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                         )}
 
                         <div className="space-y-4">
-                            <div className="flex items-center gap-4 text-xs text-neutral-500 font-mono uppercase tracking-widest border-b border-white/5 pb-2">
-                                <span>Properties</span>
+                            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-mono uppercase tracking-widest border-b border-black/10 dark:border-white/5 pb-2">
+                                <span className="flex items-center gap-2">
+                                    <Tag size={12} />
+                                    Tags
+                                </span>
                             </div>
                             
                             <div className="flex flex-wrap gap-2 items-center">
@@ -409,7 +412,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-mono uppercase tracking-widest border-b border-black/10 dark:border-white/5 pb-2">
                                     <span className="flex items-center gap-2">
                                         <Layers size={12} />
-                                        Category
+                                        Cluster
                                     </span>
                                     <button
                                         type="button"
@@ -443,7 +446,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
                             <div className="space-y-4 pt-6">
                                 <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-mono uppercase tracking-widest border-b border-black/10 dark:border-white/5 pb-2">
-                                    <span>Connections</span>
+                                    <span>Neural Links</span>
                                     <span className="text-neutral-600 dark:text-neutral-700">{nodeConnections.length}</span>
                                 </div>
 
@@ -502,7 +505,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                             }}
                                             onClick={() => setIsConnListOpen((prev) => !prev)}
                                             onFocus={() => setIsConnListOpen(true)}
-                                            placeholder="+ Connect to another neuron..."
+                                            placeholder="+ Add neural link to another neuron..."
                                             className="w-full bg-black/5 dark:bg-white/5 border border-dashed border-black/10 dark:border-white/10 rounded-xl p-3 text-xs text-neutral-600 dark:text-neutral-400 outline-none focus:border-indigo-500/50 focus:bg-black/10 dark:focus:bg-white/10 transition-all"
                                         />
                                         {connectionSearch && (

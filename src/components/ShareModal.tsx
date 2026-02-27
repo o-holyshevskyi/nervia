@@ -142,7 +142,7 @@ export default function ShareModal({
                           : "text-neutral-600 dark:text-neutral-400 hover:bg-black/5 dark:hover:bg-white/5"
                       }`}
                     >
-                      Specific Groups
+                      Specific Clusters
                     </button>
                   </div>
                 </div>
@@ -150,12 +150,12 @@ export default function ShareModal({
                 {scope === "GROUPS" && (
                   <div>
                     <span className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2 uppercase tracking-wider">
-                      Select groups
+                      Select clusters
                     </span>
                     <div className="max-h-40 overflow-y-auto rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-2 space-y-1">
                       {groups.length === 0 ? (
                         <p className="text-xs text-neutral-500 dark:text-neutral-400 italic py-2 px-2">
-                          No groups yet
+                          No clusters yet
                         </p>
                       ) : (
                         groups.map((g) => (

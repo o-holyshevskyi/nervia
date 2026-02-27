@@ -170,7 +170,7 @@ export default function NeuralSearch({
                   value={query}
                   onChange={(e) => handleQueryChange(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Search by name or meaning… (Enter for semantic search)"
+                  placeholder="Search your neurons in Nervia… (Enter for semantic search)"
                   className="flex-1 bg-transparent text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-400 focus:outline-none text-base"
                   disabled={isLoading}
                 />

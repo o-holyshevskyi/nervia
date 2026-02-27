@@ -1,0 +1,7 @@
+{
+  "name": "Nervia",
+  "short_name": "Nervia",
+  "description": "Nervia: Your Visual Intelligence Universe",
+  "start_url": "/",
+  "display": "standalone"
+}

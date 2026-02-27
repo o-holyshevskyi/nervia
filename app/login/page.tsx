@@ -71,7 +71,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 tracking-tight">Welcome to Synapse Bookmark</h1>
+                    <h1 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 tracking-tight">Welcome to Nervia</h1>
                     <p className="text-neutral-500 dark:text-neutral-400 text-sm">Sign in to access your visual bookmarks</p>
                 </div>
 

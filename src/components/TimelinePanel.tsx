@@ -70,7 +70,7 @@ export default function TimelinePanel({
                 </div>
 
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
-                    Replay how your knowledge graph grew over time. <span className="font-mono text-[10px] text-neutral-500 dark:text-neutral-500">Ctrl+Alt+T</span>
+                    Replay how your neurons grew over time. <span className="font-mono text-[10px] text-neutral-500 dark:text-neutral-500">Ctrl+Alt+T</span>
                 </p>
 
                 <div className="space-y-4">

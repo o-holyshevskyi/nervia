@@ -177,9 +177,9 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
 
                         <div className="flex p-1 mb-6 bg-black/10 dark:bg-black/50 rounded-xl mt-6 relative">
                             {[
-                                { id: 'link', icon: LinkIcon, label: 'Link' },
-                                { id: 'note', icon: FileText, label: 'Note' },
-                                { id: 'idea', icon: Lightbulb, label: 'Idea' }
+                                { id: 'link', icon: LinkIcon, label: 'Source' },
+                                { id: 'note', icon: FileText, label: 'Memory' },
+                                { id: 'idea', icon: Lightbulb, label: 'Impulse' }
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
@@ -235,7 +235,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                         animate={{ opacity: 1, height: "auto" }}
                                         exit={{ opacity: 0, height: 0 }}
                                     >
-                                        <label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-1">URL</label>
+                                        <label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-1">Source URL</label>
                                         <div className="relative">
                                             <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 dark:text-neutral-600" size={16} />
                                             <input
@@ -312,7 +312,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                     >
                                         <div className="pt-4 pb-1"> 
                                             <label htmlFor="link-input" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-                                                Link
+                                                Neural Links
                                             </label>
                                             <div id="link-input" className="mt-1 relative bg-black/5 dark:bg-black/50 border border-black/10 dark:border-white/10 rounded-xl p-2 focus-within:border-blue-500/50 transition-colors">
                                                 <div className="flex flex-wrap gap-2 mb-2">
@@ -341,7 +341,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                                         }}
                                                         onFocus={() => setShowConnectionDropdown(true)}
                                                         onBlur={() => setTimeout(() => setShowConnectionDropdown(false), 200)}
-                                                        placeholder="Link with... (enter existing neuron name)"
+                                                        placeholder="Neural link to... (enter neuron name)"
                                                         className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-600 focus:outline-none py-1"
                                                     />
                                                 </div>
