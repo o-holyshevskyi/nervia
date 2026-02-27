@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus } from "lucide-react";
 import FilterPanel from "./FilterPanel";
@@ -12,6 +12,7 @@ import ImportExport from "./ImportExport";
 import Image from "next/image";
 import Link from "next/link";
 import { useExtensionDetected } from "../hooks/useExtensionDetected";
+import { useUniverseStats } from "../hooks/useUniverseStats";
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -51,6 +52,7 @@ export default function LeftSidebar({
   const extensionDetected = useExtensionDetected();
   const supabase = createClient();
   const router = useRouter();
+  const { nodesCount, linksCount, topTag, isLoading: isStatsLoading } = useUniverseStats(nodes);
 
   useEffect(() => {
     const getUser = async () => {
@@ -118,6 +120,29 @@ export default function LeftSidebar({
 
   const toggleAccordion = (itemId: string) => {
     setOpenAccordion(openAccordion === itemId ? null : itemId);
+  };
+
+  const AnimatedNumber = ({ value, active }: { value: number; active: boolean }) => {
+    const spring = useSpring(0, {
+      stiffness: 120,
+      damping: 20,
+      mass: 0.8,
+    });
+
+    const display = useTransform(spring, (val) => Math.round(val).toLocaleString());
+
+    useEffect(() => {
+      if (active) {
+        spring.set(0);
+        spring.set(value);
+      }
+    }, [active, value, spring]);
+
+    return (
+      <motion.span className="font-mono text-white/70">
+        {display}
+      </motion.span>
+    );
   };
 
   return (
@@ -263,45 +288,76 @@ export default function LeftSidebar({
             ))}
           </div>
 
-          {/* Companion – system status */}
-          <div className="mt-6 pt-6 border-t border-white/5 space-y-1">
-            <div className="flex items-center gap-2">
-              <Puzzle size={14} className="text-neutral-500" />
-              <span className="text-xs font-semibold tracking-widest text-neutral-500 uppercase">
-                Companion
-              </span>
-            </div>
+          {/* System Telemetry – companion + universe stats */}
+          <div className="mt-6 pt-6 border-t border-white/5 space-y-3">
+            {/* Companion – system status */}
             <div className="space-y-1">
-              {extensionDetected ? (
-                <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-400 hover:text-white hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <motion.div
-                      className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-400"
-                      animate={{
-                        boxShadow: [
-                          '0 0 6px rgba(34,197,94,0.4)',
-                          '0 0 10px rgba(34,197,94,0.5)',
-                          '0 0 6px rgba(34,197,94,0.4)',
-                        ],
-                      }}
-                      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                    />
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono truncate">
-                      SYNC: ONLINE
-                    </span>
+              <div className="flex items-center gap-2">
+                <Puzzle size={14} className="text-neutral-500" />
+                <span className="text-xs font-semibold tracking-widest text-neutral-500 uppercase">
+                  System Telemetry
+                </span>
+              </div>
+              <div className="space-y-1">
+                {extensionDetected ? (
+                  <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <motion.div
+                        className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-400"
+                        animate={{
+                          boxShadow: [
+                            '0 0 6px rgba(34,197,94,0.4)',
+                            '0 0 10px rgba(34,197,94,0.5)',
+                            '0 0 6px rgba(34,197,94,0.4)',
+                          ],
+                        }}
+                        transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono truncate">
+                        SYNC: ONLINE
+                      </span>
+                    </div>
                   </div>
+                ) : (
+                  <Link
+                    href="/extension"
+                    className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-white/5 transition-colors group"
+                  >
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-mono truncate">
+                      CLIPPER: OFFLINE
+                    </span>
+                    <Plus size={14} className="shrink-0 text-neutral-500 group-hover:text-white/60 transition-colors" />
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Universe Statistics */}
+            <div className="mt-3 pt-3 border-t border-white/5 space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/30">
+                  <span>NODES:</span>
+                  {isStatsLoading ? (
+                    <span className="font-mono text-white/30">…</span>
+                  ) : (
+                    <AnimatedNumber value={nodesCount} active={isOpen} />
+                  )}
+                  <span className="text-white/20">//</span>
+                  <span>LINKS:</span>
+                  {isStatsLoading ? (
+                    <span className="font-mono text-white/30">…</span>
+                  ) : (
+                    <AnimatedNumber value={linksCount} active={isOpen} />
+                  )}
                 </div>
-              ) : (
-                <Link
-                  href="/extension"
-                  className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-white/5 transition-colors group"
-                >
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-mono truncate">
-                    CLIPPER: OFFLINE
-                  </span>
-                  <Plus size={14} className="shrink-0 text-neutral-500 group-hover:text-white/60 transition-colors" />
-                </Link>
-              )}
+              </div>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/30">
+                <span>FOCUS:</span>
+                <div className="h-3 w-px bg-white/5" />
+                <span className="font-mono text-white/70">
+                  {topTag ? `#${topTag}` : '—'}
+                </span>
+              </div>
             </div>
           </div>
 
