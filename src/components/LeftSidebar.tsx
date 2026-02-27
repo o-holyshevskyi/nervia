@@ -320,6 +320,7 @@ export default function LeftSidebar({
                         <button
                           key={item.id}
                           type="button"
+                          {...(item.id === 'chat' ? { 'data-tour-id': 'tour-neural-chat' } : {})}
                           onClick={item.onClick}
                           className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                         >

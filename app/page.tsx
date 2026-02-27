@@ -20,10 +20,13 @@ import NeuralSearch from "@/src/components/NeuralSearch";
 import PathfinderPanel from "@/src/components/PathfinderPanel";
 import TimelinePanel from "@/src/components/TimelinePanel";
 import NeuralChat from "@/src/components/NeuralChat";
+import OnboardingTour from "@/src/components/OnboardingTour";
+import { useOnboarding } from "@/src/hooks/useOnboarding";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
-    
+    const { hasCompletedOnboarding, isLoading: isOnboardingLoading, completeOnboarding } = useOnboarding(supabase);
+
     const { 
         data, 
         isLoading,
@@ -70,6 +73,13 @@ export default function Home() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [contextNodeIds, setContextNodeIds] = useState<string[]>([]);
     const [clusterMode, setClusterMode] = useState<'group' | 'tag'>('group');
+
+    // Open sidebar when onboarding runs so step 4 (Neural Chat) target is visible.
+    useEffect(() => {
+        if (!hasCompletedOnboarding && !isOnboardingLoading) {
+            setIsLeftSidebarOpen(true);
+        }
+    }, [hasCompletedOnboarding, isOnboardingLoading]);
 
     const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
         const nodes = data.nodes;
@@ -362,6 +372,8 @@ export default function Home() {
     
     return (
         <main className="bg-white dark:bg-neutral-950 flex min-h-screen flex-col items-center justify-between">
+            <OnboardingTour run={!hasCompletedOnboarding && !isOnboardingLoading} onComplete={completeOnboarding} />
+            <div className="absolute inset-0" data-tour-id="tour-graph" aria-hidden="true">
             <GraphNetwork 
                 onNodeSelect={(node) => {
                     setSelectedNode(node);
@@ -385,7 +397,8 @@ export default function Home() {
                 clusterMode={clusterMode}
                 groups={groups}
             />
-            <div className="absolute top-10 left-10 pointer-events-none">
+            </div>
+            <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
                 <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Synapse Bookmark</h1>
                 <p className="text-neutral-500 dark:text-neutral-400 mt-2">Your visual thoughts universe</p>
             </div>
@@ -407,6 +420,7 @@ export default function Home() {
                                     Start building your knowledge graph. Add a note, idea, or link to create your first connection.
                                 </p>
                                 <button
+                                    data-tour-id="tour-new-neuron"
                                     onClick={() => setIsAddModalOpen(true)}
                                     className="hover:cursor-pointer flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 dark:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-full font-semibold transition-all shadow-lg shadow-indigo-900/20 dark:shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-xl hover:shadow-indigo-900/25 dark:hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:-translate-y-1"
                                 >
@@ -634,6 +648,7 @@ export default function Home() {
 
             {!isLoading && data.nodes.length > 0 && ( 
                 <button
+                    data-tour-id="tour-new-neuron"
                     onClick={() => setIsAddModalOpen(true)}
                     className="hover:cursor-pointer absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 px-6 py-4 bg-black/10 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 text-neutral-900 dark:text-white rounded-full shadow-lg shadow-neutral-900/10 dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-black/20 dark:hover:bg-white/20 hover:scale-105 transition-all z-20 group"
                 >
