@@ -19,6 +19,7 @@ import AIStatusBar from "@/src/components/AIStatusBar";
 import NeuralSearch from "@/src/components/NeuralSearch";
 import PathfinderPanel from "@/src/components/PathfinderPanel";
 import TimelinePanel from "@/src/components/TimelinePanel";
+import NeuralChat from "@/src/components/NeuralChat";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -66,6 +67,7 @@ export default function Home() {
     const [pathData, setPathData] = useState<{ nodes: string[]; links: any[] }>({ nodes: [], links: [] });
     const [isPathfinderOpen, setIsPathfinderOpen] = useState(false);
     const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
     const [clusterMode, setClusterMode] = useState<'group' | 'tag'>('group');
 
     const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
@@ -308,6 +310,10 @@ export default function Home() {
                 e.preventDefault();
                 setIsTimelineOpen(true);
             }
+            if (e.key === "c" && (e.metaKey || e.ctrlKey) && e.altKey) {
+                e.preventDefault();
+                setIsChatOpen(true);
+            }
         };
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
@@ -536,6 +542,13 @@ export default function Home() {
                 onOpenRef={searchFocusRef}
             />
 
+            <NeuralChat
+                isOpen={isChatOpen}
+                onClose={() => setIsChatOpen(false)}
+                nodes={data.nodes}
+                isPremium={false}
+            />
+
             {isPathfinderOpen && (
                 <PathfinderPanel
                     nodes={data.nodes}
@@ -561,6 +574,7 @@ export default function Home() {
                 onOpenSearch={openSearch}
                 onOpenPathfinder={() => setIsPathfinderOpen(true)}
                 onOpenTimeline={() => setIsTimelineOpen(true)}
+                onOpenChat={() => setIsChatOpen(true)}
                 clusterMode={clusterMode}
                 onClusterModeChange={setClusterMode}
                 groups={groups}
