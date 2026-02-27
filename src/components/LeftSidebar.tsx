@@ -3,13 +3,15 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import { createClient } from "../lib/supabase/client";
 import { useRouter } from "next/navigation";
 import ImportExport from "./ImportExport";
 import Image from "next/image";
+import Link from "next/link";
+import { useExtensionDetected } from "../hooks/useExtensionDetected";
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ export default function LeftSidebar({
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [user, setUser] = useState<any>(null);
+  const extensionDetected = useExtensionDetected();
   const supabase = createClient();
   const router = useRouter();
 
@@ -258,6 +261,48 @@ export default function LeftSidebar({
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Companion – system status */}
+          <div className="mt-6 pt-6 border-t border-white/5 space-y-1">
+            <div className="flex items-center gap-2">
+              <Puzzle size={14} className="text-neutral-500" />
+              <span className="text-xs font-semibold tracking-widest text-neutral-500 uppercase">
+                Companion
+              </span>
+            </div>
+            <div className="space-y-1">
+              {extensionDetected ? (
+                <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-400 hover:text-white hover:bg-white/5 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <motion.div
+                      className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-400"
+                      animate={{
+                        boxShadow: [
+                          '0 0 6px rgba(34,197,94,0.4)',
+                          '0 0 10px rgba(34,197,94,0.5)',
+                          '0 0 6px rgba(34,197,94,0.4)',
+                        ],
+                      }}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-mono truncate">
+                      SYNC: ONLINE
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  href="/extension"
+                  className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 hover:text-neutral-300 hover:bg-white/5 transition-colors group"
+                >
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-mono truncate">
+                    CLIPPER: OFFLINE
+                  </span>
+                  <Plus size={14} className="shrink-0 text-neutral-500 group-hover:text-white/60 transition-colors" />
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* User Profile Card */}
