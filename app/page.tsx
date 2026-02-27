@@ -22,6 +22,9 @@ import TimelinePanel from "@/src/components/TimelinePanel";
 import NeuralChat from "@/src/components/NeuralChat";
 import OnboardingTour from "@/src/components/OnboardingTour";
 import { useOnboarding } from "@/src/hooks/useOnboarding";
+import { useNotifications } from "@/src/hooks/useNotifications";
+import { toast } from "sonner";
+import { playNotificationPlink } from "@/src/lib/notificationSound";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -48,6 +51,95 @@ export default function Home() {
 
     const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup } = useGroups(supabase);
 
+    const handleNotificationInsert = useCallback((n: any) => {
+        if (n?.type === "visit") {
+            playNotificationPlink();
+            const groupId = typeof n?.metadata?.group_id === "string" ? (n.metadata.group_id as string) : null;
+            toast.custom(
+                (t) => (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, filter: 'blur(8px)' }}
+                        animate={{
+                            opacity: 1,
+                            scale: 1,
+                            filter: 'blur(0px)',
+                            boxShadow: [
+                                '0 0 22px rgba(6,182,212,0.18)',
+                                '0 0 30px rgba(168,85,247,0.18)',
+                                '0 0 22px rgba(6,182,212,0.18)',
+                            ],
+                            borderColor: [
+                                'rgba(34,211,238,0.30)', // cyan-400/30-ish
+                                'rgba(192,132,252,0.30)', // purple-400/30-ish
+                                'rgba(34,211,238,0.30)',
+                            ],
+                        }}
+                        transition={{
+                            duration: 0.4,
+                            ease: [0.16, 1, 0.3, 1],
+                            boxShadow: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' },
+                            borderColor: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' },
+                        }}
+                        className="rounded-xl bg-white/10 dark:bg-black/40 backdrop-blur-2xl border border-white/10 px-4 py-3 flex items-center justify-between gap-4 min-w-[300px]"
+                        role="alert"
+                    >
+                        <div className="flex items-center gap-3 min-w-0">
+                            <motion.div
+                                animate={{ rotate: [0, 2.5, -2.5, 0], y: [0, -0.5, 0.5, 0] }}
+                                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+                                className="shrink-0"
+                                aria-hidden
+                            >
+                                <Sparkles size={18} className="text-cyan-400/80 dark:text-purple-300/80" />
+                            </motion.div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-mono uppercase tracking-[0.25em] text-neutral-500 dark:text-neutral-400">
+                                    Visit ping
+                                </p>
+                                <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                                    Your Universe is being explored! 🌌
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (groupId && typeof window !== "undefined") {
+                                    window.dispatchEvent(
+                                        new CustomEvent("synapse:navigate_to_group", { detail: { groupId } })
+                                    );
+                                }
+                                toast.dismiss(t);
+                            }}
+                            className="cursor-pointer shrink-0 text-xs font-medium text-indigo-600 dark:text-purple-400 hover:underline"
+                        >
+                            View
+                        </button>
+                    </motion.div>
+                ),
+                { duration: 6000 }
+            );
+        }
+    }, []);
+    const {
+        notifications,
+        unreadCount,
+        markAsRead,
+        markAllAsRead,
+    } = useNotifications(supabase, handleNotificationInsert);
+
+    const handleNavigateToGroup = useCallback(
+        (groupId: string) => {
+            const node = data.nodes.find((n: any) => n.group_id === groupId);
+            if (node) {
+                const id = typeof node.id === "string" ? node.id : node.id?.id;
+                if (id) setFlyToNodeId(id);
+            }
+        },
+        [data.nodes]
+    );
+
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
@@ -73,6 +165,25 @@ export default function Home() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [contextNodeIds, setContextNodeIds] = useState<string[]>([]);
     const [clusterMode, setClusterMode] = useState<'group' | 'tag'>('group');
+
+    // Deep-link from toast (and other UI) to a specific group_id.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const handler = (evt: Event) => {
+            const e = evt as CustomEvent<{ groupId?: string }>;
+            const groupId = e?.detail?.groupId;
+            if (!groupId) return;
+            const node = data.nodes.find((n: any) => n.group_id === groupId);
+            if (!node) return;
+            const id = typeof node.id === "string" ? node.id : node.id?.id;
+            if (id) {
+                setFlyToNodeId(id);
+                setIsLeftSidebarOpen(false);
+            }
+        };
+        window.addEventListener("synapse:navigate_to_group", handler as EventListener);
+        return () => window.removeEventListener("synapse:navigate_to_group", handler as EventListener);
+    }, [data.nodes]);
 
     // Open sidebar when onboarding runs so step 4 (Neural Chat) target is visible.
     useEffect(() => {
@@ -600,6 +711,11 @@ export default function Home() {
                 groups={groups}
                 onAddGroup={onAddGroup}
                 onDeleteGroup={onDeleteGroup}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                markAsRead={markAsRead}
+                markAllAsRead={markAllAsRead}
+                onNavigateToGroup={handleNavigateToGroup}
             />
 
             <Sidebar 

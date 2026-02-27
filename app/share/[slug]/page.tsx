@@ -10,6 +10,37 @@ import FilterPanel from "@/src/components/FilterPanel";
 import CloseButton from "@/src/components/ui/CloseButton";
 
 const DEFAULT_PHYSICS = { repulsion: 150, linkDistance: 60 };
+const VISIT_SPAM_WINDOW_MS = 60_000;
+const VISIT_SPAM_MAX = 10;
+
+function shouldSendVisitPing(slug: string): boolean {
+  if (typeof window === "undefined" || !slug) return false;
+  try {
+    const key = `synapse_visit_${slug}`;
+    const raw = sessionStorage.getItem(key);
+    const now = Date.now();
+    let data: { count: number; windowStart: number };
+    if (raw) {
+      try {
+        data = JSON.parse(raw) as { count: number; windowStart: number };
+        if (now - data.windowStart >= VISIT_SPAM_WINDOW_MS) {
+          data = { count: 1, windowStart: now };
+        } else {
+          if (data.count >= VISIT_SPAM_MAX) return false;
+          data.count += 1;
+        }
+      } catch {
+        data = { count: 1, windowStart: now };
+      }
+    } else {
+      data = { count: 1, windowStart: now };
+    }
+    sessionStorage.setItem(key, JSON.stringify(data));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function ShareViewPage() {
   const params = useParams();
@@ -58,6 +89,13 @@ export default function ShareViewPage() {
           setNodes(data.nodes || []);
           setLinks(data.links || []);
           setGroups(data.groups || []);
+          if (shouldSendVisitPing(slug)) {
+            fetch("/api/notifications/visit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug }),
+            }).catch(() => {});
+          }
         }
       })
       .catch((e) => {

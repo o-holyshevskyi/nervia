@@ -32,11 +32,13 @@ export async function proxy(request: NextRequest) {
   const isExtensionApi = request.nextUrl.pathname.startsWith("/api/extension/save");
   const isPublicShare = request.nextUrl.pathname.startsWith("/share");
   const isShareApi = request.nextUrl.pathname.startsWith("/api/share/");
+  const isVisitNotificationApi = request.nextUrl.pathname === "/api/notifications/visit";
   if (
     !user &&
     !isExtensionApi &&
     !isPublicShare &&
     !isShareApi &&
+    !isVisitNotificationApi &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

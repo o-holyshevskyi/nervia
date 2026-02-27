@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2 } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -39,6 +39,11 @@ interface LeftSidebarProps {
   groups: Group[];
   onAddGroup: (name: string, color: string) => void;
   onDeleteGroup: (id: string) => void;
+  notifications?: { id: string; title: string; message: string; type: string; metadata: Record<string, unknown>; read_at: string | null; created_at: string }[];
+  unreadCount?: number;
+  markAsRead?: (id: string) => void;
+  markAllAsRead?: () => void;
+  onNavigateToGroup?: (groupId: string) => void;
 }
 
 export default function LeftSidebar({ 
@@ -60,8 +65,14 @@ export default function LeftSidebar({
   groups,
   onAddGroup,
   onDeleteGroup,
+  notifications = [],
+  unreadCount = 0,
+  markAsRead,
+  markAllAsRead,
+  onNavigateToGroup,
 }: LeftSidebarProps) {
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareInitial, setShareInitial] = useState<{ scope: ShareScope; groupIds: string[] }>({ scope: 'ALL', groupIds: [] });
@@ -108,6 +119,19 @@ export default function LeftSidebar({
   };
 
   const kbdClass = "text-xs font-mono text-neutral-500 dark:text-neutral-400 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 px-1.5 py-0.5 rounded";
+
+  function relativeTime(createdAt: string): string {
+    const d = new Date(createdAt).getTime();
+    const now = Date.now();
+    const s = Math.floor((now - d) / 1000);
+    if (s < 60) return "just now";
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} hr${h === 1 ? "" : "s"} ago`;
+    const day = Math.floor(h / 24);
+    return `${day} day${day === 1 ? "" : "s"} ago`;
+  }
 
   const sections = [
     {
@@ -209,6 +233,14 @@ export default function LeftSidebar({
       label: "Management",
       icon: <Settings2 size={14} className="text-neutral-500" />,
       items: [
+        {
+          id: 'notifications',
+          title: 'Notifications',
+          icon: <Bell size={16} />,
+          shortcut: unreadCount > 0 ? String(unreadCount) : null,
+          onClick: () => setIsNotificationPanelOpen(true),
+          isNotification: true
+        },
         {
           id: 'share-universe',
           title: 'Share Universe',
@@ -316,6 +348,7 @@ export default function LeftSidebar({
                     }
 
                     if (isAction) {
+                      const isNotif = item.id === 'notifications' && (item as any).isNotification;
                       return (
                         <button
                           key={item.id}
@@ -325,10 +358,17 @@ export default function LeftSidebar({
                           className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className="text-neutral-500 dark:text-neutral-500 shrink-0">{item.icon}</span>
+                            <span className="relative text-neutral-500 dark:text-neutral-500 shrink-0">
+                              {item.icon}
+                              {isNotif && unreadCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
+                                  {unreadCount > 99 ? "99+" : unreadCount}
+                                </span>
+                              )}
+                            </span>
                             <span>{item.title}</span>
                           </div>
-                          <kbd className={kbdClass}>{item.shortcut}</kbd>
+                          {!isNotif && <kbd className={kbdClass}>{item.shortcut}</kbd>}
                         </button>
                       );
                     }
@@ -544,6 +584,84 @@ export default function LeftSidebar({
           </div>
         </motion.div>
       )}
+      {/* Notification center panel */}
+      <AnimatePresence>
+        {isOpen && isNotificationPanelOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 backdrop-blur-sm"
+              aria-hidden
+              onClick={() => setIsNotificationPanelOpen(false)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed left-80 top-0 bottom-0 w-96 z-50 flex flex-col bg-white/10 dark:bg-black/40 backdrop-blur-2xl border-l border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_rgba(0,0,0,0.3)]"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 uppercase tracking-widest">
+                  Notifications
+                </span>
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && markAllAsRead && (
+                    <button
+                      type="button"
+                      onClick={() => markAllAsRead()}
+                      className="hover:cursor-pointer text-xs text-indigo-600 dark:text-purple-400 hover:underline"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  <CloseButton onClose={() => setIsNotificationPanelOpen(false)} size={18} />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {notifications.length === 0 ? (
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 italic py-8 text-center">
+                    No new activity in your Universe.
+                  </p>
+                ) : (
+                  notifications.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => {
+                        const groupId = n.metadata?.group_id as string | undefined;
+                        if (groupId && onNavigateToGroup) {
+                          onNavigateToGroup(groupId);
+                          setIsNotificationPanelOpen(false);
+                          onClose();
+                        }
+                        markAsRead?.(n.id);
+                      }}
+                      className={`hover:cursor-pointer w-full text-left rounded-lg p-3 border transition-colors ${
+                        n.read_at
+                          ? "bg-transparent border-white/5 dark:border-white/5 hover:bg-white/5 dark:hover:bg-white/5"
+                          : "bg-indigo-500/5 dark:bg-purple-500/5 border-indigo-500/20 dark:border-purple-500/20"
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                        {n.title}
+                      </p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2">
+                        {n.message}
+                      </p>
+                      <p className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 mt-1">
+                        {relativeTime(n.created_at)}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
       <CreateGroupModal
         key="create-group-modal"
         isOpen={isCreateGroupOpen}
