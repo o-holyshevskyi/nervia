@@ -5,7 +5,7 @@ import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import AddModal from "@/src/components/AddModal";
-import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route, Sun } from "lucide-react";
+import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route, Sun, Settings2 } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
 import CommandPalette from "@/src/components/CommandPalette";
 import ContextMenu from "@/src/components/ui/ContextMenu";
@@ -159,6 +159,7 @@ export default function Home() {
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
     const [zenModeNodeId, setZenModeNodeId] = useState<string | null>(null);
     const [solarSystemNodeId, setSolarSystemNodeId] = useState<string | null>(null);
+    const [physicsPanelOpen, setPhysicsPanelOpen] = useState(false);
     const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
         repulsion: 150,
         linkDistance: 60
@@ -523,6 +524,11 @@ export default function Home() {
                 solarSystemNodeId={solarSystemNodeId}
                 clusterMode={clusterMode}
                 groups={groups}
+                renderToolbarExtra={(buttonClassName) => (
+                    <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
+                        <Settings2 size={18} />
+                    </button>
+                )}
             />
             </div>
             <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
@@ -562,10 +568,12 @@ export default function Home() {
 
             {!isLeftSidebarOpen && (
                 <button
+                    type="button"
                     onClick={() => setIsLeftSidebarOpen(true)}
-                    className="hover:cursor-pointer absolute top-32 left-20 z-10 -translate-x-1/2 flex items-center gap-2 px-6 py-4 bg-black/10 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 text-neutral-900 dark:text-white rounded-full shadow-[0_0_30px_rgba(0,0,0,0.08)] dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-black/20 dark:hover:bg-white/20 hover:scale-105 transition-all z-20 group"
+                    className="absolute top-30 left-8 z-20 w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-md bg-white/[0.03] border border-white/5 text-neutral-400 dark:text-neutral-500 hover:bg-white/10 hover:text-white transition-all duration-300 ease-out cursor-pointer"
+                    aria-label="Open left sidebar"
                 >
-                    <PanelLeftOpen size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+                    <PanelLeftOpen size={20} />
                 </button>
             )}
 
@@ -757,9 +765,11 @@ export default function Home() {
 
             <CommandPalette onOpenSearch={openSearch} />
 
-            <PhysicsControl 
-                config={physicsConfig} 
-                onChange={setPhysicsConfig} 
+            <PhysicsControl
+                config={physicsConfig}
+                onChange={setPhysicsConfig}
+                open={physicsPanelOpen}
+                onOpenChange={setPhysicsPanelOpen}
             />
 
             {data.nodes.length > 0 && isTimelineOpen && (
@@ -788,15 +798,19 @@ export default function Home() {
                 />
             )}
 
-            {!isLoading && data.nodes.length > 0 && ( 
-                <button
+            {!isLoading && data.nodes.length > 0 && (
+                <motion.button
+                    type="button"
                     data-tour-id="tour-new-neuron"
                     onClick={() => setIsAddModalOpen(true)}
-                    className="hover:cursor-pointer absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 px-6 py-4 bg-black/10 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 text-neutral-900 dark:text-white rounded-full shadow-lg shadow-neutral-900/10 dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-black/20 dark:hover:bg-white/20 hover:scale-105 transition-all z-20 group"
+                    className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-black/40 dark:bg-neutral-900/50 border border-white/10 text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 >
-                    <Plus className="group-hover:rotate-90 transition-transform duration-300" size={24} />
-                    <span className="font-medium pr-2">New Neuron</span>
-                </button>
+                    <Plus size={18} className="text-purple-400 shrink-0" />
+                    <span>New Neuron</span>
+                </motion.button>
             )}
         </main>
     );

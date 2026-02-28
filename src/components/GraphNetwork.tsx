@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from 'next/dynamic';
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Lightbulb, LinkIcon, Sparkles } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const ForceGraph2D = dynamic(() => import ('react-force-graph-2d'), {
@@ -252,6 +252,8 @@ interface GraphNetworkProps {
     onNodeContextMenu?: (node: any, event: MouseEvent) => void;
     onBackgroundClick?: () => void;
     readOnly?: boolean;
+    /** Optional extra toolbar button(s) below the built-in zoom/recenter, same style. Receives the toolbar button class. */
+    renderToolbarExtra?: (buttonClassName: string) => React.ReactNode;
 }
 
 function getLinkEnd(linkEnd: any): string | undefined {
@@ -277,7 +279,8 @@ export default function GraphNetwork({
     solarSystemNodeId = null,
     clusterMode = 'group',
     groups = [],
-    readOnly = false
+    readOnly = false,
+    renderToolbarExtra
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
@@ -857,11 +860,36 @@ export default function GraphNetwork({
         return () => clearTimeout(t);
     }, [processedData.nodes.length]);
 
+    const ZOOM_FACTOR = 1.25;
+    const NAV_DURATION_MS = 250;
+    const RECENTER_MS = 800;
+    const RECENTER_ZOOM = 1.2;
+    const handleZoomIn = useCallback(() => {
+        if (!fgRef.current) return;
+        const k = fgRef.current.zoom();
+        if (typeof k === 'number' && Number.isFinite(k)) {
+            fgRef.current.zoom(Math.min(8, k * ZOOM_FACTOR), NAV_DURATION_MS);
+        }
+    }, []);
+    const handleZoomOut = useCallback(() => {
+        if (!fgRef.current) return;
+        const k = fgRef.current.zoom();
+        if (typeof k === 'number' && Number.isFinite(k)) {
+            fgRef.current.zoom(Math.max(0.2, k / ZOOM_FACTOR), NAV_DURATION_MS);
+        }
+    }, []);
+    const handleRecenter = useCallback(() => {
+        if (!fgRef.current) return;
+        fgRef.current.centerAt(0, 0, RECENTER_MS);
+        fgRef.current.zoom(RECENTER_ZOOM, RECENTER_MS);
+    }, []);
+
+    const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-400 dark:text-neutral-500 hover:bg-white/10 hover:text-white transition-all duration-200 cursor-pointer";
 
     return (
         <div 
             ref={containerRef} 
-            className="w-full h-screen"
+            className="w-full h-screen relative"
             style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
@@ -965,6 +993,20 @@ export default function GraphNetwork({
                 backgroundColor="transparent"
                 enablePointerInteraction={true}
             />
+            <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-white/[0.03] border border-white/10 shadow-lg pointer-events-none">
+                <div className="pointer-events-auto flex flex-col gap-1">
+                    <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
+                        <ZoomIn size={18} />
+                    </button>
+                    <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
+                        <ZoomOut size={18} />
+                    </button>
+                    <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
+                        <Locate size={18} />
+                    </button>
+                    {renderToolbarExtra?.(navBtnClass)}
+                </div>
+            </div>
             <AnimatePresence>
                 {hoveredLink && (
                     <motion.div
