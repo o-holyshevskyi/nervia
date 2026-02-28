@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synapse Web Clipper</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #0a0a0a;
+      width: 380px;
+      min-height: 320px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.95);
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      padding: 20px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    header {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: rgba(255, 255, 255, 0.95);
+    }
+    header p {
+      margin: 4px 0 0 0;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 6px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+    input:focus {
+      border-color: rgba(168, 85, 247, 0.5);
+      box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.5);
+    }
+    input#pageUrl {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #tags {
+      margin-bottom: 20px;
+    }
+    #saveBtn {
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: white;
+      background: rgba(168, 85, 247, 0.9);
+      cursor: pointer;
+      outline: none;
+      transition: background 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+    }
+    #saveBtn:hover {
+      background: rgb(168, 85, 247);
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.5);
+    }
+    #saveBtn:focus {
+      box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.4);
+    }
+    #saveBtn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    #statusText {
+      margin-top: 12px;
+      font-size: 14px;
+      text-align: center;
+    }
+    #statusText.hidden {
+      display: none;
+    }
+    #statusText.text-cyan {
+      color: rgb(192, 132, 252);
+    }
+    #statusText.text-red {
+      color: rgb(248, 113, 113);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Synapse Web Clipper</h1>
+      <p>Save to your Digital Brain</p>
+    </header>
+
+    <label for="pageTitle">Page Title</label>
+    <input
+      type="text"
+      id="pageTitle"
+      readonly
+      placeholder="Loading..."
+    />
+
+    <label for="pageUrl">URL</label>
+    <input
+      type="text"
+      id="pageUrl"
+      readonly
+      placeholder="Loading..."
+    />
+
+    <label for="tags">Tags (comma-separated)</label>
+    <input
+      type="text"
+      id="tags"
+      placeholder="e.g. dev, reference, tutorial"
+    />
+
+    <button type="button" id="saveBtn">
+      Save to Brain
+    </button>
+
+    <p id="statusText" class="hidden" aria-live="polite"></p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
