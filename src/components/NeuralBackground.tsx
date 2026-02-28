@@ -47,7 +47,6 @@ export function NeuralBackground() {
     if (particlesRef.current.length === 0) {
       particlesRef.current = createParticles(width, height);
     } else {
-      // Wrap positions on resize
       particlesRef.current.forEach((p) => {
         p.x = p.x % (width + 1);
         p.y = p.y % (height + 1);
@@ -105,7 +104,6 @@ export function NeuralBackground() {
 
       ctx.clearRect(0, 0, width, height);
 
-      // Update positions
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
@@ -115,7 +113,6 @@ export function NeuralBackground() {
         p.y = Math.max(0, Math.min(height, p.y));
       });
 
-      // Draw connections between particles
       ctx.lineWidth = 0.8;
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
@@ -131,7 +128,6 @@ export function NeuralBackground() {
         }
       }
 
-      // Draw connections from particles to mouse
       if (mouse) {
         ctx.lineWidth = 1;
         particles.forEach((p) => {
@@ -150,7 +146,6 @@ export function NeuralBackground() {
         });
       }
 
-      // Draw particles (glowing dots)
       particles.forEach((p) => {
         const gradient = ctx.createRadialGradient(
           p.x, p.y, 0,
@@ -184,7 +179,7 @@ export function NeuralBackground() {
     <>
       <svg width={0} height={0} aria-hidden>
         <defs>
-          <clipPath id="neural-brain-clip-landing" clipPathUnits="objectBoundingBox">
+          <clipPath id="neural-brain-clip" clipPathUnits="objectBoundingBox">
             {/* Brain silhouette: two lobes, central dip at top, rounded bottom */}
             <path d="M0.5,0.02 C0.22,0.06 0.02,0.32 0.05,0.58 C0.08,0.8 0.32,0.98 0.5,0.98 C0.68,0.98 0.92,0.8 0.95,0.58 C0.98,0.32 0.78,0.06 0.5,0.02 Z" />
           </clipPath>
@@ -192,7 +187,7 @@ export function NeuralBackground() {
       </svg>
       <div
         className="absolute inset-0 z-0 overflow-hidden"
-        style={{ clipPath: "url(#neural-brain-clip-landing)", pointerEvents: "auto" }}
+        style={{ clipPath: "url(#neural-brain-clip)", pointerEvents: "auto" }}
       >
         <canvas
           ref={canvasRef}

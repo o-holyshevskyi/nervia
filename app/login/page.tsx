@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Github, Mail, Loader2, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
-import Image from 'next/image';
 import { createClient } from '@/src/lib/supabase/client';
+import { NeuralBackground } from '@/src/components/NeuralBackground';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -66,8 +66,11 @@ export default function LoginPage() {
                 className="w-full max-w-md bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-3xl shadow-xl dark:shadow-2xl relative z-10 overflow-hidden"
             >
                 <div className="p-8 md:p-10">
-                <div className="flex justify-center mb-8">
-                    <Image src="/banner.png" alt="Nervia" width={1900} height={1300} />
+                <div
+                    className="flex justify-center mb-8 w-full relative rounded-xl overflow-hidden"
+                    style={{ aspectRatio: '1900/1300' }}
+                >
+                    <NeuralBackground />
                 </div>
 
                 <div className="text-center mb-8">
