@@ -15,9 +15,41 @@ const geistMono = Geist_Mono({
     subsets: ["latin"],
 });
 
+const SITE_URL =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof process.env.VERCEL_URL === "string"
+        ? `https://${process.env.VERCEL_URL}`
+        : "https://nervia.app");
+
 export const metadata: Metadata = {
-    title: "Nervia",
-    description: "Nervia: Your Visual Intelligence Universe",
+    title: "Nervia | Your Visual Intelligence Universe",
+    description:
+        "Build your exocortex. Visualize your thoughts, links, and ideas as an interactive 3D neural network.",
+    metadataBase: new URL(SITE_URL),
+    openGraph: {
+        title: "Nervia | Your Visual Intelligence Universe",
+        description:
+            "Build your exocortex. Visualize your thoughts, links, and ideas as an interactive 3D neural network.",
+        url: SITE_URL,
+        siteName: "Nervia",
+        images: [{ url: "/banner.png", width: 1200, height: 630, alt: "Nervia 3D knowledge graph" }],
+        locale: "en_US",
+        type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "Nervia | Your Visual Intelligence Universe",
+        description:
+            "Build your exocortex. Visualize your thoughts, links, and ideas as an interactive 3D neural network.",
+        images: ["/banner.png"],
+    },
+    icons: {
+        icon: [
+            { url: "/favicon.ico", sizes: "any" },
+            { url: "/icon.png", type: "image/png", sizes: "32x32" },
+        ],
+        apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+    },
 };
 
 export default function RootLayout({

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Github, Mail, Sparkles, Loader2, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Github, Mail, Loader2, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import Image from 'next/image';
 import { createClient } from '@/src/lib/supabase/client';
 
 export default function LoginPage() {
@@ -65,14 +66,12 @@ export default function LoginPage() {
                 className="w-full max-w-md bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 p-8 rounded-3xl shadow-xl dark:shadow-2xl relative z-10"
             >
                 <div className="flex justify-center mb-8">
-                    <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] dark:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
-                        <Sparkles className="text-indigo-600 dark:text-purple-400" size={32} />
-                    </div>
+                    <Image src="/banner.png" alt="Nervia" width={1900} height={1300} />
                 </div>
 
                 <div className="text-center mb-8">
                     <h1 className="text-2xl font-bold text-neutral-900 dark:text-white mb-2 tracking-tight">Welcome to Nervia</h1>
-                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">Sign in to access your visual bookmarks</p>
+                    <p className="text-neutral-500 dark:text-neutral-400 text-sm">Sign in to access your visual intelligence universe</p>
                 </div>
 
                 <AnimatePresence mode="wait">
