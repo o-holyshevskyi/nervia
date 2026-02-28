@@ -13,7 +13,7 @@ const faqs = [
   },
   {
     q: "Can I try Pro for free?",
-    a: "Architect (Pro) comes with a free trial. No credit card required to start.",
+    a: "Singularity (Pro) comes with a free trial. No credit card required to start.",
   },
 ];
 

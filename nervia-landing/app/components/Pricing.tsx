@@ -8,7 +8,7 @@ const APP_URL = "https://synapse-bookmark-ten.vercel.app/";
 
 const tiers = [
   {
-    name: "Explorer",
+    name: "Genesis",
     price: "$0",
     period: "Forever",
     features: [
@@ -24,7 +24,7 @@ const tiers = [
     highlighted: false,
   },
   {
-    name: "Builder",
+    name: "Constellation",
     price: "$3,99",
     period: "month",
     features: [
@@ -32,25 +32,26 @@ const tiers = [
       "Pathfinder & Zen Mode",
       "Tags & Advanced Filters",
       "Data Import/Export",
+      "Connect thoughts into infinite clusters",
     ],
-    cta: "Become a Builder",
+    cta: "Join Constellation",
     ctaHref: APP_URL,
     primary: false,
     highlighted: false,
   },
   {
-    name: "Architect",
-    badge: "Ultimate Brain",
+    name: "Singularity",
+    badge: "Ultimate AI Fusion",
     price: "$7,99",
     period: "month",
     features: [
-      "Neural Core (AI Chat)",
+      "Full AI Neural Core (Chat & Search)",
       "AI Semantic Search",
       "3D Graph Visualization",
       "Time Machine & Evolution Journal",
       "Unlimited Shared Universes",
     ],
-    cta: "Upgrade to Architect",
+    cta: "Reach Singularity",
     ctaHref: APP_URL,
     primary: true,
     highlighted: true,

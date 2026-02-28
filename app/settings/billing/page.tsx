@@ -10,12 +10,12 @@ import { createClient } from '@/src/lib/supabase/client';
 type PlanId = 'explorer' | 'builder' | 'architect';
 
 const PLAN_LABELS: Record<PlanId, string> = {
-  explorer: 'Explorer',
-  builder: 'Builder',
-  architect: 'Architect',
+  explorer: 'Genesis',
+  builder: 'Constellation',
+  architect: 'Singularity',
 };
 
-// Plan limits (mock – replace with API later). Explorer = 60 neurons.
+// Plan limits (mock – replace with API later). Genesis = 60 neurons.
 const NEURONS_LIMIT_BY_PLAN: Record<PlanId, number> = {
   explorer: 60,
   builder: Infinity,
@@ -85,44 +85,44 @@ export default function BillingPage() {
 
   if (authChecking) {
     return (
-      <main className="min-h-screen bg-neutral-100 dark:bg-neutral-950 flex items-center justify-center p-4">
+      <main className="h-screen bg-neutral-100 dark:bg-neutral-950 flex items-center justify-center p-4">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500 dark:text-purple-400" />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 dark:bg-neutral-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <main className="h-screen bg-neutral-100 dark:bg-neutral-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="w-full max-w-2xl bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-3xl shadow-xl dark:shadow-2xl relative z-10 overflow-hidden"
+        className="w-full max-w-2xl max-h-full bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-3xl shadow-xl dark:shadow-2xl relative z-10 overflow-hidden"
       >
-        <div className="p-8 md:p-10">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] dark:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
-              <CreditCard className="text-indigo-600 dark:text-purple-400" size={32} />
+        <div className="p-4 md:p-5">
+          <div className="flex justify-center mb-3">
+            <div className="w-12 h-12 bg-indigo-500/20 dark:bg-purple-500/20 rounded-xl flex items-center justify-center border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] dark:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+              <CreditCard className="text-indigo-600 dark:text-purple-400" size={24} />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white text-center mb-2 tracking-tight">
+          <h1 className="text-xl font-bold text-neutral-900 dark:text-white text-center mb-1 tracking-tight">
             Universe Telemetry & Billing
           </h1>
-          <p className="text-neutral-500 dark:text-neutral-400 text-sm text-center mb-10">
+          <p className="text-neutral-500 dark:text-neutral-400 text-sm text-center mb-5">
             Your plan, usage, and upgrade options.
           </p>
 
           {/* Current usage */}
-          <div className="space-y-4 mb-10">
+          <div className="space-y-2 mb-5">
             <div className="flex items-center gap-2">
               <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 text-indigo-600 dark:text-purple-400 text-sm font-bold">
                 1
               </span>
               <span className="text-sm font-semibold text-neutral-900 dark:text-white">Current usage</span>
             </div>
-            <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-5 space-y-5">
+            <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-4 space-y-3">
               <div>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500 mb-0.5">Current Plan</p>
                 <p className="text-sm font-medium text-neutral-900 dark:text-white">{PLAN_LABELS[plan]}</p>
@@ -154,11 +154,11 @@ export default function BillingPage() {
 
           {/* Pro: Manage Subscription */}
           {isPro && (
-            <div className="space-y-4 mb-10">
-              <button
-                type="button"
-                onClick={handleManageSubscription}
-                className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-3.5 rounded-xl border border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/5 text-neutral-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/10 font-medium transition-all"
+            <div className="space-y-2 mb-5">
+                <button
+                    type="button"
+                    onClick={handleManageSubscription}
+                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-black/20 dark:border-white/20 bg-black/5 dark:bg-white/5 text-neutral-800 dark:text-white hover:bg-black/10 dark:hover:bg-white/10 font-medium transition-all"
               >
                 <CreditCard size={20} />
                 Manage Subscription
@@ -168,22 +168,22 @@ export default function BillingPage() {
 
           {/* Upgrade options (hidden when Pro) */}
           {!isPro && (
-            <div className="space-y-4 mb-10">
+            <div className="space-y-2 mb-5">
               <div className="flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 text-indigo-600 dark:text-purple-400 text-sm font-bold">
                   2
                 </span>
                 <span className="text-sm font-semibold text-neutral-900 dark:text-white">Upgrade options</span>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {/* Builder */}
-                <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-5 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* Constellation */}
+                <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 flex items-center justify-center shrink-0">
                       <Zap size={20} className="text-indigo-600 dark:text-purple-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-neutral-900 dark:text-white">Builder</p>
+                      <p className="text-sm font-semibold text-neutral-900 dark:text-white">Constellation</p>
                       <p className="text-lg font-bold text-neutral-900 dark:text-white">$3.99<span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/mo</span></p>
                     </div>
                   </div>
@@ -191,29 +191,30 @@ export default function BillingPage() {
                     <li>Unlimited Neurons</li>
                     <li>Unlimited Tags</li>
                     <li>5 Shared Clusters</li>
+                    <li>Connect thoughts into infinite clusters</li>
                   </ul>
                   <button
                     type="button"
                     onClick={() => handleUpgrade('builder')}
-                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
+                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                   >
                     Upgrade
                   </button>
                 </div>
 
-                {/* Architect */}
-                <div className="bg-black/5 dark:bg-white/5 border-2 border-amber-500/40 dark:border-amber-400/40 rounded-2xl p-5 space-y-4 shadow-[0_0_30px_rgba(245,158,11,0.15)] dark:shadow-[0_0_30px_rgba(245,158,11,0.2)]">
+                {/* Singularity */}
+                <div className="bg-black/5 dark:bg-white/5 border-2 border-amber-500/40 dark:border-amber-400/40 rounded-2xl p-4 space-y-3 shadow-[0_0_30px_rgba(245,158,11,0.15)] dark:shadow-[0_0_30px_rgba(245,158,11,0.2)]">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
                       <Zap size={20} className="text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-neutral-900 dark:text-white">Architect</p>
+                      <p className="text-sm font-semibold text-neutral-900 dark:text-white">Singularity</p>
                       <p className="text-lg font-bold text-neutral-900 dark:text-white">$7.99<span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/mo</span></p>
                     </div>
                   </div>
                   <ul className="text-xs text-neutral-500 dark:text-neutral-400 space-y-1">
-                    <li>Ultimate Brain</li>
+                    <li>Ultimate AI Fusion</li>
                     <li>Full AI Neural Core</li>
                     <li>3D Graph</li>
                     <li>Unlimited Sharing</li>
@@ -221,7 +222,7 @@ export default function BillingPage() {
                   <button
                     type="button"
                     onClick={() => handleUpgrade('architect')}
-                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
+                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                   >
                     Upgrade
                   </button>
