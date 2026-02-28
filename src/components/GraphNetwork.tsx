@@ -67,6 +67,23 @@ function getNodeGroupKey(node: any): string | number {
     return getNodeGroup(node);
 }
 
+function looksLikeId(s: string, idStr: string): boolean {
+    if (!s || s === idStr) return true;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return true;
+    if (s.length >= 32 && /^[0-9a-f-]+$/i.test(s)) return true;
+    return false;
+}
+
+/** Prefer title/content for display; never show raw id (UUID or similar) as label. */
+function getNodeLabel(node: any): string {
+    const idStr = typeof node.id === 'string' ? node.id : node?.id != null ? String(node.id) : '';
+    const title = (node.title ?? '').toString().trim();
+    const content = (node.content ?? '').toString().trim();
+    if (title && !looksLikeId(title, idStr)) return title;
+    if (content && !looksLikeId(content, idStr)) return content;
+    return 'Untitled';
+}
+
 /** Read graph theme from CSS variables (no re-render on theme switch). */
 function getGraphThemeColors(container: HTMLElement | null): { nodeColor: string; linkColor: string; graphBg: string } {
     const el = container ?? (typeof document !== 'undefined' ? document.documentElement : null);
@@ -103,7 +120,12 @@ function getGroupColor(key: string | number, groupColorsById: Record<string, str
 }
 
 function getGroupLabel(key: string | number, groupNamesById: Record<string, string>): string {
-    if (typeof key === 'string') return groupNamesById[key] ?? key;
+    if (typeof key === 'string') {
+        const name = groupNamesById[key];
+        if (name) return name;
+        if (key.length >= 32 && /^[0-9a-f-]+$/i.test(key)) return 'New group';
+        return key;
+    }
     return groupNames[key] ?? `Group ${key}`;
 }
 
@@ -260,7 +282,6 @@ export default function GraphNetwork({
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
-    const lastTransformRef = useRef<{ k: number; x: number; y: number } | null>(null);
     const prevNodeCountRef = useRef(0);
 
     const groupColorsById = useMemo(() => {
@@ -367,19 +388,38 @@ export default function GraphNetwork({
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
-        const layoutRadius = 280;
+        // Stretched layout around graph origin (0,0); use larger radius so groups stay visibly separated
+        const minDim = Math.min(dimensions.width, dimensions.height);
+        const layoutRadius = minDim * 0.48;
+        const getClusterKey = (n: any): string | number =>
+            clusterMode === 'group'
+                ? getNodeGroupKey(n)
+                : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
+        const rawKeys = [...new Set(workingNodes.map((n: any) => getClusterKey(n)))];
+        const uniqueKeys = clusterMode === 'group'
+            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
+            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
+        const clusterCenters: Record<string | number, { x: number; y: number }> = {};
+        uniqueKeys.forEach((key, i) => {
+            const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
+            clusterCenters[key] = {
+                x: layoutRadius * Math.cos(angle),
+                y: layoutRadius * Math.sin(angle),
+            };
+        });
+        const jitter = 28;
         const nodesWithVal = workingNodes.map((node: any, index: number) => {
             const id = getNodeId(node);
             const degree = degreeMap[id] ?? 0;
             const val = Math.min(4 + degree * 1.5, 20);
-            const g = getNodeGroup(node);
             const idStr = id != null ? String(id) : `i${index}`;
-            const h = hashStr(idStr);
-            const angle = h * 2 * Math.PI;
-            const r = layoutRadius * (0.3 + 0.7 * (hashStr(idStr + "r") % 1));
-            const x = r * Math.cos(angle);
-            const y = r * Math.sin(angle);
-            return { ...node, val, x: node.x ?? x, y: node.y ?? y };
+            const key = getClusterKey(node);
+            const center = clusterCenters[key];
+            const dx = center ? jitter * (hashStr(idStr + 'x') - 0.5) : 0;
+            const dy = center ? jitter * (hashStr(idStr + 'y') - 0.5) : 0;
+            const x = center ? center.x + dx : 0;
+            const y = center ? center.y + dy : 0;
+            return { ...node, val, x, y };
         });
         const linksCopy = workingLinks.map((link: any) => ({ ...link }));
         if (pathfinderActive) {
@@ -404,7 +444,7 @@ export default function GraphNetwork({
             return { nodes: [...dim, ...bright], links: linksCopy };
         }
         return { nodes: nodesWithVal, links: linksCopy };
-    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate]);
+    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate, dimensions.width, dimensions.height, clusterMode]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
@@ -462,7 +502,7 @@ export default function GraphNetwork({
 
         const themeColors = getGraphThemeColors(containerRef.current);
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
-        const label = node.title ?? node.content ?? idStr ?? '';
+        const label = getNodeLabel(node);
         const rawSize = (node.val ?? 4) * 1;
         let size = Math.min(20, Math.max(6, rawSize));
 
@@ -658,10 +698,8 @@ export default function GraphNetwork({
     useEffect(() => {
         if (!fgRef.current) return;
         const fg = fgRef.current;
-        const cx = dimensions.width / 2;
-        const cy = dimensions.height / 2;
         const minDim = Math.min(dimensions.width, dimensions.height);
-        const radius = minDim * 0.35;
+        const radius = minDim * 0.48;
 
         const getClusterKey = (node: any): string | number => {
             if (clusterMode === 'group') {
@@ -679,38 +717,50 @@ export default function GraphNetwork({
         uniqueKeys.forEach((key, i) => {
             const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
             clusterCenters[key] = {
-                x: cx + radius * Math.cos(angle),
-                y: cy + radius * Math.sin(angle),
+                x: radius * Math.cos(angle),
+                y: radius * Math.sin(angle),
             };
+        });
+
+        // Force stretched layout on the node objects the graph uses (fixes first-load blob:
+        // the library may ignore or overwrite our processedData positions on initial mount).
+        const jitter = 28;
+        processedData.nodes.forEach((node: any) => {
+            const key = getClusterKey(node);
+            const center = clusterCenters[key];
+            if (!center) return;
+            const idStr = (typeof node.id === 'string' ? node.id : node?.id) ?? '';
+            const dx = jitter * (hashStr(String(idStr) + 'x') - 0.5);
+            const dy = jitter * (hashStr(String(idStr) + 'y') - 0.5);
+            (node as any).x = center.x + dx;
+            (node as any).y = center.y + dy;
         });
 
         const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
 
         if (solarSystemNodeId && solarNeighbors.size > 0) {
-            // Solar System mode: lock sun at center, neighbors on radial ring
             const centerNode = processedData.nodes.find(
                 (n: any) => getNodeIdStr(n) === solarSystemNodeId
             );
             if (centerNode) {
-                (centerNode as any).fx = cx;
-                (centerNode as any).fy = cy;
+                (centerNode as any).fx = 0;
+                (centerNode as any).fy = 0;
             }
             fg.d3Force('x', null);
             fg.d3Force('y', null);
-            fg.d3Force('radial', forceRadial(250, cx, cy).strength((node: any) =>
+            fg.d3Force('radial', forceRadial(250, 0, 0).strength((node: any) =>
                 solarNeighbors.has(getNodeIdStr(node)) ? 1 : 0
             ));
             fg.d3Force('collide', forceCollide(24).strength(1));
         } else {
-            // Normal mode: clear all fx/fy so no node stays pinned
             processedData.nodes.forEach((node: any) => {
                 delete (node as any).fx;
                 delete (node as any).fy;
             });
             fg.d3Force('radial', null);
             fg.d3Force('collide', null);
-            fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? cx).strength(0.15));
-            fg.d3Force('y', forceY((node: any) => clusterCenters[getClusterKey(node)]?.y ?? cy).strength(0.15));
+            fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? 0).strength(0.4));
+            fg.d3Force('y', forceY((node: any) => clusterCenters[getClusterKey(node)]?.y ?? 0).strength(0.4));
         }
 
         fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
@@ -733,11 +783,9 @@ export default function GraphNetwork({
 
     useEffect(() => {
         if (!solarSystemNodeId || !fgRef.current) return;
-        const cx = dimensions.width / 2;
-        const cy = dimensions.height / 2;
-        fgRef.current.centerAt(cx, cy, 800);
+        fgRef.current.centerAt(0, 0, 800);
         fgRef.current.zoom(3, 800);
-    }, [solarSystemNodeId, dimensions.width, dimensions.height]);
+    }, [solarSystemNodeId]);
 
     useEffect(() => {
         if (!fgRef.current || contextNodeIds.length === 0) return;
@@ -768,9 +816,7 @@ export default function GraphNetwork({
         fgRef.current.zoom(k, 400);
     }, [contextNodeIds.length, contextNodeSet, processedData.nodes, dimensions.width, dimensions.height]);
 
-    const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
-        lastTransformRef.current = { k: transform.k, x: transform.x, y: transform.y };
-    }, []);
+    const handleZoom = useCallback((_transform: { k: number; x: number; y: number }) => {}, []);
 
     useEffect(() => {
         if (!flyToNodeId || !fgRef.current) return;
@@ -786,32 +832,22 @@ export default function GraphNetwork({
         onFlyToComplete?.();
     }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
+    // Center view at graph (0,0): on first load and whenever a new neuron is added (smooth)
+    const CENTER_ANIMATION_MS = 800;
+    const DEFAULT_ZOOM_ON_CENTER = 1.2;
     useEffect(() => {
         if (timelineDate != null) return;
         const nodeCount = processedData.nodes.length;
         const prevCount = prevNodeCountRef.current;
         prevNodeCountRef.current = nodeCount;
-        if (nodeCount > prevCount && prevCount > 0 && lastTransformRef.current && fgRef.current) {
-            const { k, x, y } = lastTransformRef.current;
-            const w = dimensions.width;
-            const h = dimensions.height;
-            const centerX = (w / 2 - x) / k;
-            const centerY = (h / 2 - y) / k;
-            const restore = () => {
-                if (!fgRef.current || !isFinite(centerX) || !isFinite(centerY)) return;
-                fgRef.current.centerAt(centerX, centerY, 0);
-                fgRef.current.zoom(k, 0);
-            };
-            const t1 = setTimeout(restore, 100);
-            const t2 = setTimeout(restore, 400);
-            const t3 = setTimeout(restore, 800);
-            return () => {
-                clearTimeout(t1);
-                clearTimeout(t2);
-                clearTimeout(t3);
-            };
+        if (!fgRef.current) return;
+        const isFirstLoad = prevCount === 0 && nodeCount > 0;
+        const isNewNeuron = nodeCount > prevCount && prevCount > 0;
+        if (isFirstLoad || isNewNeuron) {
+            fgRef.current.centerAt(0, 0, CENTER_ANIMATION_MS);
+            fgRef.current.zoom(DEFAULT_ZOOM_ON_CENTER, CENTER_ANIMATION_MS);
         }
-    }, [processedData.nodes.length, dimensions.width, dimensions.height, timelineDate]);
+    }, [processedData.nodes.length, timelineDate]);
 
     useEffect(() => {
         if (!fgRef.current || processedData.nodes.length === 0) return;
@@ -821,25 +857,6 @@ export default function GraphNetwork({
         return () => clearTimeout(t);
     }, [processedData.nodes.length]);
 
-    useEffect(() => {
-        if (lastTransformRef.current != null) return;
-        const id = setTimeout(() => {
-            if (fgRef.current) {
-                const center = fgRef.current.centerAt();
-                const zoom = fgRef.current.zoom();
-                if (center && typeof zoom === 'number' && Number.isFinite(center.x) && Number.isFinite(center.y)) {
-                    const w = dimensions.width;
-                    const h = dimensions.height;
-                    lastTransformRef.current = {
-                        k: zoom,
-                        x: w / 2 - center.x * zoom,
-                        y: h / 2 - center.y * zoom,
-                    };
-                }
-            }
-        }, 600);
-        return () => clearTimeout(id);
-    }, [processedData.nodes.length, dimensions.width, dimensions.height]);
 
     return (
         <div 
@@ -854,7 +871,7 @@ export default function GraphNetwork({
                 height={dimensions.height}
                 graphData={processedData}
                 nodeVal={(node: any) => node.val ?? 4}
-                nodeLabel={(node: any) => node.title ?? node.content ?? (typeof node.id === 'string' ? node.id : node.id?.id) ?? ''}
+                nodeLabel={(node: any) => getNodeLabel(node)}
                 nodeCanvasObject={drawNode}
                 onRenderFramePre={handleRenderFramePre}
                 onZoom={handleZoom}

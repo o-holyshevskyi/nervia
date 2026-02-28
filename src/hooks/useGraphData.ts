@@ -118,9 +118,11 @@ export function useGraphData(supabase: any) {
 
                 setData((prev) => {
                     if (prev.nodes.some((n: any) => (n.id ?? n.id?.id) === nodeId)) return prev;
-                    const n = row;
+                    const n = row as Record<string, unknown>;
                     const normalized = {
                         ...n,
+                        title: n.title ?? n.Title ?? '',
+                        content: n.content ?? n.Content ?? '',
                         group: n.group != null ? n.group : (n.type === 'note' ? 2 : n.type === 'idea' ? 3 : 1),
                         isNew: true,
                         newPingAt: Date.now(),
@@ -138,6 +140,32 @@ export function useGraphData(supabase: any) {
                         }),
                     }));
                 }, NEW_NODE_PING_DURATION_MS);
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'nodes' }, (payload: { new: Record<string, unknown> }) => {
+                const row = payload.new as Record<string, unknown>;
+                if (row.user_id !== user?.id) return;
+                const nodeId = row.id as string;
+                setData((prev) => {
+                    const existing = prev.nodes.find((n: any) => (n.id ?? n.id?.id) === nodeId);
+                    if (!existing) return prev;
+                    let rowTitle = (row.title ?? row.Title ?? existing.title ?? '').toString().trim();
+                    let rowContent = (row.content ?? row.Content ?? existing.content ?? '').toString().trim();
+                    if (rowTitle === nodeId || /^[0-9a-f-]{36}$/i.test(rowTitle)) rowTitle = (existing.title ?? '').toString().trim();
+                    if (rowContent === nodeId || /^[0-9a-f-]{36}$/i.test(rowContent)) rowContent = (existing.content ?? '').toString().trim();
+                    const merged = {
+                        ...existing,
+                        ...row,
+                        title: rowTitle || (existing.title ?? ''),
+                        content: rowContent || (existing.content ?? ''),
+                        group: row.group != null ? row.group : existing.group,
+                    };
+                    return {
+                        ...prev,
+                        nodes: prev.nodes.map((n: any) =>
+                            (n.id ?? n.id?.id) === nodeId ? merged : n
+                        ),
+                    };
+                });
             })
             .subscribe();
 
@@ -305,21 +333,24 @@ export function useGraphData(supabase: any) {
             }
         }
 
+        const nodeIdNorm = nodeId;
         setData((prev) => {
             const newNodes = prev.nodes.map((node) => {
-                if (node.id === nodeId) {
-                    return {
-                        ...node,
-                        title: newData.title ?? node.title,
-                        content: newData.content ?? node.content,
-                        tags: newData.tags ?? node.tags,
-                        url: newData.url ?? node.url,
-                        is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
-                        group: newData.group ?? node.group,
-                        group_id: newData.group_id !== undefined ? newData.group_id : node.group_id,
-                    };
-                }
-                return node;
+                const nid = typeof node.id === 'string' ? node.id : node.id?.id;
+                if (nid !== nodeIdNorm) return node;
+                const proposedTitle = newData.title !== undefined ? newData.title : node.title;
+                const titleIsNodeId = proposedTitle != null && String(proposedTitle).trim() === nodeIdNorm;
+                const safeTitle = titleIsNodeId ? (node.title ?? '') : (newData.title ?? node.title);
+                return {
+                    ...node,
+                    title: safeTitle,
+                    content: newData.content ?? node.content,
+                    tags: newData.tags ?? node.tags,
+                    url: newData.url ?? node.url,
+                    is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
+                    group: newData.group ?? node.group,
+                    group_id: newData.group_id !== undefined ? newData.group_id : node.group_id,
+                };
             });
             return { ...prev, nodes: newNodes };
         });

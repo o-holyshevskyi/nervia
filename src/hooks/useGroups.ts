@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const DEFAULT_GENERAL_COLOR = '#64748b';
 
@@ -78,6 +78,54 @@ export function useGroups(supabase: any) {
         return () => { cancelled = true; };
     }, [supabase, fetchGroups]);
 
+    // Realtime: sync newly created/updated groups from backend (e.g. AI-created groups)
+    const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    useEffect(() => {
+        if (!supabase) return;
+
+        let cancelled = false;
+        (async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user?.id || cancelled) return;
+
+            const channel = supabase
+                .channel('groups-changes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'groups' }, (payload: { new: Record<string, unknown> }) => {
+                    const row = payload.new;
+                    if (row.user_id !== user.id) return;
+                    const newGroup = row as Group;
+                    setGroups((prev) => {
+                        if (prev.some((g) => g.id === newGroup.id)) return prev;
+                        return [...prev, newGroup].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
+                    });
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups' }, (payload: { new: Record<string, unknown> }) => {
+                    const row = payload.new;
+                    if (row.user_id !== user.id) return;
+                    const updated = row as Group;
+                    setGroups((prev) =>
+                        prev.map((g) => (g.id === updated.id ? { ...g, ...updated } : g))
+                    );
+                })
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'groups' }, (payload: { old: Record<string, unknown> }) => {
+                    const id = (payload.old?.id as string) ?? '';
+                    setGroups((prev) => prev.filter((g) => g.id !== id));
+                })
+                .subscribe();
+
+            if (!cancelled) channelRef.current = channel;
+            else supabase.removeChannel(channel);
+        })();
+
+        return () => {
+            cancelled = true;
+            if (channelRef.current) {
+                supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+            }
+        };
+    }, [supabase]);
+
     const addGroup = useCallback(async (name: string, color: string): Promise<Group | null> => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.id) return null;
@@ -111,5 +159,12 @@ export function useGroups(supabase: any) {
         setGroups((prev) => prev.filter((g) => g.id !== id));
     }, [supabase]);
 
-    return { groups, isLoading, addGroup, deleteGroup, refetch: fetchGroups };
+    const refetch = useCallback(async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return;
+        const { data: listData, ok } = await fetchGroups(user.id);
+        if (ok && listData) setGroups(listData);
+    }, [supabase, fetchGroups]);
+
+    return { groups, isLoading, addGroup, deleteGroup, refetch };
 }

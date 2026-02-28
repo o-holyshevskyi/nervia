@@ -50,7 +50,17 @@ export default function Home() {
         data.nodes
     );
 
-    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup } = useGroups(supabase);
+    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup, refetch: refetchGroups } = useGroups(supabase);
+
+    // When any node has a group_id not in our groups list (e.g. AI-created group on backend), refetch groups so the graph shows the real name
+    const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
+    useEffect(() => {
+        const hasMissingGroup = data.nodes.some((n: any) => {
+            const gid = n?.group_id;
+            return typeof gid === 'string' && gid.length > 0 && !groupIds.has(gid);
+        });
+        if (hasMissingGroup) refetchGroups();
+    }, [data.nodes, groupIds, refetchGroups]);
 
     const handleNotificationInsert = useCallback((n: any) => {
         if (n?.type === "visit") {
