@@ -1,0 +1,193 @@
+"use client";
+
+import { useCallback, useEffect, useRef } from "react";
+
+const PARTICLE_COUNT = 70;
+const CONNECT_THRESHOLD = 120;
+const MOUSE_RADIUS = 150;
+const PARTICLE_RADIUS = 2;
+const BRAND_CYAN = "#06b6d4";
+const BRAND_PURPLE = "#a855f7";
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+}
+
+function createParticles(width: number, height: number): Particle[] {
+  const particles: Particle[] = [];
+  const colors = [BRAND_CYAN, BRAND_PURPLE];
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      color: colors[i % colors.length],
+    });
+  }
+  return particles;
+}
+
+function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+export function NeuralBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef<number>(0);
+  const mouseRef = useRef<{ x: number; y: number } | null>(null);
+  const particlesRef = useRef<Particle[]>([]);
+  const dimensionsRef = useRef({ width: 0, height: 0 });
+
+  const initOrResizeParticles = useCallback((width: number, height: number) => {
+    if (particlesRef.current.length === 0) {
+      particlesRef.current = createParticles(width, height);
+    } else {
+      // Wrap positions on resize
+      particlesRef.current.forEach((p) => {
+        p.x = p.x % (width + 1);
+        p.y = p.y % (height + 1);
+        if (p.x < 0) p.x += width;
+        if (p.y < 0) p.y += height;
+      });
+    }
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    mouseRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    mouseRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const setSize = () => {
+      const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
+      const width = Math.floor(canvas.offsetWidth);
+      const height = Math.floor(canvas.offsetHeight);
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dimensionsRef.current = { width, height };
+      initOrResizeParticles(width, height);
+    };
+
+    setSize();
+    const resizeObserver = new ResizeObserver(setSize);
+    resizeObserver.observe(canvas);
+
+    const tick = () => {
+      const { width, height } = dimensionsRef.current;
+      if (width <= 0 || height <= 0) {
+        frameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const particles = particlesRef.current;
+      const mouse = mouseRef.current;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Update positions
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > width) p.vx *= -1;
+        if (p.y < 0 || p.y > height) p.vy *= -1;
+        p.x = Math.max(0, Math.min(width, p.x));
+        p.y = Math.max(0, Math.min(height, p.y));
+      });
+
+      // Draw connections between particles
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const d = dist(particles[i], particles[j]);
+          if (d < CONNECT_THRESHOLD) {
+            const opacity = 1 - d / CONNECT_THRESHOLD;
+            ctx.strokeStyle = `rgba(6, 182, 212, ${opacity * 0.35})`;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw connections from particles to mouse
+      if (mouse) {
+        ctx.lineWidth = 1;
+        particles.forEach((p) => {
+          const d = dist(p, mouse);
+          if (d < MOUSE_RADIUS) {
+            const opacity = 1 - d / MOUSE_RADIUS;
+            ctx.strokeStyle = `rgba(168, 85, 247, ${opacity * 0.5})`;
+            ctx.shadowColor = BRAND_PURPLE;
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          }
+        });
+      }
+
+      // Draw particles (glowing dots)
+      particles.forEach((p) => {
+        const gradient = ctx.createRadialGradient(
+          p.x, p.y, 0,
+          p.x, p.y, PARTICLE_RADIUS * 4
+        );
+        gradient.addColorStop(0, p.color);
+        gradient.addColorStop(0.4, p.color + "99");
+        gradient.addColorStop(1, p.color + "00");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, PARTICLE_RADIUS * 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, PARTICLE_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      frameRef.current = requestAnimationFrame(tick);
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      resizeObserver.disconnect();
+      cancelAnimationFrame(frameRef.current);
+    };
+  }, [initOrResizeParticles]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 z-0 h-full w-full overflow-hidden"
+      style={{ pointerEvents: "auto" }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      aria-hidden
+    />
+  );
+}

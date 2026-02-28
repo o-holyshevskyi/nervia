@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { FadeIn } from "./FadeIn";
 import { Play } from "lucide-react";
+import { NeuralBackground } from "./NeuralBackground";
 
 export function Hero() {
   return (
-    <section className="relative px-6 pt-20 pb-24 md:pt-28 md:pb-32">
-      <div className="mx-auto max-w-4xl text-center">
+    <section className="relative px-6 pt-20 pb-24 md:pt-28 md:pb-32 overflow-hidden">
+      <NeuralBackground />
+      <div className="relative z-10 mx-auto max-w-4xl text-center pointer-events-none">
         <FadeIn>
           <span className="inline-block rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-sm text-slate-300 backdrop-blur-sm">
             Welcome to the evolution of thought.
@@ -29,7 +31,7 @@ export function Hero() {
             interactive 3D neurons, AI-powered clusters, and shared intelligence.
           </p>
         </FadeIn>
-        <FadeIn delay={0.3} className="mt-10 flex flex-wrap items-center justify-center gap-4">
+        <FadeIn delay={0.3} className="mt-10 flex flex-wrap items-center justify-center gap-4 pointer-events-auto">
           <Link
             href="https://synapse-bookmark-ten.vercel.app/"
             target="_blank"
