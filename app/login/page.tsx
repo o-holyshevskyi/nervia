@@ -59,12 +59,13 @@ export default function LoginPage() {
             {/* Фоновий ефект */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 dark:bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
 
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="w-full max-w-md bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 p-8 rounded-3xl shadow-xl dark:shadow-2xl relative z-10"
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className="w-full max-w-md bg-white/80 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 rounded-3xl shadow-xl dark:shadow-2xl relative z-10 overflow-hidden"
             >
+                <div className="p-8 md:p-10">
                 <div className="flex justify-center mb-8">
                     <Image src="/banner.png" alt="Nervia" width={1900} height={1300} />
                 </div>
@@ -154,7 +155,7 @@ export default function LoginPage() {
                             <button
                                 type="submit"
                                 disabled={isLoading !== null || !email}
-                                className="cursor-pointer group relative flex items-center justify-center w-full gap-2 px-4 py-3 bg-indigo-600 dark:bg-purple-600 text-white font-semibold rounded-xl hover:bg-indigo-500 dark:hover:bg-purple-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(99,102,241,0.2)] dark:shadow-[0_0_20px_rgba(168,85,247,0.2)]"
+                                className="hover:cursor-pointer group flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isLoading === 'email' ? <Loader2 size={18} className="animate-spin" /> : (
                                     <>
@@ -166,6 +167,7 @@ export default function LoginPage() {
                         </form>
                     </div>
                 )}
+                </div>
             </motion.div>
         </main>
     );

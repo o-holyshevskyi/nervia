@@ -476,7 +476,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             <button
                                 type="submit"
                                 disabled={!title.trim()}
-                                className="hover:cursor-pointer w-full mt-4 py-3 bg-neutral-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg dark:shadow-none"
+                                className="hover:cursor-pointer flex items-center justify-center gap-2 w-full mt-4 py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Save to universe
                             </button>

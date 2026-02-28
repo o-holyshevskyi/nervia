@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -259,6 +259,16 @@ export default function LeftSidebar({
           title: 'Data Transfer',
           icon: <ImportIcon size={16} />,
           content: <ImportExport onImport={onImport} onExport={onExport} />
+        },
+        {
+          id: 'billing',
+          title: 'Billing',
+          icon: <CreditCard size={16} />,
+          shortcut: 'Billing',
+          onClick: () => {
+            router.push('/settings/billing');
+            onClose();
+          }
         }
       ]
     }
