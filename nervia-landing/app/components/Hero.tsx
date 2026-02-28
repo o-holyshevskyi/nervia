@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FadeIn } from "./FadeIn";
 import { Play } from "lucide-react";
 import { NeuralBackground } from "./NeuralBackground";
+import { InteractiveHeroGraph } from "./InteractiveHeroGraph";
 
 export function Hero() {
   return (
@@ -49,24 +50,7 @@ export function Hero() {
           </Link>
         </FadeIn>
         <FadeIn delay={0.4} className="mt-16">
-          <div
-            className="mx-auto aspect-video max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] shadow-2xl"
-            style={{
-              boxShadow:
-                "0 0 60px rgba(6,182,212,0.15), 0 0 80px rgba(168,85,247,0.1), inset 0 0 0 1px rgba(255,255,255,0.05)",
-            }}
-          >
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900/80 to-slate-950/80">
-              <div className="grid grid-cols-3 gap-2 p-8">
-                {[...Array(9)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-16 rounded-lg border border-white/10 bg-white/[0.03] backdrop-blur-sm"
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+          <InteractiveHeroGraph />
         </FadeIn>
       </div>
     </section>
