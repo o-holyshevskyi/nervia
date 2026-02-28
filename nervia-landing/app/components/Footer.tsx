@@ -8,8 +8,6 @@ const productLinks = [
 
 const companyLinks = [
   { label: "About", href: "#" },
-  { label: "Blog", href: "#" },
-  { label: "Careers", href: "#" },
 ];
 
 const legalLinks = [

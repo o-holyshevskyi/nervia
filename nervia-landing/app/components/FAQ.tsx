@@ -5,7 +5,7 @@ import { FadeIn } from "./FadeIn";
 const faqs = [
   {
     q: "What is a Neuron?",
-    a: "A Neuron is a single unit of knowledge—a note, a source, or an idea—that can connect to others in your 3D graph.",
+    a: "A Neuron is a single unit of knowledge - a note, a source, or an idea - that can connect to others in your 3D graph.",
   },
   {
     q: "Is my data private?",

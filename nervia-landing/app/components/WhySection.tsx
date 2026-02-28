@@ -23,7 +23,7 @@ export function WhySection() {
               </div>
               <p className="mt-4 text-lg text-slate-300">
                 Static hierarchies. Notes buried in folders. No way to see how
-                ideas link across projects. Your second brain stays flat—and
+                ideas link across projects. Your second brain stays flat - and
                 forgettable.
               </p>
             </div>

@@ -4,38 +4,63 @@ import { FadeIn } from "./FadeIn";
 import {
   Box,
   MessageCircle,
-  GitBranch,
+  Search,
+  Compass,
+  Bookmark,
+  History,
   Globe,
 } from "lucide-react";
 
 const cards = [
   {
-    title: "Interactive 3D Graph",
+    title: "3D Graph Visualization",
     description:
-      "Fly through your knowledge. Connect Neurons, Sources, and Impulses visually.",
+      "Fly through your knowledge in 3D. Connect neurons, sources, and impulses as a living network.",
     icon: Box,
     large: true,
   },
   {
-    title: "Neural Core (AI)",
+    title: "Neural Core (AI Chat)",
     description:
-      "Chat with your universe. Our RAG-powered AI finds hidden connections in milliseconds.",
+      "Chat with your universe. RAG-powered AI finds hidden connections and answers in milliseconds.",
     icon: MessageCircle,
+    large: true,
+  },
+  {
+    title: "AI Semantic Search",
+    description:
+      "Find ideas by meaning, not just keywords. Search the way your brain associates concepts.",
+    icon: Search,
     large: false,
   },
   {
-    title: "Auto-Clusters",
+    title: "Pathfinder & Zen Mode",
     description:
-      "Watch as related ideas automatically pull together into smart clusters.",
-    icon: GitBranch,
+      "Focus and navigate your graph with clarity. Pathfinder and Zen Mode keep you in the flow.",
+    icon: Compass,
     large: false,
   },
   {
-    title: "Shared Intelligence",
+    title: "Browser Web Clipper",
     description:
-      "Publish your clusters as interactive 3D worlds for others to explore.",
+      "Save pages and ideas from the web straight into your graph. One click to add a new neuron.",
+    icon: Bookmark,
+    large: false,
+  },
+  {
+    title: "Time Machine & Evolution Journal",
+    description:
+      "See how your knowledge evolved over time. Revisit past states and track the growth of your universe.",
+    icon: History,
+    large: false,
+  },
+  {
+    title: "Shared Universes",
+    description:
+      "Publish clusters as interactive 3D worlds. Share your universe with others to explore.",
     icon: Globe,
     large: false,
+    fullWidth: true,
   },
 ];
 
@@ -51,23 +76,31 @@ export function FeaturesBento() {
             One visual intelligence layer for your notes, research, and ideas.
           </p>
         </FadeIn>
-        <div className="mt-16 grid gap-6 md:grid-cols-2">
+        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card, i) => {
             const Icon = card.icon;
+            const fullWidth = "fullWidth" in card && card.fullWidth;
+            const spanClass = fullWidth
+              ? "sm:col-span-2 lg:col-span-4"
+              : card.large
+                ? "sm:col-span-2"
+                : "";
             return (
               <FadeIn
                 key={card.title}
-                delay={0.1 * (i + 1)}
-                className={card.large ? "md:col-span-2" : ""}
+                delay={0.05 * (i + 1)}
+                className={spanClass}
               >
-                <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.05]">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
-                    <Icon className="h-6 w-6 text-cyan-400" />
+                <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.05] md:p-8">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
+                    <Icon className="h-5 w-5 text-cyan-400" />
                   </div>
-                  <h3 className="mt-6 text-xl font-semibold tracking-tight text-white">
+                  <h3 className="mt-5 text-lg font-semibold tracking-tight text-white md:text-xl">
                     {card.title}
                   </h3>
-                  <p className="mt-3 flex-1 text-slate-400">{card.description}</p>
+                  <p className="mt-2 flex-1 text-sm text-slate-400 md:text-base">
+                    {card.description}
+                  </p>
                 </div>
               </FadeIn>
             );

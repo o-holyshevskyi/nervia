@@ -1,42 +1,59 @@
 "use client";
 
+import Link from "next/link";
 import { FadeIn } from "./FadeIn";
 import { Check } from "lucide-react";
+
+const APP_URL = "https://synapse-bookmark-ten.vercel.app/";
 
 const tiers = [
   {
     name: "Explorer",
-    subtitle: "Free",
-    description: "Get started with your first neurons.",
-    features: ["100 Neurons", "Basic UI", "Local storage"],
-    cta: "Get started",
+    price: "$0",
+    period: "Forever",
+    features: [
+      "Up to 60 Neurons",
+      "2D Knowledge Graph",
+      "Browser Web Clipper",
+      "Standard Search",
+      "Share 1 Cluster",
+    ],
+    cta: "Start your Universe",
+    ctaHref: APP_URL,
+    primary: false,
+    highlighted: false,
+  },
+  {
+    name: "Builder",
+    price: "$3,99",
+    period: "month",
+    features: [
+      "Unlimited Neurons",
+      "Pathfinder & Zen Mode",
+      "Tags & Advanced Filters",
+      "Data Import/Export",
+    ],
+    cta: "Become a Builder",
+    ctaHref: APP_URL,
+    primary: false,
     highlighted: false,
   },
   {
     name: "Architect",
-    subtitle: "Pro",
-    description: "For serious builders and researchers.",
+    badge: "Ultimate Brain",
+    price: "$7,99",
+    period: "month",
     features: [
-      "Unlimited Neurons",
-      "Neural Core (AI) access",
-      "Custom Clusters",
-      "Priority support",
+      "Neural Core (AI Chat)",
+      "AI Semantic Search",
+      "3D Graph Visualization",
+      "Time Machine & Evolution Journal",
+      "Unlimited Shared Universes",
     ],
-    cta: "Start free trial",
+    cta: "Upgrade to Architect",
+    ctaHref: APP_URL,
+    primary: true,
     highlighted: true,
-  },
-  {
-    name: "Nexus",
-    subtitle: "Team",
-    description: "Shared workspaces and advanced telemetry.",
-    features: [
-      "Everything in Architect",
-      "Shared workspaces",
-      "Advanced telemetry",
-      "SSO & admin controls",
-    ],
-    cta: "Contact sales",
-    highlighted: false,
   },
 ];
 
@@ -49,24 +66,31 @@ export function Pricing() {
             Simple pricing
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-            Start free. Scale when you need to.
+            Start free. Upgrade when you need more.
           </p>
         </FadeIn>
-        <div className="mt-16 grid gap-8 md:grid-cols-3">
+        <div className="mt-16 grid gap-6 md:grid-cols-3">
           {tiers.map((tier, i) => (
-            <FadeIn key={tier.name} delay={0.1 * (i + 1)}>
+            <FadeIn key={tier.name} delay={0.1 * (i + 1)} className="min-w-0">
               <div
                 className={`relative flex h-full flex-col rounded-2xl border p-8 backdrop-blur-xl ${
                   tier.highlighted
-                    ? "border-cyan-400/40 bg-cyan-500/5 shadow-[0_0_40px_rgba(6,182,212,0.15)]"
+                    ? "border-cyan-400/50 border-purple-400/30 bg-cyan-500/5 shadow-[0_0_48px_rgba(6,182,212,0.2),0_0_32px_rgba(168,85,247,0.15)]"
                     : "border-white/10 bg-white/[0.03]"
                 }`}
               >
-                <h3 className="text-xl font-semibold tracking-tight text-white">
+                {tier.badge && (
+                  <span className="inline-block rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-cyan-300">
+                    {tier.badge}
+                  </span>
+                )}
+                <h3 className="mt-2 text-xl font-semibold tracking-tight text-white">
                   {tier.name}
                 </h3>
-                <p className="mt-1 text-sm text-cyan-400">{tier.subtitle}</p>
-                <p className="mt-4 text-slate-400">{tier.description}</p>
+                <p className="mt-3 text-2xl font-semibold text-white">
+                  {tier.price}
+                  <span className="text-sm font-normal text-slate-400"> / {tier.period}</span>
+                </p>
                 <ul className="mt-6 flex-1 space-y-3">
                   {tier.features.map((feature) => (
                     <li
@@ -78,16 +102,18 @@ export function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <button
-                  type="button"
-                  className={`mt-8 w-full rounded-full py-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950 ${
-                    tier.highlighted
-                      ? "bg-white text-slate-950 hover:bg-slate-100"
-                      : "border border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06]"
+                <Link
+                  href={tier.ctaHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`mt-8 block w-full rounded-full py-3 text-center text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                    tier.primary
+                      ? "bg-white text-slate-950 shadow-[0_0_24px_rgba(255,255,255,0.2)] hover:bg-slate-100 hover:shadow-[0_0_28px_rgba(255,255,255,0.25)]"
+                      : "border border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.06] hover:border-white/20"
                   }`}
                 >
                   {tier.cta}
-                </button>
+                </Link>
               </div>
             </FadeIn>
           ))}

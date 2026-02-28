@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Brain } from "lucide-react";
+import Image from "next/image";
 
 export function Header() {
   return (
@@ -11,7 +11,13 @@ export function Header() {
           href="/"
           className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
         >
-          <Brain className="h-6 w-6 text-cyan-400" />
+          <Image
+            src="/icon.png"
+            alt="Nervia"
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0"
+          />
           Nervia
         </Link>
         <nav className="hidden items-center gap-8 md:flex" aria-label="Main">
@@ -35,7 +41,9 @@ export function Header() {
           </Link>
         </nav>
         <Link
-          href="#"
+          href="https://synapse-bookmark-ten.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-white shadow-[0_0_20px_rgba(6,182,212,0.25)] transition hover:border-purple-400/40 hover:bg-purple-500/10 hover:shadow-[0_0_24px_rgba(168,85,247,0.2)] focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
         >
           Enter Universe

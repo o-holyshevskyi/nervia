@@ -31,7 +31,9 @@ export function Hero() {
         </FadeIn>
         <FadeIn delay={0.3} className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
-            href="#"
+            href="https://synapse-bookmark-ten.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-lg transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950"
           >
             Start Building for Free

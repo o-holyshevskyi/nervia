@@ -45,7 +45,7 @@ export default function TimelinePanel({
     const isSinglePoint = datePoints.length <= 1;
     const currentStep = findCurrentStep(datePoints, currentDate);
     const displayDate = hasNoPoints
-        ? "—"
+        ? "-"
         : new Date(datePoints[currentStep] ?? currentDate).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",

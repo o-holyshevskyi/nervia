@@ -546,7 +546,7 @@ export default function LeftSidebar({
                 <span>FOCUS:</span>
                 <div className="h-3 w-px bg-black/10 dark:bg-white/5" />
                 <span className="font-mono text-neutral-700 dark:text-white/70">
-                  {topTag ? `#${topTag}` : '—'}
+                  {topTag ? `#${topTag}` : '-'}
                 </span>
               </div>
             </div>
