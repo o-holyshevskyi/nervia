@@ -26,6 +26,13 @@ import { useOnboarding } from "@/src/hooks/useOnboarding";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import { usePlan } from "@/src/hooks/usePlan";
 import { useFeatureAccess } from "@/src/hooks/useFeatureAccess";
+
+const VIEW_MODE_STORAGE_KEY = 'nervia-graph-view-mode';
+function getStoredViewMode(): '2D' | '3D' {
+    if (typeof window === 'undefined') return '2D';
+    const v = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return (v === '2D' || v === '3D') ? v : '2D';
+}
 import UpgradeModal, { type UpgradeTargetPlan } from "@/src/components/UpgradeModal";
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
@@ -171,7 +178,16 @@ export default function Home() {
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
     const [zenModeNodeId, setZenModeNodeId] = useState<string | null>(null);
     const [solarSystemNodeId, setSolarSystemNodeId] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
+    const [viewMode, setViewModeState] = useState<'2D' | '3D'>(getStoredViewMode);
+    const setViewMode = useCallback((mode: '2D' | '3D') => {
+        setViewModeState(mode);
+        if (typeof window !== 'undefined') localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    }, []);
+
+    // Genesis/Constellation: force 2D; only Singularity can use 3D
+    useEffect(() => {
+        if (!access.canUse3DGraph && viewMode === '3D') setViewMode('2D');
+    }, [access.canUse3DGraph, viewMode, setViewMode]);
     const [physicsPanelOpen, setPhysicsPanelOpen] = useState(false);
     const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
         repulsion: 150,
@@ -791,6 +807,10 @@ export default function Home() {
                 onOpenAddModal={() => setIsAddModalOpen(true)}
                 plan={plan}
                 onRequestUpgrade={openUpgradeModal}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                canUse3DGraph={access.canUse3DGraph}
+                onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
             />
 
             <Sidebar 

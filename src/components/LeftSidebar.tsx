@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings2, Lock, Eye } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings2, Lock, Eye, Box } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -53,6 +53,10 @@ interface LeftSidebarProps {
   onOpenAddModal?: () => void;
   plan?: PlanId;
   onRequestUpgrade?: (targetPlan: UpgradeTargetPlan) => void;
+  viewMode?: '2D' | '3D';
+  onViewModeChange?: (mode: '2D' | '3D') => void;
+  canUse3DGraph?: boolean;
+  onRequest3DUpgrade?: () => void;
 }
 
 function SubViewHeader({ title, onBack }: { title: string; onBack: () => void }) {
@@ -104,6 +108,10 @@ export default function LeftSidebar({
   onOpenAddModal,
   plan = 'genesis',
   onRequestUpgrade,
+  viewMode = '2D',
+  onViewModeChange,
+  canUse3DGraph = false,
+  onRequest3DUpgrade,
 }: LeftSidebarProps) {
   const access = useFeatureAccess(plan);
   const [activeView, setActiveView] = useState<'main' | 'discovery' | 'collections' | 'viewOptions' | 'telemetry' | 'management'>('main');
@@ -530,6 +538,23 @@ export default function LeftSidebar({
                       <div role="group" aria-label="By cluster or tag" className="flex h-8 w-16 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-0.5 shrink-0">
                         <button type="button" title="By Cluster" onClick={() => onClusterModeChange('group')} className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${clusterMode === 'group' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}><Globe size={14} /></button>
                         <button type="button" title="By Tag" onClick={() => onClusterModeChange('tag')} className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${clusterMode === 'tag' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}><Tag size={14} /></button>
+                      </div>
+                    </div>
+                    <div className="w-full h-10 flex items-center justify-between px-3 rounded-md">
+                      <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                        <Box size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Universe view</span>
+                      </div>
+                      <div role="group" aria-label="2D or 3D view" className="flex h-8 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-0.5 shrink-0 gap-0.5">
+                        <button type="button" title="2D" onClick={() => onViewModeChange?.('2D')} className={`hover:cursor-pointer px-3 flex items-center justify-center rounded-full text-xs font-medium transition-all duration-200 ${viewMode === '2D' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}>2D</button>
+                        {canUse3DGraph ? (
+                          <button type="button" title="3D" onClick={() => onViewModeChange?.('3D')} className={`hover:cursor-pointer px-3 flex items-center justify-center rounded-full text-xs font-medium transition-all duration-200 ${viewMode === '3D' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}>3D</button>
+                        ) : (
+                          <button type="button" title="3D (Singularity only)" onClick={onRequest3DUpgrade} className="hover:cursor-pointer px-3 flex items-center justify-center rounded-full text-xs font-medium text-neutral-500 dark:text-neutral-500 opacity-70 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all gap-1">
+                            <span>3D</span>
+                            <Lock size={10} className="text-purple-500 dark:text-purple-400 shrink-0" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

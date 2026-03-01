@@ -883,22 +883,55 @@ export default function GraphNetwork({
     const RECENTER_MS = 800;
     const RECENTER_ZOOM = 1.2;
     const handleZoomIn = useCallback(() => {
+        if (viewMode === '3D') {
+            const fg3d = fg3dRef.current;
+            if (fg3d?.cameraPosition) {
+                const pos = fg3d.cameraPosition();
+                if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' && typeof pos.z === 'number') {
+                    const scale = 1 / ZOOM_FACTOR;
+                    fg3d.cameraPosition(
+                        { x: pos.x * scale, y: pos.y * scale, z: pos.z * scale },
+                        { x: 0, y: 0, z: 0 },
+                        NAV_DURATION_MS
+                    );
+                }
+            }
+            return;
+        }
         if (!fgRef.current) return;
         const k = fgRef.current.zoom();
         if (typeof k === 'number' && Number.isFinite(k)) {
             fgRef.current.zoom(Math.min(8, k * ZOOM_FACTOR), NAV_DURATION_MS);
         }
-    }, []);
+    }, [viewMode]);
     const handleZoomOut = useCallback(() => {
+        if (viewMode === '3D') {
+            const fg3d = fg3dRef.current;
+            if (fg3d?.cameraPosition) {
+                const pos = fg3d.cameraPosition();
+                if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' && typeof pos.z === 'number') {
+                    const scale = ZOOM_FACTOR;
+                    fg3d.cameraPosition(
+                        { x: pos.x * scale, y: pos.y * scale, z: pos.z * scale },
+                        { x: 0, y: 0, z: 0 },
+                        NAV_DURATION_MS
+                    );
+                }
+            }
+            return;
+        }
         if (!fgRef.current) return;
         const k = fgRef.current.zoom();
         if (typeof k === 'number' && Number.isFinite(k)) {
             fgRef.current.zoom(Math.max(0.2, k / ZOOM_FACTOR), NAV_DURATION_MS);
         }
-    }, []);
+    }, [viewMode]);
     const handleRecenter = useCallback(() => {
         if (viewMode === '3D') {
-            fg3dRef.current?.zoomToFit?.(RECENTER_MS);
+            const fg3d = fg3dRef.current;
+            if (typeof fg3d?.zoomToFit === 'function') {
+                fg3d.zoomToFit(RECENTER_MS, 120);
+            }
             return;
         }
         if (!fgRef.current) return;
@@ -1071,17 +1104,37 @@ export default function GraphNetwork({
             />
             )}
             {graphData.nodes.length > 0 && (
-                <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none">
-                    <div className="pointer-events-auto flex flex-col gap-1">
-                        <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
-                            <ZoomIn size={18} />
-                        </button>
-                        <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
-                            <ZoomOut size={18} />
-                        </button>
-                        <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
-                            <Locate size={18} />
-                        </button>
+                <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none overflow-hidden">
+                    <div className="pointer-events-auto flex flex-col gap-1 overflow-hidden">
+                        <AnimatePresence initial={false} mode="wait">
+                            {viewMode === '2D' && (
+                                <motion.div
+                                    key="nav-zoom-recenter"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{
+                                        opacity: 1,
+                                        scale: 1,
+                                        transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                                    }}
+                                    exit={{
+                                        opacity: 0,
+                                        scale: 0.9,
+                                        transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+                                    }}
+                                    className="flex flex-col gap-1 origin-top"
+                                >
+                                    <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
+                                        <ZoomIn size={18} />
+                                    </button>
+                                    <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
+                                        <ZoomOut size={18} />
+                                    </button>
+                                    <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
+                                        <Locate size={18} />
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                         {canUse3DGraph ? (
                             <button
                                 type="button"
