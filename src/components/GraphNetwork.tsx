@@ -2,19 +2,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from 'next/dynamic';
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
 import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
-
-const ForceGraph2D = dynamic(() => import ('react-force-graph-2d'), {
-    ssr: false,
-});
-
-const ForceGraph3D = dynamic(() => import ('react-force-graph-3d'), {
-    ssr: false,
-});
+import GraphNetwork2D from './GraphNetwork2D';
+import GraphNetwork3D from './GraphNetwork3D';
 
 const imgCache: { [key: string]: HTMLImageElement } = {};
 const iconCache: Record<string, HTMLImageElement> = {};
@@ -28,7 +21,7 @@ const groupColors: Record<number, string> = {
 };
 const groupNames: Record<number, string> = {
     1: "No Group",
-    2: "AI",
+    2: "No Group",
     3: "Finance",
     4: "Design",
     5: "Research",
@@ -88,7 +81,7 @@ function getNodeLabel(node: any): string {
     return 'Untitled';
 }
 
-/** Read graph theme from CSS variables (no re-render on theme switch). */
+/** Read graph theme from CSS variables (no re-render on theme switch). Used by 2D; 3D normalizes in its own component. */
 function getGraphThemeColors(container: HTMLElement | null): { nodeColor: string; linkColor: string; graphBg: string } {
     const el = container ?? (typeof document !== 'undefined' ? document.documentElement : null);
     if (!el) return { nodeColor: '#1f2937', linkColor: 'rgba(55, 65, 81, 0.5)', graphBg: '#f9fafb' };
@@ -216,14 +209,11 @@ const createIconImage = (IconComponent: any, color: string, strokeWidth: number 
     const cacheKey = `${IconComponent.displayName}-${color}`;
     if (iconCache[cacheKey]) return iconCache[cacheKey];
 
-    // Конвертуємо компонент у рядок SVG
-    // strokeWidth та size можна налаштувати тут
     const svgString = renderToStaticMarkup(
         <IconComponent color={color} size={32} strokeWidth={strokeWidth} />
     );
 
     const img = new Image();
-    // Кодуємо SVG у Base64 для використання в src
     img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
     
     iconCache[cacheKey] = img;
@@ -234,6 +224,7 @@ export interface GraphGroup {
     id: string;
     name: string;
     color: string;
+    description?: string;
 }
 
 interface GraphNetworkProps {
@@ -256,20 +247,40 @@ interface GraphNetworkProps {
     onNodeContextMenu?: (node: any, event: MouseEvent) => void;
     onBackgroundClick?: () => void;
     readOnly?: boolean;
-    /** Optional extra toolbar button(s) below the built-in zoom/recenter, same style. Receives the toolbar button class. */
     renderToolbarExtra?: (buttonClassName: string) => React.ReactNode;
-    /** When true, user can switch to 3D view (Singularity). When false, 3D button shows lock and triggers onRequest3DUpgrade. */
     canUse3DGraph?: boolean;
-    /** Called when non-Singularity user clicks the 3D button. */
     onRequest3DUpgrade?: () => void;
-    /** Current view mode; when '3D', ForceGraph3D is rendered. */
     viewMode?: '2D' | '3D';
-    /** Called when user toggles 2D/3D (only when canUse3DGraph). */
     onViewModeChange?: (mode: '2D' | '3D') => void;
 }
 
 function getLinkEnd(linkEnd: any): string | undefined {
     return typeof linkEnd === "string" ? linkEnd : linkEnd?.id;
+}
+
+// ─── helpers shared between physics setup and initial position seeding ───────
+
+function buildClusterCenters2D(
+    nodes: any[],
+    clusterMode: 'group' | 'tag',
+    layoutRadius: number
+): Record<string | number, { x: number; y: number }> {
+    const getClusterKey = (n: any): string | number =>
+        clusterMode === 'group'
+            ? getNodeGroupKey(n)
+            : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
+
+    const rawKeys = [...new Set(nodes.map(getClusterKey))];
+    const uniqueKeys = rawKeys.sort((a, b) => String(a).localeCompare(String(b)));
+    const centers: Record<string | number, { x: number; y: number }> = {};
+    uniqueKeys.forEach((key, i) => {
+        const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
+        centers[key] = {
+            x: layoutRadius * Math.cos(angle),
+            y: layoutRadius * Math.sin(angle),
+        };
+    });
+    return centers;
 }
 
 export default function GraphNetwork({ 
@@ -303,6 +314,28 @@ export default function GraphNetwork({
     const fgRef = useRef<any>(null);
     const fg3dRef = useRef<any>(null);
     const prevNodeCountRef = useRef(0);
+    const prevViewModeRef = useRef(viewMode);
+    const threeDKeyRef = useRef(0);
+    if (prevViewModeRef.current !== '3D' && viewMode === '3D') {
+        threeDKeyRef.current += 1;
+    }
+    prevViewModeRef.current = viewMode;
+
+    // ── Engine-ready signal ──────────────────────────────────────────────────
+    // Incremented when the 2D graph engine fires onEngineStop (first run or after reheat).
+    // Physics useEffect depends on this so it re-runs once the dynamic import has resolved
+    // and fgRef.current is set; otherwise the first effect run sees null and forces never apply.
+    const [engineReadyCount, setEngineReadyCount] = useState(0);
+    const handleEngineStop = useCallback(() => {
+        setEngineReadyCount((c) => c + 1);
+    }, []);
+
+    // Fallback: if onEngineStop doesn't fire (e.g. library timing), re-run physics after ref is likely set.
+    useEffect(() => {
+        if (viewMode !== '2D') return;
+        const t = setTimeout(() => setEngineReadyCount((c) => Math.max(c, 1)), 400);
+        return () => clearTimeout(t);
+    }, [viewMode]);
 
     const groupColorsById = useMemo(() => {
         const out: Record<string, string> = {};
@@ -312,6 +345,11 @@ export default function GraphNetwork({
     const groupNamesById = useMemo(() => {
         const out: Record<string, string> = {};
         for (const g of groups) out[g.id] = g.name;
+        return out;
+    }, [groups]);
+    const groupDescriptionsById = useMemo(() => {
+        const out: Record<string, string> = {};
+        for (const g of groups) if (g.description) out[g.id] = g.description;
         return out;
     }, [groups]);
 
@@ -408,25 +446,15 @@ export default function GraphNetwork({
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
-        // Stretched layout around graph origin (0,0); use larger radius so groups stay visibly separated
+
         const minDim = Math.min(dimensions.width, dimensions.height);
         const layoutRadius = minDim * 0.48;
         const getClusterKey = (n: any): string | number =>
             clusterMode === 'group'
                 ? getNodeGroupKey(n)
                 : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
-        const rawKeys = [...new Set(workingNodes.map((n: any) => getClusterKey(n)))];
-        const uniqueKeys = clusterMode === 'group'
-            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
-            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
-        const clusterCenters: Record<string | number, { x: number; y: number }> = {};
-        uniqueKeys.forEach((key, i) => {
-            const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
-            clusterCenters[key] = {
-                x: layoutRadius * Math.cos(angle),
-                y: layoutRadius * Math.sin(angle),
-            };
-        });
+        const clusterCenters = buildClusterCenters2D(workingNodes, clusterMode, layoutRadius);
+
         const jitter = 28;
         const nodesWithVal = workingNodes.map((node: any, index: number) => {
             const id = getNodeId(node);
@@ -470,9 +498,9 @@ export default function GraphNetwork({
         if (node.type === 'link' && node.url) {
             try {
                 const domain = new URL(node.url).hostname;
-                return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-            } catch (e) {
-                return `https://www.google.com/s2/favicons?domain=${node.url}&sz=64`;
+                return `/api/favicon?domain=${domain}`;
+            } catch {
+                return null;
             }
         }
         return null;
@@ -482,28 +510,23 @@ export default function GraphNetwork({
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
         const tId = typeof link.target === 'string' ? link.target : link.target?.id;
 
-        // Solar System (Deep Focus): hide links where BOTH endpoints are outside the solar set
         if (solarSystemNodeId) {
             if (!solarNeighbors.has(sId) && !solarNeighbors.has(tId)) return true;
             return false;
         }
 
-        // Pathfinder: show only path links; hide all others
         if (pathfinderActive) {
             return !isPathLink(link);
         }
 
-        // 0. Neural Search: hide links that don't touch at least one highlighted node
         if (searchActive) {
             if (!highlightedSet.has(sId) && !highlightedSet.has(tId)) return true;
         }
         
-        // 1. Zen Mode: ховаємо лінки, якщо жодна з нод не є центральною
         if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) {
             return true; 
         }
 
-        // 2. Filter Tag: ховаємо лінки, якщо хоча б одна з нод не має потрібного тегу
         if (activeTag) {
             const sTags = typeof link.source === 'object' ? link.source.tags : graphData.nodes.find((n: any) => n.id === sId)?.tags;
             const tTags = typeof link.target === 'object' ? link.target.tags : graphData.nodes.find((n: any) => n.id === tId)?.tags;
@@ -526,7 +549,6 @@ export default function GraphNetwork({
         const rawSize = (node.val ?? 4) * 1;
         let size = Math.min(20, Math.max(6, rawSize));
 
-        // Solar System (Deep Focus): top priority
         let isHidden = false;
         let baseColor: string;
         let strongGlow = false;
@@ -544,7 +566,6 @@ export default function GraphNetwork({
                 strongGlow = true;
             }
         } else {
-            // Pathfinder mode overrides Zen and search
             const isPathNode = pathfinderActive && pathNodeSet.has(idStr);
             const pathStartId = pathNodes[0];
             const pathEndId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
@@ -579,7 +600,6 @@ export default function GraphNetwork({
             ? (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor)
             : baseColor;
 
-        // Neural Core context halo: pulsing semi-transparent ring (cyan/purple) when node is in context
         const isContextNode = contextNodeSet.has(idStr);
         if (isContextNode) {
             const t = Date.now() / 500;
@@ -602,7 +622,6 @@ export default function GraphNetwork({
             ctx.restore();
         }
 
-        // New-node ping: glowing circle behind the node that fades out over a few seconds
         if (node.isNew && node.newPingAt) {
             const elapsed = Date.now() - (node.newPingAt as number);
             const duration = 4000;
@@ -622,7 +641,6 @@ export default function GraphNetwork({
             }
         }
 
-        // 2. Малюємо порожнє коло (Border)
         ctx.beginPath();
         ctx.arc(x, y, size, 0, 2 * Math.PI, false);
         
@@ -630,14 +648,12 @@ export default function GraphNetwork({
         ctx.fillStyle = innerFill;
         ctx.fill();
 
-        // Налаштування бордера (stronger glow for search/path/solar highlight)
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = strongGlow ? 2.5 / globalScale : 2 / globalScale;
         ctx.shadowColor = strokeColor;
         ctx.shadowBlur = strongGlow ? 18 / globalScale : 10 / globalScale;
         ctx.stroke();
 
-        // 3. Малюємо іконку/емодзі всередині (якщо не приховано)
         if (!isHidden) {
             const iconUrl = getNodeIconUrl(node);
             const iconSize = size * 1.2;
@@ -652,7 +668,6 @@ export default function GraphNetwork({
                     const iconSize = size * 1.2;
                     ctx.save();
                     ctx.beginPath();
-                    // Кліпаємо коло трохи менше за бордер, щоб іконка не вилазила
                     ctx.arc(x, y, size * 0.8, 0, Math.PI * 2, true);
                     ctx.clip();
                     ctx.drawImage(img, x - iconSize/2, y - iconSize/2, iconSize, iconSize);
@@ -666,10 +681,8 @@ export default function GraphNetwork({
                     iconImg = createIconImage(FileText, baseColor);
                 }
 
-                // Малюємо іконку, якщо вона завантажена
                 if (iconImg && iconImg.complete) {
                     ctx.save();
-                    // Додаємо легке світіння самій іконці
                     ctx.shadowColor = baseColor;
                     ctx.shadowBlur = 8 / globalScale;
                     
@@ -685,7 +698,6 @@ export default function GraphNetwork({
             }
         }
 
-        // 4. Текст під нодою (theme-aware)
         if (globalScale > 1.5) {
             const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Inter, sans-serif`;
@@ -715,6 +727,10 @@ export default function GraphNetwork({
         }
     }, []);
 
+    // ── 2D Physics setup ─────────────────────────────────────────────────────
+    // NOTE: `engineReadyCount` is intentionally included so this effect re-runs
+    // once the dynamic import resolves and ForceGraph2D fires its first onEngineStop.
+    // Without it, fgRef.current is null on the very first run and forces are never applied.
     useEffect(() => {
         if (!fgRef.current) return;
         const fg = fgRef.current;
@@ -722,28 +738,13 @@ export default function GraphNetwork({
         const radius = minDim * 0.48;
 
         const getClusterKey = (node: any): string | number => {
-            if (clusterMode === 'group') {
-                return getNodeGroupKey(node);
-            }
+            if (clusterMode === 'group') return getNodeGroupKey(node);
             return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
         };
 
-        const rawKeys = [...new Set(processedData.nodes.map((n: any) => getClusterKey(n)))];
-        const uniqueKeys = clusterMode === 'group'
-            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
-            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
+        const clusterCenters = buildClusterCenters2D(processedData.nodes, clusterMode, radius);
 
-        const clusterCenters: Record<string | number, { x: number; y: number }> = {};
-        uniqueKeys.forEach((key, i) => {
-            const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
-            clusterCenters[key] = {
-                x: radius * Math.cos(angle),
-                y: radius * Math.sin(angle),
-            };
-        });
-
-        // Force stretched layout on the node objects the graph uses (fixes first-load blob:
-        // the library may ignore or overwrite our processedData positions on initial mount).
+        // Seed positions deterministically so nodes start near their cluster center
         const jitter = 28;
         processedData.nodes.forEach((node: any) => {
             const key = getClusterKey(node);
@@ -799,7 +800,8 @@ export default function GraphNetwork({
         }
 
         fg.d3ReheatSimulation();
-    }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [engineReadyCount, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
 
     useEffect(() => {
         if (!solarSystemNodeId || !fgRef.current) return;
@@ -852,7 +854,6 @@ export default function GraphNetwork({
         onFlyToComplete?.();
     }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
-    // Center view at graph (0,0): on first load and whenever a new neuron is added (smooth)
     const CENTER_ANIMATION_MS = 800;
     const DEFAULT_ZOOM_ON_CENTER = 1.2;
     useEffect(() => {
@@ -910,33 +911,55 @@ export default function GraphNetwork({
     const graphTheme = getGraphThemeColors(containerRef.current);
     const dataFor3D = useMemo(() => {
         if (viewMode !== '3D') return processedData;
-        return {
-            nodes: processedData.nodes.map((n: any) => ({ ...n, z: typeof n.z === 'number' ? n.z : 0 })),
-            links: processedData.links,
-        };
-    }, [viewMode, processedData]);
+        const getClusterKey = (n: any): string | number =>
+            clusterMode === 'group'
+                ? getNodeGroupKey(n)
+                : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
+        const rawKeys = [...new Set(processedData.nodes.map((n: any) => getClusterKey(n)))];
+        const uniqueKeys = clusterMode === 'group'
+            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
+            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
+        const minDim = Math.min(dimensions.width, dimensions.height);
+        const layoutRadius = minDim * 0.48;
+        const clusterZ: Record<string | number, number> = {};
+        uniqueKeys.forEach((key, i) => {
+            const t = uniqueKeys.length > 1 ? (i / (uniqueKeys.length - 1)) * 2 - 1 : 0;
+            clusterZ[key] = t * layoutRadius * 0.6;
+        });
+        const jitterZ = 20;
+        const nodes = processedData.nodes.map((n: any) => {
+            const key = getClusterKey(n);
+            const zCenter = clusterZ[key] ?? 0;
+            const idStr = (typeof n.id === 'string' ? n.id : n?.id) ?? '';
+            const j = (hashStr(idStr + 'z') - 0.5) * jitterZ;
+            const x = typeof n.x === 'number' ? n.x : 0;
+            const y = typeof n.y === 'number' ? n.y : 0;
+            return { ...n, x, y, z: zCenter + j };
+        });
+        return { nodes, links: processedData.links };
+    }, [viewMode, processedData, clusterMode, dimensions.width, dimensions.height]);
 
     return (
         <div
             ref={containerRef}
-            className={`w-full h-screen relative ${viewMode === '3D' ? 'shadow-[0_0_80px_rgba(168,85,247,0.12)] dark:shadow-[0_0_100px_rgba(168,85,247,0.18)]' : ''}`}
+            className={`w-full h-screen relative ${viewMode === '3D' ? '' : ''}`}
             style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
             {viewMode === '2D' && (
-            <ForceGraph2D
+            <GraphNetwork2D
                 ref={fgRef}
                 width={dimensions.width}
                 height={dimensions.height}
                 graphData={processedData}
                 nodeVal={(node: any) => node.val ?? 4}
-                nodeLabel={(node: any) => getNodeLabel(node)}
+                nodeLabel={getNodeLabel}
                 nodeCanvasObject={drawNode}
                 onRenderFramePre={handleRenderFramePre}
                 onZoom={handleZoom}
                 warmupTicks={100}
                 d3AlphaDecay={0.0228}
-                d3VelocityDecay={0.4}                
+                d3VelocityDecay={0.4}
                 onNodeClick={(node: any) => {
                     if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
                         fgRef.current.centerAt(node.x, node.y, 800);
@@ -951,7 +974,6 @@ export default function GraphNetwork({
                     if (onBackgroundClick) onBackgroundClick();
                 }}
                 onLinkHover={(link) => setHoveredLink(link)}
-                
                 nodePointerAreaPaint={(node: any, color, ctx) => {
                     const x = node.x ?? 0;
                     const y = node.y ?? 0;
@@ -1021,37 +1043,31 @@ export default function GraphNetwork({
                     if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : theme.nodeColor;
                     return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : theme.linkColor;
                 }}
-                backgroundColor="transparent"
+                backgroundColor="rgba(0,0,0,0)"
                 enablePointerInteraction={true}
+                onEngineStop={handleEngineStop}
             />
             )}
             {viewMode === '3D' && (
-            <ForceGraph3D
+            <GraphNetwork3D
+                key={`3d-${threeDKeyRef.current}`}
                 ref={fg3dRef}
                 width={dimensions.width}
                 height={dimensions.height}
                 graphData={dataFor3D}
-                nodeVal={(node: any) => node.val ?? 4}
-                nodeLabel={(node: any) => getNodeLabel(node)}
-                nodeColor={(node: any) => {
-                    const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
-                    const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
-                    return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? graphTheme.nodeColor;
-                }}
-                linkColor={() => graphTheme.linkColor}
-                backgroundColor="transparent"
-                onNodeClick={(node: any) => {
-                    if (!readOnly) onNodeSelect(node);
-                }}
-                onNodeRightClick={(node: any, event: MouseEvent) => {
-                    if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event);
-                }}
-                onBackgroundClick={() => onBackgroundClick?.()}
-                enableNodeDrag={!readOnly}
-                enableNavigationControls={true}
-                d3AlphaDecay={0.0228}
-                d3VelocityDecay={0.4}
-                warmupTicks={100}
+                graphTheme={graphTheme}
+                groupColorsById={groupColorsById}
+                groupNamesById={groupNamesById}
+                groupDescriptionsById={groupDescriptionsById}
+                nodeIdToGroupKeyMap={nodeIdToGroupKeyMap}
+                getNodeGroupKey={getNodeGroupKey}
+                getNodeLabel={getNodeLabel}
+                getNodeIconUrl={getNodeIconUrl}
+                linkDistance={physicsConfig.linkDistance}
+                readOnly={readOnly}
+                onNodeSelect={onNodeSelect}
+                onNodeContextMenu={onNodeContextMenu}
+                onBackgroundClick={onBackgroundClick}
             />
             )}
             {graphData.nodes.length > 0 && (

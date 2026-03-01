@@ -260,8 +260,10 @@ export default function Home() {
     const timelineDateRef = useRef(timelineDate);
     timelineDateRef.current = timelineDate;
     const playbackRafRef = useRef<number>(0);
+    const playbackCancelledRef = useRef(false);
     useEffect(() => {
         if (!isPlaying || data.nodes.length === 0 || timelineDatePoints.length === 0) return;
+        playbackCancelledRef.current = false;
         const duration = playbackDurationSeconds * 1000;
         const start = Date.now();
         const points = timelineDatePoints;
@@ -273,6 +275,7 @@ export default function Home() {
             return;
         }
         const tick = () => {
+            if (playbackCancelledRef.current) return;
             const elapsed = Date.now() - start;
             const t = Math.min(1, elapsed / duration);
             const step = startStep + t * (endStep - startStep);
@@ -285,7 +288,10 @@ export default function Home() {
             }
         };
         playbackRafRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(playbackRafRef.current);
+        return () => {
+            playbackCancelledRef.current = true;
+            cancelAnimationFrame(playbackRafRef.current);
+        };
     }, [isPlaying, data.nodes.length, timelineDatePoints, playbackDurationSeconds]);
 
     const [contextMenu, setContextMenu] = useState({
