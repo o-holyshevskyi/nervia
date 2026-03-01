@@ -854,7 +854,7 @@ export default function GraphNetwork({
         onFlyToComplete?.();
     }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
-    const CENTER_ANIMATION_MS = 800;
+    const CENTER_ANIMATION_MS = 1000; 
     const DEFAULT_ZOOM_ON_CENTER = 1.2;
     useEffect(() => {
         if (timelineDate != null) return;
@@ -862,9 +862,16 @@ export default function GraphNetwork({
         const prevCount = prevNodeCountRef.current;
         prevNodeCountRef.current = nodeCount;
         if (!fgRef.current) return;
+        
         const isFirstLoad = prevCount === 0 && nodeCount > 0;
         const isNewNeuron = nodeCount > prevCount && prevCount > 0;
+        
         if (isFirstLoad || isNewNeuron) {
+            // 🔥 If it's the first load, instantly pull the camera WAY back
+            // so the animation beautifully zooms all the way in
+            if (isFirstLoad) {
+                fgRef.current.zoom(0.1); 
+            }
             fgRef.current.centerAt(0, 0, CENTER_ANIMATION_MS);
             fgRef.current.zoom(DEFAULT_ZOOM_ON_CENTER, CENTER_ANIMATION_MS);
         }
@@ -972,6 +979,8 @@ export default function GraphNetwork({
         return { nodes, links: processedData.links };
     }, [viewMode, processedData, clusterMode, dimensions.width, dimensions.height]);
 
+    const graphTransition = { duration: 1.5, ease: [0.25, 0.1, 0.25, 1] as const };
+
     return (
         <div
             ref={containerRef}
@@ -979,7 +988,15 @@ export default function GraphNetwork({
             style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
+            <AnimatePresence initial={false} mode="wait">
             {viewMode === '2D' && (
+            <motion.div
+                key="graph-2d"
+                className="absolute inset-0 w-full h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: graphTransition }}
+                exit={{ opacity: 0, transition: { duration: 4, ease: [0.4, 0, 0.2, 1] as const } }}
+            >
             <GraphNetwork2D
                 ref={fgRef}
                 width={dimensions.width}
@@ -990,7 +1007,7 @@ export default function GraphNetwork({
                 nodeCanvasObject={drawNode}
                 onRenderFramePre={handleRenderFramePre}
                 onZoom={handleZoom}
-                warmupTicks={100}
+                warmupTicks={0}
                 d3AlphaDecay={0.0228}
                 d3VelocityDecay={0.4}
                 onNodeClick={(node: any) => {
@@ -1080,8 +1097,16 @@ export default function GraphNetwork({
                 enablePointerInteraction={true}
                 onEngineStop={handleEngineStop}
             />
+            </motion.div>
             )}
             {viewMode === '3D' && (
+            <motion.div
+                key="graph-3d"
+                className="absolute inset-0 w-full h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: graphTransition }}
+                exit={{ opacity: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] as const } }}
+            >
             <GraphNetwork3D
                 key={`3d-${threeDKeyRef.current}`}
                 ref={fg3dRef}
@@ -1102,7 +1127,9 @@ export default function GraphNetwork({
                 onNodeContextMenu={onNodeContextMenu}
                 onBackgroundClick={onBackgroundClick}
             />
+            </motion.div>
             )}
+            </AnimatePresence>
             {graphData.nodes.length > 0 && (
                 <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none overflow-hidden">
                     <div className="pointer-events-auto flex flex-col gap-1 overflow-hidden">

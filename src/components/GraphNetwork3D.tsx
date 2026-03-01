@@ -358,12 +358,14 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
 
             // Only auto zoom-to-fit on first load; don't recenter when user is zooming/panning
             if (!initialZoomDoneRef.current) {
+                // 🔥 Reduced delay from 800ms to 100ms so it starts moving immediately
                 zoomTimer = setTimeout(() => {
                     try {
-                        fg.zoomToFit?.(1200, 120);
+                        // 🔥 Increased animation duration from 1200ms to 3500ms for a slow, smooth fly-in
+                        fg.zoomToFit?.(3500, 120);
                         initialZoomDoneRef.current = true;
                     } catch { /* ignore */ }
-                }, 800);
+                }, 100); 
             }
         } catch (err) {
             console.warn('[GraphNetwork3D] physics setup:', err);
