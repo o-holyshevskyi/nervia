@@ -104,7 +104,17 @@ export default function LeftSidebar({
   const [shareInitial, setShareInitial] = useState<{ scope: ShareScope; groupIds: string[] }>({ scope: 'ALL', groupIds: [] });
   const [user, setUser] = useState<any>(null);
   const supabase = useMemo(() => createClient(), []);
-  const { createShare } = useSharing(supabase);
+  const { createShare, shares } = useSharing(supabase);
+  const sharedClustersCount = useMemo(() => {
+    const groupIds = new Set<string>();
+    shares.forEach((s) => {
+      if (s.scope === 'GROUPS' && Array.isArray(s.shared_group_ids)) {
+        s.shared_group_ids.forEach((id: string) => groupIds.add(id));
+      }
+    });
+    return groupIds.size;
+  }, [shares]);
+  const GENESIS_SHARED_CLUSTERS_LIMIT = 1;
   const [scrollShadows, setScrollShadows] = useState({ top: false, bottom: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -304,12 +314,19 @@ export default function LeftSidebar({
                       <span>System Telemetry</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {extensionDetected && (
-                        <span className="relative flex h-2 w-2 shrink-0" title="Live Sync">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                        </span>
-                      )}
+                      <span
+                        className="relative flex h-2 w-2 shrink-0 rounded-full"
+                        title={nodesCount < 50 ? 'Healthy' : nodesCount < 60 ? 'Approaching limit' : 'Limit reached'}
+                      >
+                        {nodesCount < 60 && (
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${nodesCount < 50 ? 'bg-emerald-500' : 'bg-orange-500'}`} />
+                        )}
+                        <span
+                          className={`relative inline-flex rounded-full h-2 w-2 ${
+                            nodesCount >= 60 ? 'bg-red-500' : nodesCount >= 50 ? 'bg-orange-500' : 'bg-emerald-500'
+                          }`}
+                        />
+                      </span>
                       <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500" />
                     </div>
                   </button>
@@ -547,15 +564,20 @@ export default function LeftSidebar({
                         </Link>
                       )}
                     </div>
-                    <div className="pt-3 border-t border-black/10 dark:border-white/5 space-y-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
-                          <span>NEURONS:</span>
-                          {isStatsLoading ? <span className="font-mono text-neutral-400 dark:text-white/30">…</span> : <AnimatedNumber value={nodesCount} active={isOpen} />}
-                          <span className="text-neutral-400 dark:text-white/20">//</span>
-                          <span>NEURAL LINKS:</span>
-                          {isStatsLoading ? <span className="font-mono text-neutral-400 dark:text-white/30">…</span> : <AnimatedNumber value={linksCount} active={isOpen} />}
+                    <div className="pt-3 border-t border-black/10 dark:border-white/5 space-y-3">
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] text-neutral-500 dark:text-white/40 font-medium">
+                          Universe Capacity: {isStatsLoading ? '…' : `${nodesCount} / 60 Neurons`}
+                        </p>
+                        <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-300"
+                            style={{ width: `${Math.min(100, (nodesCount / 60) * 100)}%` }}
+                          />
                         </div>
+                      </div>
+                      <div className="text-[10px] text-neutral-500 dark:text-white/40">
+                        Shared Clusters: {sharedClustersCount} / {GENESIS_SHARED_CLUSTERS_LIMIT}
                       </div>
                       <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
                         <span>FOCUS:</span>

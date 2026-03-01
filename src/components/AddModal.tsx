@@ -3,8 +3,12 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import Link from "next/link";
 import { FileText, GitMerge, Hash, Lightbulb, LinkIcon, Sparkles, X, Plus, AlertCircle, Globe } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
+
+const GENESIS_NEURON_LIMIT = 60;
+const GENESIS_UPGRADE_THRESHOLD = 50;
 
 export interface NodeData {
     type: 'link' | 'note' | 'idea';
@@ -472,6 +476,19 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                     </motion.div>
                                 )}
                             </AnimatePresence>
+
+                            {existingNodes.length >= GENESIS_UPGRADE_THRESHOLD && (
+                                <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-lg text-xs text-neutral-700 dark:text-neutral-300">
+                                    Your Genesis Universe is reaching its limit ({existingNodes.length}/{GENESIS_NEURON_LIMIT}).{" "}
+                                    <Link
+                                        href="/settings/billing"
+                                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium underline underline-offset-1"
+                                    >
+                                        Upgrade to Constellation
+                                    </Link>{" "}
+                                    for unlimited space.
+                                </div>
+                            )}
 
                             <button
                                 type="submit"
