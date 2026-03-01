@@ -552,7 +552,7 @@ export default function Home() {
                     >
                         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
                             <div className="bg-black/5 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 p-10 rounded-3xl text-center max-w-md pointer-events-auto shadow-2xl flex flex-col items-center transform transition-all hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-neutral-900/80">
-                                <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] dark:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+                                <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.1)]">
                                     <Sparkles className="text-indigo-600 dark:text-purple-400" size={32} />
                                 </div>
                                 <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-3 tracking-tight">Nothing here yet</h2>
@@ -748,6 +748,7 @@ export default function Home() {
                 markAsRead={markAsRead}
                 markAllAsRead={markAllAsRead}
                 onNavigateToGroup={handleNavigateToGroup}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
             />
 
             <Sidebar 

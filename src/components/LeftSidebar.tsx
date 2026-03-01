@@ -45,6 +45,7 @@ interface LeftSidebarProps {
   markAsRead?: (id: string) => void;
   markAllAsRead?: () => void;
   onNavigateToGroup?: (groupId: string) => void;
+  onOpenAddModal?: () => void;
 }
 
 function SubViewHeader({ title, onBack }: { title: string; onBack: () => void }) {
@@ -92,8 +93,10 @@ export default function LeftSidebar({
   markAsRead,
   markAllAsRead,
   onNavigateToGroup,
+  onOpenAddModal,
 }: LeftSidebarProps) {
   const [activeView, setActiveView] = useState<'main' | 'discovery' | 'collections' | 'viewOptions' | 'telemetry' | 'management'>('main');
+  const [lastOpenedView, setLastOpenedView] = useState<typeof activeView | null>(null);
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -137,7 +140,10 @@ export default function LeftSidebar({
   }, [supabase]);
 
   useEffect(() => {
-    if (!isOpen) setActiveView('main');
+    if (!isOpen) {
+      setActiveView('main');
+      setLastOpenedView(null);
+    }
   }, [isOpen]);
 
   const handleSignOut = async () => {
@@ -237,8 +243,8 @@ export default function LeftSidebar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveView('discovery')}
-                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={() => { setLastOpenedView('discovery'); setActiveView('discovery'); }}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'discovery' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Compass size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
@@ -246,21 +252,41 @@ export default function LeftSidebar({
                     </div>
                     <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('collections')}
-                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  <div
+                    className={`group/row w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors cursor-pointer ${lastOpenedView === 'collections' ? 'bg-white/5 dark:bg-purple-500/5' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { setLastOpenedView('collections'); setActiveView('collections'); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLastOpenedView('collections'); setActiveView('collections'); } }}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
                       <Layers size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
-                      <span>Collections</span>
+                      <span className={lastOpenedView === 'collections' ? 'text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 group-hover/row:text-neutral-900 dark:group-hover/row:text-white'}>Collections</span>
+                      {onOpenAddModal && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onOpenAddModal(); }}
+                          className="opacity-0 group-hover/row:opacity-100 hover:opacity-100 p-1 rounded-md text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 transition-all shrink-0"
+                          title="Add neuron"
+                          aria-label="Add neuron"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
                     </div>
-                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
-                  </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {groups.length > 0 && (
+                        <span className="text-[10px] font-medium tabular-nums text-neutral-400 dark:text-neutral-500 bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">
+                          {groups.length}
+                        </span>
+                      )}
+                      <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500" />
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setActiveView('viewOptions')}
-                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={() => { setLastOpenedView('viewOptions'); setActiveView('viewOptions'); }}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'viewOptions' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Sliders size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
@@ -270,19 +296,27 @@ export default function LeftSidebar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveView('telemetry')}
-                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={() => { setLastOpenedView('telemetry'); setActiveView('telemetry'); }}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'telemetry' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Activity size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
                       <span>System Telemetry</span>
                     </div>
-                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {extensionDetected && (
+                        <span className="relative flex h-2 w-2 shrink-0" title="Live Sync">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        </span>
+                      )}
+                      <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500" />
+                    </div>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveView('management')}
-                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    onClick={() => { setLastOpenedView('management'); setActiveView('management'); }}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'management' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Settings2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
