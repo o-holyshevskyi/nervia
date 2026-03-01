@@ -993,20 +993,22 @@ export default function GraphNetwork({
                 backgroundColor="transparent"
                 enablePointerInteraction={true}
             />
-            <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none">
-                <div className="pointer-events-auto flex flex-col gap-1">
-                    <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
-                        <ZoomIn size={18} />
-                    </button>
-                    <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
-                        <ZoomOut size={18} />
-                    </button>
-                    <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
-                        <Locate size={18} />
-                    </button>
-                    {renderToolbarExtra?.(navBtnClass)}
+            {graphData.nodes.length > 0 && (
+                <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none">
+                    <div className="pointer-events-auto flex flex-col gap-1">
+                        <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
+                            <ZoomIn size={18} />
+                        </button>
+                        <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
+                            <ZoomOut size={18} />
+                        </button>
+                        <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
+                            <Locate size={18} />
+                        </button>
+                        {renderToolbarExtra?.(navBtnClass)}
+                    </div>
                 </div>
-            </div>
+            )}
             <AnimatePresence>
                 {hoveredLink && (
                     <motion.div
