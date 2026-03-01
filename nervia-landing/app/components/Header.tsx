@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { APP_URL } from "../lib/app-url";
 
 export function Header() {
   return (
@@ -41,7 +42,7 @@ export function Header() {
           </Link>
         </nav>
         <Link
-          href="https://synapse-bookmark-ten.vercel.app/"
+          href={`${APP_URL}/`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-medium text-white shadow-[0_0_20px_rgba(6,182,212,0.25)] transition hover:border-purple-400/40 hover:bg-purple-500/10 hover:shadow-[0_0_24px_rgba(168,85,247,0.2)] focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"

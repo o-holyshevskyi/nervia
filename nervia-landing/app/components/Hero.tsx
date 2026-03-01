@@ -5,8 +5,13 @@ import { FadeIn } from "./FadeIn";
 import { Play } from "lucide-react";
 import { NeuralBackground } from "./NeuralBackground";
 import { InteractiveHeroGraph } from "./InteractiveHeroGraph";
+import { APP_URL } from "../lib/app-url";
 
-export function Hero() {
+interface HeroProps {
+  onWatchDemo?: () => void;
+}
+
+export function Hero({ onWatchDemo }: HeroProps) {
   return (
     <section className="relative px-6 pt-20 pb-24 md:pt-28 md:pb-32 overflow-hidden">
       <NeuralBackground />
@@ -34,20 +39,21 @@ export function Hero() {
         </FadeIn>
         <FadeIn delay={0.3} className="mt-10 flex flex-wrap items-center justify-center gap-4 pointer-events-auto">
           <Link
-            href="https://synapse-bookmark-ten.vercel.app/"
+            href={`${APP_URL}/`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-slate-950 shadow-lg transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950"
           >
             Start Building for Free
           </Link>
-          <Link
-            href="#"
+          <button
+            type="button"
+            onClick={() => onWatchDemo?.()}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
           >
             <Play className="h-4 w-4" />
             Watch Demo
-          </Link>
+          </button>
         </FadeIn>
         <FadeIn delay={0.4} className="mt-16">
           <InteractiveHeroGraph />

@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Header } from "./components/Header";
 import { Hero } from "./components/Hero";
 import { WhySection } from "./components/WhySection";
@@ -6,8 +10,11 @@ import { Pricing } from "./components/Pricing";
 import { Testimonials } from "./components/Testimonials";
 import { FAQ } from "./components/FAQ";
 import { Footer } from "./components/Footer";
+import { DemoModal } from "./components/DemoModal";
 
 export default function Home() {
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
+
   return (
     <>
       {/* Animated orbs background */}
@@ -26,7 +33,7 @@ export default function Home() {
       <div className="relative z-10 min-h-screen">
         <Header />
         <main>
-          <Hero />
+          <Hero onWatchDemo={() => setIsDemoOpen(true)} />
           <WhySection />
           <FeaturesBento />
           <Pricing />
@@ -35,6 +42,10 @@ export default function Home() {
           <Footer />
         </main>
       </div>
+
+      <AnimatePresence mode="wait">
+        {isDemoOpen && <DemoModal key="demo-modal" onClose={() => setIsDemoOpen(false)} />}
+      </AnimatePresence>
     </>
   );
 }

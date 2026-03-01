@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { FadeIn } from "./FadeIn";
 import { Check } from "lucide-react";
-
-const APP_URL = "https://synapse-bookmark-ten.vercel.app/";
+import { APP_URL } from "../lib/app-url";
 
 const tiers = [
   {
@@ -19,7 +18,7 @@ const tiers = [
       "Share 1 Cluster",
     ],
     cta: "Start your Universe",
-    ctaHref: APP_URL,
+    ctaHref: `${APP_URL}/`,
     primary: false,
     highlighted: false,
   },
@@ -35,7 +34,7 @@ const tiers = [
       "Connect thoughts into infinite clusters",
     ],
     cta: "Join Constellation",
-    ctaHref: APP_URL,
+    ctaHref: `${APP_URL}/`,
     primary: false,
     highlighted: false,
   },
@@ -52,7 +51,7 @@ const tiers = [
       "Unlimited Shared Universes",
     ],
     cta: "Reach Singularity",
-    ctaHref: APP_URL,
+    ctaHref: `${APP_URL}/`,
     primary: true,
     highlighted: true,
   },
