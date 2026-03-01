@@ -51,8 +51,8 @@ export default function TermsPage() {
                   Nervia provides a Visual Intelligence Universe: a 3D knowledge graph where you
                   can create neurons (notes, sources, ideas), connect them visually, use
                   AI-powered features (Neural Core, RAG), and benefit from auto-clustering and
-                  shared workspaces. The Service may be offered in free (Explorer) and paid
-                  (Architect, Nexus) tiers as described on our pricing page.
+                  shared workspaces. The Service may be offered in Genesis, Constellation, and Singularity tiers as
+                  described on our pricing page.
                 </p>
               </section>
 
@@ -114,7 +114,7 @@ export default function TermsPage() {
               <section>
                 <h2 className="text-xl font-semibold text-white">7. Paid Plans and Billing</h2>
                 <p>
-                  Paid plans (e.g., Architect, Nexus) may be subject to separate billing terms
+                  Paid plans (e.g., Constellation, Singularity) may be subject to separate billing terms
                   and subscription conditions. Fees, renewal, and cancellation will be communicated
                   at sign-up or in the application. We may change pricing with reasonable notice.
                   Refunds are handled in accordance with our refund policy as stated at the time of

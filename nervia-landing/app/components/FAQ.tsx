@@ -1,23 +1,71 @@
 "use client";
 
+import { useState } from "react";
 import { FadeIn } from "./FadeIn";
+import { ChevronDown, ChevronUp } from "lucide-react";
+
+const INITIAL_VISIBLE = 4;
 
 const faqs = [
   {
     q: "What is a Neuron?",
-    a: "A Neuron is a single unit of knowledge - a note, a source, or an idea - that can connect to others in your 3D graph.",
+    a: "A Neuron is a single unit of knowledge - a note, a bookmark, a source, or an idea - that lives in your graph. You connect neurons to each other; clusters form automatically as related ideas group together.",
+  },
+  {
+    q: "What is the difference between 2D and 3D graph?",
+    a: "Genesis includes a 2D knowledge graph to build and explore your connections. Singularity unlocks the full 3D graph: fly through your knowledge in 3D, zoom into clusters, and navigate your universe spatially.",
+  },
+  {
+    q: "How do I sign in?",
+    a: "You can sign in with Google, GitHub, or Magic Link (email). No password required for Magic Link - we send you a one-time link to access your account.",
+  },
+  {
+    q: "What is the Neural Core?",
+    a: "The Neural Core is Nervia's AI layer (Singularity tier). It uses RAG over your graph so you can chat with your knowledge: ask questions, get summaries, and surface connections across your neurons in real time.",
+  },
+  {
+    q: "What are clusters?",
+    a: "Clusters are groups of connected neurons that form automatically as you add and link content. You can focus on one cluster, share it (e.g. as a 3D world on higher tiers), and use it to organize your thinking.",
+  },
+  {
+    q: "What is the Browser Web Clipper?",
+    a: "Our browser extension lets you save pages, highlights, and ideas from the web straight into your graph. One click creates a new neuron and keeps your browsing connected to your knowledge base.",
+  },
+  {
+    q: "Can I export my data?",
+    a: "Yes. Data import and export are available on Constellation and Singularity. You can export your graph and content to use or back up outside Nervia.",
+  },
+  {
+    q: "What are Pathfinder and Zen Mode?",
+    a: "Pathfinder helps you navigate between neurons and clusters in your graph. Zen Mode is a focused view so you can work without distraction. Both are included in Constellation and above.",
+  },
+  {
+    q: "What is Time Machine and the Evolution Journal?",
+    a: "Time Machine and the Evolution Journal (Singularity) let you see how your knowledge graph changed over time. Revisit past states and track the growth of your universe.",
+  },
+  {
+    q: "What are Shared Universes?",
+    a: "On Singularity you can publish clusters as interactive 3D worlds - Shared Universes - that others can explore. Great for sharing research, portfolios, or curated knowledge.",
+  },
+  {
+    q: "What happens if I hit the 60-neuron limit on Genesis?",
+    a: "Genesis is free and includes up to 60 neurons. When you need more, upgrade to Constellation for unlimited neurons and more features. You can also try Singularity with a free trial.",
+  },
+  {
+    q: "Can I try Singularity for free?",
+    a: "Yes. Singularity comes with a free trial. No credit card required to start. You can explore the Neural Core, 3D graph, and other Singularity features before subscribing.",
   },
   {
     q: "Is my data private?",
-    a: "Yes. Your graph lives in your workspace. We never train on your content. See our Privacy Policy for details.",
-  },
-  {
-    q: "Can I try Pro for free?",
-    a: "Singularity (Pro) comes with a free trial. No credit card required to start.",
+    a: "Yes. Your graph lives in your workspace. We never train on your content. For full details, see our Privacy Policy.",
   },
 ];
 
 export function FAQ() {
+  const [expanded, setExpanded] = useState(false);
+  const visibleFaqs = expanded ? faqs : faqs.slice(0, INITIAL_VISIBLE);
+  const hasMore = faqs.length > INITIAL_VISIBLE;
+
   return (
     <section className="relative px-6 py-24 md:py-32" id="faq">
       <div className="mx-auto max-w-3xl">
@@ -27,7 +75,7 @@ export function FAQ() {
           </h2>
         </FadeIn>
         <ul className="mt-16 space-y-6">
-          {faqs.map((faq, i) => (
+          {visibleFaqs.map((faq, i) => (
             <FadeIn key={faq.q} delay={0.1 * (i + 1)}>
               <li className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
                 <h3 className="font-semibold text-white">{faq.q}</h3>
@@ -36,6 +84,28 @@ export function FAQ() {
             </FadeIn>
           ))}
         </ul>
+        {hasMore && (
+          <FadeIn delay={0.5} className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              className="cursor-pointer inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-5 py-2.5 text-sm font-medium text-slate-300 backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-white/20 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
+              aria-expanded={expanded}
+            >
+              {expanded ? (
+                <>
+                  Show less
+                  <ChevronUp className="h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  Show {faqs.length - INITIAL_VISIBLE} more questions
+                  <ChevronDown className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </FadeIn>
+        )}
       </div>
     </section>
   );

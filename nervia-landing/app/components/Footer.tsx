@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NeuralBackground } from "./NeuralBackground";
 
 const productLinks = [
   { label: "Features", href: "#features" },
@@ -7,7 +8,9 @@ const productLinks = [
 ];
 
 const companyLinks = [
-  { label: "About", href: "#" },
+  { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
+  { label: "Support", href: "/support" },
 ];
 
 const legalLinks = [
@@ -22,9 +25,15 @@ export function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="grid gap-12 md:grid-cols-4">
           <div>
-            <p className="text-lg font-semibold tracking-tight text-white">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
+            >
+              <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg" aria-hidden>
+                <NeuralBackground clipPathId="neural-brain-clip-footer" />
+              </span>
               Nervia
-            </p>
+            </Link>
             <p className="mt-2 text-sm text-slate-500">
               Your Visual Intelligence Universe.
             </p>
