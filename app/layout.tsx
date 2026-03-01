@@ -45,6 +45,7 @@ export const metadata: Metadata = {
     },
     icons: {
         icon: [
+            { url: "/brain.svg", type: "image/svg+xml" },
             { url: "/favicon.ico", sizes: "any" },
             { url: "/icon.png", type: "image/png", sizes: "32x32" },
         ],

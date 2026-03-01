@@ -15,7 +15,10 @@ export const metadata: Metadata = {
   description:
     "Build your exocortex with interactive 3D neurons, AI-powered clusters, and shared intelligence. Stop organizing notes in flat folders.",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/brain.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
   },
   openGraph: {
     title: "Nervia – Your Visual Intelligence Universe",
