@@ -884,7 +884,7 @@ export default function GraphNetwork({
         fgRef.current.zoom(RECENTER_ZOOM, RECENTER_MS);
     }, []);
 
-    const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-400 dark:text-neutral-500 hover:bg-white/10 hover:text-white transition-all duration-200 cursor-pointer";
+    const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-200 cursor-pointer";
 
     return (
         <div 
@@ -993,7 +993,7 @@ export default function GraphNetwork({
                 backgroundColor="transparent"
                 enablePointerInteraction={true}
             />
-            <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-white/[0.03] border border-white/10 shadow-lg pointer-events-none">
+            <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none">
                 <div className="pointer-events-auto flex flex-col gap-1">
                     <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
                         <ZoomIn size={18} />

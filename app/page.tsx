@@ -561,7 +561,7 @@ export default function Home() {
                                 <button
                                     data-tour-id="tour-new-neuron"
                                     onClick={() => setIsAddModalOpen(true)}
-                                    className="hover:cursor-pointer flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 dark:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-full font-semibold transition-all shadow-lg shadow-indigo-900/20 dark:shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-xl hover:shadow-indigo-900/25 dark:hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:-translate-y-1"
+                                    className="hover:cursor-pointer flex items-center gap-2 px-8 py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                                 >
                                     <Plus size={18} />
                                     Create First Neuron
@@ -576,7 +576,7 @@ export default function Home() {
                 <button
                     type="button"
                     onClick={() => setIsLeftSidebarOpen(true)}
-                    className="absolute top-30 left-8 z-20 w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-md bg-white/[0.03] border border-white/5 text-neutral-400 dark:text-neutral-500 hover:bg-white/10 hover:text-white transition-all duration-300 ease-out cursor-pointer"
+                    className="absolute top-30 left-8 z-20 w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-md bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/5 text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-300 ease-out cursor-pointer"
                     aria-label="Open left sidebar"
                 >
                     <PanelLeftOpen size={20} />
@@ -809,7 +809,7 @@ export default function Home() {
                     type="button"
                     data-tour-id="tour-new-neuron"
                     onClick={() => setIsAddModalOpen(true)}
-                    className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-black/40 dark:bg-neutral-900/50 border border-white/10 text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
+                    className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-white/90 dark:bg-neutral-900/50 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
