@@ -14,7 +14,13 @@ function normalizeUrl(url: string | undefined): string {
     return t;
 }
 
-export function useGraphData(supabase: any) {
+export interface UseGraphDataOptions {
+    /** Max neurons allowed (e.g. 60 for Genesis). Enforced in addNewNode. */
+    neuronLimit?: number;
+}
+
+export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
+    const neuronLimit = options?.neuronLimit;
     const [user, setUser] = useState<any>(null);
     const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
     const [isLoading, setIsLoading] = useState(true);
@@ -176,6 +182,13 @@ export function useGraphData(supabase: any) {
 
     const addNewNode = async (nodeData: NodeData): Promise<any> => {
         if (!user) return undefined;
+
+        // Enforce neuron limit (Genesis 60). For security, also add Supabase RLS on nodes INSERT.
+        if (typeof neuronLimit === 'number' && data.nodes.length >= neuronLimit) {
+            const err = new Error('NEURON_LIMIT_REACHED') as Error & { code?: string };
+            err.code = 'NEURON_LIMIT_REACHED';
+            throw err;
+        }
 
         const titleLower = (nodeData.title ?? '').toString().trim().toLowerCase();
         const urlNorm = normalizeUrl(nodeData.url);

@@ -24,6 +24,9 @@ import NeuralChat from "@/src/components/NeuralChat";
 import OnboardingTour from "@/src/components/OnboardingTour";
 import { useOnboarding } from "@/src/hooks/useOnboarding";
 import { useNotifications } from "@/src/hooks/useNotifications";
+import { usePlan } from "@/src/hooks/usePlan";
+import { useFeatureAccess } from "@/src/hooks/useFeatureAccess";
+import UpgradeModal, { type UpgradeTargetPlan } from "@/src/components/UpgradeModal";
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
 import { NeuralBackground } from "@/src/components/NeuralBackground";
@@ -31,6 +34,10 @@ import { NeuralBackground } from "@/src/components/NeuralBackground";
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
     const { hasCompletedOnboarding, isLoading: isOnboardingLoading, completeOnboarding } = useOnboarding(supabase);
+    const { plan } = usePlan(supabase);
+    const access = useFeatureAccess(plan);
+    const [upgradeModalTarget, setUpgradeModalTarget] = useState<UpgradeTargetPlan | null>(null);
+    const openUpgradeModal = useCallback<(target: UpgradeTargetPlan) => void>((target) => { setUpgradeModalTarget(target); }, []);
 
     const { 
         data, 
@@ -42,7 +49,7 @@ export default function Home() {
         deleteLink,
         importData,
         exportData,
-    } = useGraphData(supabase);
+    } = useGraphData(supabase, { neuronLimit: access.neuronLimit });
 
     const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
         supabase,
@@ -292,6 +299,10 @@ export default function Home() {
     }, [data]);
 
     const toggleZenMode = (nodeId: string) => {
+        if (!access.canUseZenMode) {
+            openUpgradeModal("constellation");
+            return;
+        }
         if (zenModeNodeId === nodeId) {
             setZenModeNodeId(null);
         } else {
@@ -326,6 +337,10 @@ export default function Home() {
     }, [data.nodes]);
 
     const handleAddWithAI = async (nodeData: any) => {
+        if (!access.canAddNeuron(data.nodes.length)) {
+            openUpgradeModal("constellation");
+            return;
+        }
         setAddError(null);
         setAiTotal(1);
         setAiProgress(0);
@@ -335,7 +350,11 @@ export default function Home() {
         try {
             createdNode = await addNewNode(nodeData);
         } catch (e) {
-            setAddError(e instanceof Error ? e.message : 'Failed to add neuron.');
+            if (e instanceof Error && (e as Error & { code?: string }).code === 'NEURON_LIMIT_REACHED') {
+                openUpgradeModal("constellation");
+            } else {
+                setAddError(e instanceof Error ? e.message : 'Failed to add neuron.');
+            }
             setIsAIProcessing(false);
             return;
         }
@@ -440,24 +459,28 @@ export default function Home() {
             }
             if (e.key === "p" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsPathfinderOpen(true);
+                if (access.canUsePathfinder) setIsPathfinderOpen(true);
+                else openUpgradeModal("constellation");
             }
             if (e.key === "t" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsTimelineOpen(true);
+                if (access.canUseTimeMachine) setIsTimelineOpen(true);
+                else openUpgradeModal("singularity");
             }
             if (e.key === "h" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsHistoryOpen(true);
+                if (access.canUseEvolutionJournal) setIsHistoryOpen(true);
+                else openUpgradeModal("singularity");
             }
             if (e.key === "c" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsChatOpen(true);
+                if (access.canUseNeuralCore) setIsChatOpen(true);
+                else openUpgradeModal("singularity");
             }
         };
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [openSearch]);
+    }, [openSearch, access.canUsePathfinder, access.canUseTimeMachine, access.canUseEvolutionJournal, access.canUseNeuralCore]);
 
     const nodeIdsSet = useMemo(() => new Set(data.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id)), [data.nodes]);
 
@@ -672,7 +695,7 @@ export default function Home() {
                 node={contextMenu.node}
                 isZenModeActive={zenModeNodeId !== null}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
-                onDeepFocus={(nodeId) => setSolarSystemNodeId(nodeId)}
+                onDeepFocus={(nodeId) => { if (access.canUse3DGraph) setSolarSystemNodeId(nodeId); else openUpgradeModal("singularity"); }}
                 onZenMode={toggleZenMode}
                 onEdit={(node) => {
                     setSelectedNode(node);
@@ -698,6 +721,8 @@ export default function Home() {
                     setHighlightedNodes([]);
                 }}
                 onOpenRef={searchFocusRef}
+                semanticSearchEnabled={access.canUseAISearch}
+                onRequestUpgrade={() => openUpgradeModal("singularity")}
             />
 
             <NeuralChat
@@ -735,9 +760,9 @@ export default function Home() {
                 onExport={exportData}
                 onOpenSearch={openSearch}
                 onOpenPathfinder={() => setIsPathfinderOpen(true)}
-                onOpenTimeline={() => setIsTimelineOpen(true)}
-                onOpenHistory={() => setIsHistoryOpen(true)}
-                onOpenChat={() => setIsChatOpen(true)}
+                onOpenTimeline={() => { if (access.canUseTimeMachine) setIsTimelineOpen(true); else openUpgradeModal("singularity"); }}
+                onOpenHistory={() => { if (access.canUseEvolutionJournal) setIsHistoryOpen(true); else openUpgradeModal("singularity"); }}
+                onOpenChat={() => { if (access.canUseNeuralCore) setIsChatOpen(true); else openUpgradeModal("singularity"); }}
                 clusterMode={clusterMode}
                 onClusterModeChange={setClusterMode}
                 groups={groups}
@@ -749,6 +774,8 @@ export default function Home() {
                 markAllAsRead={markAllAsRead}
                 onNavigateToGroup={handleNavigateToGroup}
                 onOpenAddModal={() => setIsAddModalOpen(true)}
+                plan={plan}
+                onRequestUpgrade={openUpgradeModal}
             />
 
             <Sidebar 
@@ -769,6 +796,8 @@ export default function Home() {
                 existingNodes={data.nodes}
                 allTags={allTags}
                 submitError={addError}
+                onUpgradeRequest={() => { setIsAddModalOpen(false); openUpgradeModal("constellation"); }}
+                neuronLimit={access.neuronLimit}
             />
 
             <CommandPalette onOpenSearch={openSearch} />
@@ -807,6 +836,8 @@ export default function Home() {
                     onClose={() => setIsHistoryOpen(false)}
                 />
             )}
+
+            <UpgradeModal isOpen={upgradeModalTarget !== null} targetPlan={upgradeModalTarget ?? "constellation"} onClose={() => setUpgradeModalTarget(null)} />
 
             {!isLoading && data.nodes.length > 0 && (
                 <motion.button

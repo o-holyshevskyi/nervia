@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CreditCard, Zap, Loader2 } from 'lucide-react';
 import { createClient } from '@/src/lib/supabase/client';
+import { usePlan, getNeuronLimit, getSharedUniversesLimit } from '@/src/hooks/usePlan';
 
 type PlanId = 'explorer' | 'builder' | 'architect';
 
@@ -15,24 +16,17 @@ const PLAN_LABELS: Record<PlanId, string> = {
   architect: 'Singularity',
 };
 
-// Plan limits (mock – replace with API later). Genesis = 60 neurons.
-const NEURONS_LIMIT_BY_PLAN: Record<PlanId, number> = {
-  explorer: 60,
-  builder: Infinity,
-  architect: Infinity,
-};
-
 export default function BillingPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { plan, isLoading: planLoading } = usePlan(supabase);
   const [authChecking, setAuthChecking] = useState(true);
   const [neuronsUsed, setNeuronsUsed] = useState<number | null>(null);
-  const [sharedClusters, setSharedClusters] = useState<number | null>(null);
+  const [sharedCount, setSharedCount] = useState<number | null>(null);
 
-  // Mock plan – replace with API later
-  const plan: PlanId = 'explorer';
-  const neuronsLimit = NEURONS_LIMIT_BY_PLAN[plan];
-  const isPro = plan === 'builder' || plan === 'architect';
+  const neuronsLimit = getNeuronLimit(plan);
+  const sharedUniversesLimit = getSharedUniversesLimit(plan);
+  const isPaid = plan === 'builder' || plan === 'architect';
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -62,7 +56,7 @@ export default function BillingPage() {
       if (sharesError) {
         console.error('Billing: shares count error', sharesError);
       } else {
-        setSharedClusters(sharesCount ?? 0);
+        setSharedCount(sharesCount ?? 0);
       }
     };
     checkAuth();
@@ -83,7 +77,7 @@ export default function BillingPage() {
         ? 'bg-amber-500'
         : 'bg-indigo-500 dark:bg-purple-500';
 
-  if (authChecking) {
+  if (authChecking || planLoading) {
     return (
       <main className="h-screen bg-neutral-100 dark:bg-neutral-950 flex items-center justify-center p-4">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-500 dark:text-purple-400" />
@@ -126,6 +120,9 @@ export default function BillingPage() {
               <div>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500 mb-0.5">Current Plan</p>
                 <p className="text-sm font-medium text-neutral-900 dark:text-white">{PLAN_LABELS[plan]}</p>
+                {plan === 'explorer' && (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Up to 60 Neurons · 2D Graph · Standard Search · Share 1 Universe</p>
+                )}
               </div>
               <div className="h-px bg-black/10 dark:bg-white/10" />
               <div>
@@ -146,14 +143,16 @@ export default function BillingPage() {
               </div>
               <div className="h-px bg-black/10 dark:bg-white/10" />
               <div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-500 mb-0.5">Shared clusters</p>
-                <p className="font-mono text-sm font-medium text-neutral-900 dark:text-white/90">{sharedClusters === null ? '…' : sharedClusters}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-500 mb-0.5">Shared universes</p>
+                <p className="font-mono text-sm font-medium text-neutral-900 dark:text-white/90">
+                  {sharedCount === null ? '…' : sharedCount} / {sharedUniversesLimit === Infinity ? '∞' : sharedUniversesLimit}
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Pro: Manage Subscription */}
-          {isPro && (
+          {/* Paid: Manage Subscription */}
+          {isPaid && (
             <div className="space-y-2 mb-5">
                 <button
                     type="button"
@@ -166,8 +165,8 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* Upgrade options (hidden when Pro) */}
-          {!isPro && (
+          {/* Upgrade options (hidden when already paid) */}
+          {!isPaid && (
             <div className="space-y-2 mb-5">
               <div className="flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 text-indigo-600 dark:text-purple-400 text-sm font-bold">
@@ -176,7 +175,7 @@ export default function BillingPage() {
                 <span className="text-sm font-semibold text-neutral-900 dark:text-white">Upgrade options</span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {/* Constellation */}
+                {/* Constellation — $3.99/mo */}
                 <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 flex items-center justify-center shrink-0">
@@ -184,25 +183,26 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-neutral-900 dark:text-white">Constellation</p>
-                      <p className="text-lg font-bold text-neutral-900 dark:text-white">$3.99<span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/mo</span></p>
+                      <p className="text-lg font-bold text-neutral-900 dark:text-white">$3.99<span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/month</span></p>
                     </div>
                   </div>
                   <ul className="text-xs text-neutral-500 dark:text-neutral-400 space-y-1">
                     <li>Unlimited Neurons</li>
-                    <li>Unlimited Tags</li>
-                    <li>5 Shared Clusters</li>
-                    <li>Connect thoughts into infinite clusters</li>
+                    <li>Pathfinder & Zen Mode</li>
+                    <li>Tags & Advanced Filters</li>
+                    <li>Data Import/Export</li>
+                    <li className="italic">Connect thoughts into infinite clusters</li>
                   </ul>
                   <button
                     type="button"
                     onClick={() => handleUpgrade('builder')}
                     className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                   >
-                    Upgrade
+                    Join Constellation
                   </button>
                 </div>
 
-                {/* Singularity */}
+                {/* Singularity — $7.99/mo */}
                 <div className="bg-black/5 dark:bg-white/5 border-2 border-amber-500/40 dark:border-amber-400/40 rounded-2xl p-4 space-y-3 shadow-[0_0_30px_rgba(245,158,11,0.15)] dark:shadow-[0_0_30px_rgba(245,158,11,0.2)]">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
@@ -210,21 +210,23 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-neutral-900 dark:text-white">Singularity</p>
-                      <p className="text-lg font-bold text-neutral-900 dark:text-white">$7.99<span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/mo</span></p>
+                      <p className="text-lg font-bold text-neutral-900 dark:text-white">$7.99<span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">/month</span></p>
                     </div>
                   </div>
                   <ul className="text-xs text-neutral-500 dark:text-neutral-400 space-y-1">
                     <li>Ultimate AI Fusion</li>
-                    <li>Full AI Neural Core</li>
-                    <li>3D Graph</li>
-                    <li>Unlimited Sharing</li>
+                    <li>Full AI Neural Core (Chat & Search)</li>
+                    <li>AI Semantic Search</li>
+                    <li>3D Graph Visualization</li>
+                    <li>Time Machine & Evolution Journal</li>
+                    <li>Unlimited Shared Universes</li>
                   </ul>
                   <button
                     type="button"
                     onClick={() => handleUpgrade('architect')}
-                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
+                    className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-amber-500/20 dark:bg-amber-500/20 border border-amber-500/40 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/30 dark:hover:bg-amber-500/30 font-medium transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)]"
                   >
-                    Upgrade
+                    Get Singularity
                   </button>
                 </div>
               </div>

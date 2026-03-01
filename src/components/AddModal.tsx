@@ -34,9 +34,11 @@ interface AddModalProps {
     onClose: () => void;
     onAdd: (data: NodeData) => void;
     submitError?: string | null;
+    onUpgradeRequest?: () => void;
+    neuronLimit?: number;
 }
 
-export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError }: AddModalProps) {
+export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError, onUpgradeRequest, neuronLimit = GENESIS_NEURON_LIMIT }: AddModalProps) {
     const [activeTab, setActiveTab] = useState<'link' | 'note' | 'idea'>('link');
     const [title, setTitle] = useState("");
     const [url, setUrl] = useState("");
@@ -57,6 +59,11 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
         e.preventDefault();
         const trimmedTitle = title.trim();
         if (!trimmedTitle) return;
+
+        if (existingNodes.length >= neuronLimit) {
+            onUpgradeRequest?.();
+            return;
+        }
 
         const isDuplicateTitle = existingNodes.some((n: any) =>
             (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase() === trimmedTitle.toLowerCase()
@@ -479,7 +486,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
 
                             {existingNodes.length >= GENESIS_UPGRADE_THRESHOLD && (
                                 <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-lg text-xs text-neutral-700 dark:text-neutral-300">
-                                    Your Genesis Universe is reaching its limit ({existingNodes.length}/{GENESIS_NEURON_LIMIT}).{" "}
+                                    Your Genesis Universe is reaching its limit ({existingNodes.length}/{neuronLimit}).{" "}
                                     <Link
                                         href="/settings/billing"
                                         className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium underline underline-offset-1"

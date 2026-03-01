@@ -14,6 +14,11 @@ interface ShareModalProps {
   initialScope?: ShareScope;
   initialGroupIds?: string[];
   onCreateShare: (scope: ShareScope, groupIds?: string[]) => Promise<{ slug: string; url: string } | null>;
+  /** When false, creating a GROUPS share will trigger onUpgradeRequest instead. */
+  allowShareClusters?: boolean;
+  /** When false, creating any share (ALL or GROUPS) will trigger onUpgradeRequest. Use for Genesis total share limit. */
+  allowCreateShare?: boolean;
+  onUpgradeRequest?: () => void;
 }
 
 export default function ShareModal({
@@ -23,6 +28,9 @@ export default function ShareModal({
   initialScope = "ALL",
   initialGroupIds = [],
   onCreateShare,
+  allowShareClusters = true,
+  allowCreateShare = true,
+  onUpgradeRequest,
 }: ShareModalProps) {
   const [scope, setScope] = useState<ShareScope>(initialScope);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
@@ -44,8 +52,16 @@ export default function ShareModal({
 
   const handleCreateLink = async () => {
     setError(null);
+    if (!allowCreateShare) {
+      onUpgradeRequest?.();
+      return;
+    }
     if (scope === "GROUPS" && selectedGroupIds.size === 0) {
       setError("Select at least one group.");
+      return;
+    }
+    if (scope === "GROUPS" && !allowShareClusters) {
+      onUpgradeRequest?.();
       return;
     }
     setIsCreating(true);
