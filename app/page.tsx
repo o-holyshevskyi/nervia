@@ -37,7 +37,11 @@ export default function Home() {
     const { plan } = usePlan(supabase);
     const access = useFeatureAccess(plan);
     const [upgradeModalTarget, setUpgradeModalTarget] = useState<UpgradeTargetPlan | null>(null);
-    const openUpgradeModal = useCallback<(target: UpgradeTargetPlan) => void>((target) => { setUpgradeModalTarget(target); }, []);
+    const [upgradeModalDescriptionOverride, setUpgradeModalDescriptionOverride] = useState<string | undefined>(undefined);
+    const openUpgradeModal = useCallback((target: UpgradeTargetPlan, options?: { descriptionOverride?: string }) => {
+        setUpgradeModalTarget(target);
+        setUpgradeModalDescriptionOverride(options?.descriptionOverride);
+    }, []);
 
     const { 
         data, 
@@ -167,6 +171,7 @@ export default function Home() {
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
     const [zenModeNodeId, setZenModeNodeId] = useState<string | null>(null);
     const [solarSystemNodeId, setSolarSystemNodeId] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'2D' | '3D'>('2D');
     const [physicsPanelOpen, setPhysicsPanelOpen] = useState(false);
     const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
         repulsion: 150,
@@ -527,11 +532,11 @@ export default function Home() {
         <main className="bg-white dark:bg-neutral-950 flex min-h-screen flex-col items-center justify-between">
             <OnboardingTour run={!hasCompletedOnboarding && !isOnboardingLoading} onComplete={completeOnboarding} />
             <div className="absolute inset-0" data-tour-id="tour-graph" aria-hidden="true">
-            <GraphNetwork 
+            <GraphNetwork
                 onNodeSelect={(node) => {
                     setSelectedNode(node);
                     setFocusedNodeId(typeof node.id === 'string' ? node.id : node.id?.id);
-                }} 
+                }}
                 graphData={data}
                 timelineDate={data.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
                 activeTag={activeTag}
@@ -549,6 +554,10 @@ export default function Home() {
                 solarSystemNodeId={solarSystemNodeId}
                 clusterMode={clusterMode}
                 groups={groups}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                canUse3DGraph={access.canUse3DGraph}
+                onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
                 renderToolbarExtra={data.nodes.length > 0 ? (buttonClassName) => (
                     <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
                         <Settings2 size={18} />
@@ -732,7 +741,6 @@ export default function Home() {
                     setContextNodeIds([]);
                 }}
                 nodes={data.nodes}
-                isPremium={false}
                 setContextNodeIds={setContextNodeIds}
             />
 
@@ -763,6 +771,7 @@ export default function Home() {
                 onOpenTimeline={() => { if (access.canUseTimeMachine) setIsTimelineOpen(true); else openUpgradeModal("singularity"); }}
                 onOpenHistory={() => { if (access.canUseEvolutionJournal) setIsHistoryOpen(true); else openUpgradeModal("singularity"); }}
                 onOpenChat={() => { if (access.canUseNeuralCore) setIsChatOpen(true); else openUpgradeModal("singularity"); }}
+                onZenModeClick={() => { if (zenModeNodeId) setZenModeNodeId(null); else setIsLeftSidebarOpen(false); }}
                 clusterMode={clusterMode}
                 onClusterModeChange={setClusterMode}
                 groups={groups}
@@ -789,8 +798,8 @@ export default function Home() {
                 onAddGroup={onAddGroup}
             />
 
-            <AddModal 
-                isOpen={isAddModalOpen} 
+<AddModal
+                isOpen={isAddModalOpen}
                 onClose={() => { setIsAddModalOpen(false); setAddError(null); }}
                 onAdd={handleAddWithAI}
                 existingNodes={data.nodes}
@@ -798,6 +807,7 @@ export default function Home() {
                 submitError={addError}
                 onUpgradeRequest={() => { setIsAddModalOpen(false); openUpgradeModal("constellation"); }}
                 neuronLimit={access.neuronLimit}
+                showGenesisUpgradeBanner={plan === 'genesis'}
             />
 
             <CommandPalette onOpenSearch={openSearch} />
@@ -837,7 +847,12 @@ export default function Home() {
                 />
             )}
 
-            <UpgradeModal isOpen={upgradeModalTarget !== null} targetPlan={upgradeModalTarget ?? "constellation"} onClose={() => setUpgradeModalTarget(null)} />
+            <UpgradeModal
+                isOpen={upgradeModalTarget !== null}
+                targetPlan={upgradeModalTarget ?? "constellation"}
+                descriptionOverride={upgradeModalDescriptionOverride}
+                onClose={() => { setUpgradeModalTarget(null); setUpgradeModalDescriptionOverride(undefined); }}
+            />
 
             {!isLoading && data.nodes.length > 0 && (
                 <motion.button

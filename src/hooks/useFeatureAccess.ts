@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import type { PlanId } from './usePlan';
-import { SHARED_CLUSTERS_LIMIT_GENESIS } from './usePlan';
 import { getNeuronLimit, getSharedUniversesLimit, isUnlimitedPlan } from './usePlan';
 
 export interface FeatureAccess {
@@ -13,7 +12,8 @@ export interface FeatureAccess {
   canUseZenMode: boolean;
   canUseFilters: boolean;
   canUseImportExport: boolean;
-  canShareMoreClusters: (sharedClustersCount: number) => boolean;
+  /** Can create another share (universe or cluster — same limit). */
+  canCreateShare: (currentShareCount: number) => boolean;
   /** Singularity only: Full AI Neural Core (Chat & Search) */
   canUseNeuralCore: boolean;
   /** Singularity only: AI Semantic Search */
@@ -32,7 +32,7 @@ export function useFeatureAccess(plan: PlanId): FeatureAccess {
     const neuronLimit = getNeuronLimit(plan);
     const isUnlimited = isUnlimitedPlan(plan);
     const sharedUniversesLimit = getSharedUniversesLimit(plan);
-    const isSingularity = plan === 'architect';
+    const isSingularity = plan === 'singularity';
 
     return {
       plan,
@@ -44,8 +44,7 @@ export function useFeatureAccess(plan: PlanId): FeatureAccess {
       canUseZenMode: isUnlimited,
       canUseFilters: isUnlimited,
       canUseImportExport: isUnlimited,
-      canShareMoreClusters: (sharedClustersCount: number) =>
-        isUnlimited || sharedClustersCount < SHARED_CLUSTERS_LIMIT_GENESIS,
+      canCreateShare: (currentShareCount: number) => currentShareCount < sharedUniversesLimit,
       canUseNeuralCore: isSingularity,
       canUseAISearch: isSingularity,
       canUse3DGraph: isSingularity,

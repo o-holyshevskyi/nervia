@@ -6,14 +6,12 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CreditCard, Zap, Loader2 } from 'lucide-react';
 import { createClient } from '@/src/lib/supabase/client';
-import { usePlan, getNeuronLimit, getSharedUniversesLimit } from '@/src/hooks/usePlan';
-
-type PlanId = 'explorer' | 'builder' | 'architect';
+import { usePlan, getNeuronLimit, getSharedUniversesLimit, type PlanId } from '@/src/hooks/usePlan';
 
 const PLAN_LABELS: Record<PlanId, string> = {
-  explorer: 'Genesis',
-  builder: 'Constellation',
-  architect: 'Singularity',
+  genesis: 'Genesis',
+  constellation: 'Constellation',
+  singularity: 'Singularity',
 };
 
 export default function BillingPage() {
@@ -26,7 +24,7 @@ export default function BillingPage() {
 
   const neuronsLimit = getNeuronLimit(plan);
   const sharedUniversesLimit = getSharedUniversesLimit(plan);
-  const isPaid = plan === 'builder' || plan === 'architect';
+  const isPaid = plan === 'constellation' || plan === 'singularity';
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -63,7 +61,7 @@ export default function BillingPage() {
   }, [supabase, router]);
 
   // Stub: wire Stripe/LemonSqueezy later
-  const handleUpgrade = (_tier: 'builder' | 'architect') => {};
+  const handleUpgrade = (_tier: 'constellation' | 'singularity') => {};
 
   // Stub: link to Stripe/LemonSqueezy customer portal later
   const handleManageSubscription = () => {};
@@ -120,7 +118,7 @@ export default function BillingPage() {
               <div>
                 <p className="text-xs text-neutral-500 dark:text-neutral-500 mb-0.5">Current Plan</p>
                 <p className="text-sm font-medium text-neutral-900 dark:text-white">{PLAN_LABELS[plan]}</p>
-                {plan === 'explorer' && (
+                {plan === 'genesis' && (
                   <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Up to 60 Neurons · 2D Graph · Standard Search · Share 1 Universe</p>
                 )}
               </div>
@@ -142,11 +140,11 @@ export default function BillingPage() {
                 )}
               </div>
               <div className="h-px bg-black/10 dark:bg-white/10" />
-              <div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-500 mb-0.5">Shared universes</p>
-                <p className="font-mono text-sm font-medium text-neutral-900 dark:text-white/90">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-neutral-500 dark:text-neutral-500">Shares</span>
+                <span className="font-mono text-neutral-900 dark:text-white/90">
                   {sharedCount === null ? '…' : sharedCount} / {sharedUniversesLimit === Infinity ? '∞' : sharedUniversesLimit}
-                </p>
+                </span>
               </div>
             </div>
           </div>
@@ -191,11 +189,11 @@ export default function BillingPage() {
                     <li>Pathfinder & Zen Mode</li>
                     <li>Tags & Advanced Filters</li>
                     <li>Data Import/Export</li>
-                    <li className="italic">Connect thoughts into infinite clusters</li>
+                    <li>Up to 5 shares</li>
                   </ul>
                   <button
                     type="button"
-                    onClick={() => handleUpgrade('builder')}
+                    onClick={() => handleUpgrade('constellation')}
                     className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                   >
                     Join Constellation
@@ -219,11 +217,11 @@ export default function BillingPage() {
                     <li>AI Semantic Search</li>
                     <li>3D Graph Visualization</li>
                     <li>Time Machine & Evolution Journal</li>
-                    <li>Unlimited Shared Universes</li>
+                    <li>Unlimited shares</li>
                   </ul>
                   <button
                     type="button"
-                    onClick={() => handleUpgrade('architect')}
+                    onClick={() => handleUpgrade('singularity')}
                     className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-amber-500/20 dark:bg-amber-500/20 border border-amber-500/40 dark:border-amber-400/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/30 dark:hover:bg-amber-500/30 font-medium transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)]"
                   >
                     Get Singularity

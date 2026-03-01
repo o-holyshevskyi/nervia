@@ -14,9 +14,9 @@ interface ShareModalProps {
   initialScope?: ShareScope;
   initialGroupIds?: string[];
   onCreateShare: (scope: ShareScope, groupIds?: string[]) => Promise<{ slug: string; url: string } | null>;
-  /** When false, creating a GROUPS share will trigger onUpgradeRequest instead. */
+  /** When false, creating a share (GROUPS or ALL) will trigger onUpgradeRequest. Same limit for both. */
   allowShareClusters?: boolean;
-  /** When false, creating any share (ALL or GROUPS) will trigger onUpgradeRequest. Use for Genesis total share limit. */
+  /** When false, creating any share will trigger onUpgradeRequest. Same limit as allowShareClusters. */
   allowCreateShare?: boolean;
   onUpgradeRequest?: () => void;
 }
@@ -126,7 +126,7 @@ export default function ShareModal({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold tracking-widest text-neutral-700 dark:text-neutral-300 uppercase flex items-center gap-2">
                 <Link2 size={18} className="text-indigo-600 dark:text-purple-400" />
-                Share Universe
+                Share
               </h3>
               <CloseButton onClose={handleClose} size={18} />
             </div>

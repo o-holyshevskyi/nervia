@@ -38,6 +38,8 @@ interface LeftSidebarProps {
   onOpenTimeline?: () => void;
   onOpenHistory?: () => void;
   onOpenChat?: () => void;
+  /** When user has Zen Mode access and clicks Zen Mode: exit Zen if active, or close sidebar so they can right-click a node. */
+  onZenModeClick?: () => void;
   clusterMode: 'group' | 'tag';
   onClusterModeChange: (mode: 'group' | 'tag') => void;
   groups: Group[];
@@ -88,6 +90,7 @@ export default function LeftSidebar({
   onOpenTimeline,
   onOpenHistory,
   onOpenChat,
+  onZenModeClick,
   clusterMode,
   onClusterModeChange,
   groups,
@@ -99,7 +102,7 @@ export default function LeftSidebar({
   markAllAsRead,
   onNavigateToGroup,
   onOpenAddModal,
-  plan = 'explorer',
+  plan = 'genesis',
   onRequestUpgrade,
 }: LeftSidebarProps) {
   const access = useFeatureAccess(plan);
@@ -113,16 +116,6 @@ export default function LeftSidebar({
   const [user, setUser] = useState<any>(null);
   const supabase = useMemo(() => createClient(), []);
   const { createShare, shares } = useSharing(supabase);
-  const sharedClustersCount = useMemo(() => {
-    const groupIds = new Set<string>();
-    shares.forEach((s) => {
-      if (s.scope === 'GROUPS' && Array.isArray(s.shared_group_ids)) {
-        s.shared_group_ids.forEach((id: string) => groupIds.add(id));
-      }
-    });
-    return groupIds.size;
-  }, [shares]);
-  const GENESIS_SHARED_CLUSTERS_LIMIT = 1;
   const [scrollShadows, setScrollShadows] = useState({ top: false, bottom: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -324,14 +317,14 @@ export default function LeftSidebar({
                     <div className="flex items-center gap-2 shrink-0">
                       <span
                         className="relative flex h-2 w-2 shrink-0 rounded-full"
-                        title={nodesCount < 50 ? 'Healthy' : nodesCount < 60 ? 'Approaching limit' : 'Limit reached'}
+                        title={access.isUnlimited ? 'Unlimited' : nodesCount < access.neuronLimit * 0.85 ? 'Healthy' : nodesCount < access.neuronLimit ? 'Approaching limit' : 'Limit reached'}
                       >
-                        {nodesCount < 60 && (
-                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${nodesCount < 50 ? 'bg-emerald-500' : 'bg-orange-500'}`} />
+                        {!access.isUnlimited && nodesCount < access.neuronLimit && (
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${nodesCount < access.neuronLimit * 0.85 ? 'bg-emerald-500' : 'bg-orange-500'}`} />
                         )}
                         <span
                           className={`relative inline-flex rounded-full h-2 w-2 ${
-                            nodesCount >= 60 ? 'bg-red-500' : nodesCount >= 50 ? 'bg-orange-500' : 'bg-emerald-500'
+                            access.isUnlimited ? 'bg-emerald-500' : nodesCount >= access.neuronLimit ? 'bg-red-500' : nodesCount >= access.neuronLimit * 0.85 ? 'bg-orange-500' : 'bg-emerald-500'
                           }`}
                         />
                       </span>
@@ -384,22 +377,23 @@ export default function LeftSidebar({
                         <div className="flex items-center gap-2.5">
                           <Route size={16} className="shrink-0" />
                           <span>Pathfinder</span>
-                          <Lock size={14} className="text-purple-500 dark:text-purple-400 shrink-0" />
                         </div>
-                        <kbd className={kbdClass}>Ctrl+Alt+P</kbd>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <kbd className={kbdClass}>Ctrl+Alt+P</kbd>
+                          <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                        </span>
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => access.canUseZenMode ? undefined : onRequestUpgrade?.("constellation")}
+                      onClick={() => access.canUseZenMode ? onZenModeClick?.() : onRequestUpgrade?.("constellation")}
                       className={`w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${access.canUseZenMode ? 'hover:cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5' : 'opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] text-neutral-500 dark:text-neutral-500 cursor-pointer'}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <Eye size={16} className="shrink-0" />
                         <span>Zen Mode</span>
-                        {!access.canUseZenMode && <Lock size={14} className="text-purple-500 dark:text-purple-400 shrink-0" />}
                       </div>
-                      {access.canUseZenMode ? <kbd className={kbdClass}>—</kbd> : null}
+                      {access.canUseZenMode ? <kbd className={kbdClass}>—</kbd> : <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>}
                     </button>
                     {access.canUseTimeMachine ? (
                     <button type="button" onClick={() => onOpenTimeline?.()} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -408,8 +402,11 @@ export default function LeftSidebar({
                     </button>
                     ) : (
                     <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
-                      <div className="flex items-center gap-2.5"><Clock size={16} className="shrink-0" /><span>Time Machine</span><Lock size={14} className="text-purple-500 dark:text-purple-400 shrink-0" /></div>
-                      <kbd className={kbdClass}>Ctrl+Alt+T</kbd>
+                      <div className="flex items-center gap-2.5"><Clock size={16} className="shrink-0" /><span>Time Machine</span></div>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <kbd className={kbdClass}>Ctrl+Alt+T</kbd>
+                        <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                      </span>
                     </button>
                     )}
                     {access.canUseEvolutionJournal ? (
@@ -419,8 +416,11 @@ export default function LeftSidebar({
                     </button>
                     ) : (
                     <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
-                      <div className="flex items-center gap-2.5"><History size={16} className="shrink-0" /><span>Evolution Journal</span><Lock size={14} className="text-purple-500 dark:text-purple-400 shrink-0" /></div>
-                      <kbd className={kbdClass}>Ctrl+Alt+H</kbd>
+                      <div className="flex items-center gap-2.5"><History size={16} className="shrink-0" /><span>Evolution Journal</span></div>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <kbd className={kbdClass}>Ctrl+Alt+H</kbd>
+                        <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                      </span>
                     </button>
                     )}
                     {access.canUseNeuralCore ? (
@@ -430,8 +430,11 @@ export default function LeftSidebar({
                     </button>
                     ) : (
                     <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
-                      <div className="flex items-center gap-2.5"><MessageCircle size={16} className="shrink-0" /><span>Neural Core</span><Lock size={14} className="text-purple-500 dark:text-purple-400 shrink-0" /></div>
-                      <kbd className={kbdClass}>Ctrl+Alt+C</kbd>
+                      <div className="flex items-center gap-2.5"><MessageCircle size={16} className="shrink-0" /><span>Neural Core</span></div>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <kbd className={kbdClass}>Ctrl+Alt+C</kbd>
+                        <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                      </span>
                     </button>
                     )}
                   </div>
@@ -472,7 +475,7 @@ export default function LeftSidebar({
                             >
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
                               <span className="flex-1 min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">{g.name}</span>
-                              <button type="button" onClick={() => { if (!access.canShareMoreClusters(sharedClustersCount)) { onRequestUpgrade?.("constellation"); return; } setShareInitial({ scope: 'GROUPS', groupIds: [g.id] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all" title="Share this cluster"><Share2 size={12} /></button>
+                              <button type="button" onClick={() => { if (shares.length >= access.sharedUniversesLimit) { onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation'); return; } setShareInitial({ scope: 'GROUPS', groupIds: [g.id] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all" title="Share"><Share2 size={12} /></button>
                               <button type="button" onClick={() => onDeleteGroup(g.id)} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all" title="Delete cluster"><Trash2 size={12} /></button>
                             </li>
                           ))}
@@ -480,14 +483,14 @@ export default function LeftSidebar({
                       )}
                     </div>
                     <div className="space-y-2">
-                      <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase flex items-center gap-1.5">
+                      <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase flex items-center justify-between gap-1.5 w-full">
                         Filters
-                        {!access.canUseFilters && <Lock size={12} className="text-purple-500 dark:text-purple-400" />}
+                        {!access.canUseFilters && <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={12} /></span>}
                       </span>
                       {!access.canUseFilters ? (
-                        <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full py-3 px-2 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all flex items-center justify-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
-                          <Lock size={14} />
-                          Advanced Filters (Constellation)
+                        <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full py-3 px-2 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
+                          <span>Advanced Filters (Constellation)</span>
+                          <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                         </button>
                       ) : tags.length === 0 ? (
                         <div className="py-3 px-2 text-center bg-black/5 dark:bg-white/5 rounded-md border border-black/10 dark:border-white/10">
@@ -551,8 +554,8 @@ export default function LeftSidebar({
                       </div>
                       {unreadCount > 0 && <kbd className={kbdClass}>{unreadCount}</kbd>}
                     </button>
-                    <button type="button" onClick={() => { if (shares.length >= access.sharedUniversesLimit) { onRequestUpgrade?.("constellation"); return; } setShareInitial({ scope: 'ALL', groupIds: [] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                      <div className="flex items-center gap-2.5"><Share2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" /><span>Share Universe</span></div>
+                    <button type="button" onClick={() => { if (shares.length >= access.sharedUniversesLimit) { onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation'); return; } setShareInitial({ scope: 'ALL', groupIds: [] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-2.5"><Share2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" /><span>Share</span></div>
                       <kbd className={kbdClass}>Share</kbd>
                     </button>
                     {access.canUseImportExport ? (
@@ -571,7 +574,8 @@ export default function LeftSidebar({
                     </div>
                     ) : (
                     <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
-                      <div className="flex items-center gap-2.5"><ImportIcon size={16} className="shrink-0" /><span>Data Transfer</span><Lock size={14} className="text-purple-500 dark:text-purple-400 shrink-0" /></div>
+                      <div className="flex items-center gap-2.5"><ImportIcon size={16} className="shrink-0" /><span>Data Transfer</span></div>
+                      <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                     </button>
                     )}
                     <button type="button" onClick={() => { router.push('/settings/billing'); onClose(); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -614,9 +618,24 @@ export default function LeftSidebar({
                     </div>
                     <div className="pt-3 border-t border-black/10 dark:border-white/5 space-y-3">
                       {access.isUnlimited ? (
-                        <div className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 w-fit">
-                          <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Status: Unlimited</span>
-                        </div>
+                        <>
+                          <div className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 w-fit">
+                            <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Status: Unlimited</span>
+                          </div>
+                          <div className="space-y-1 text-[10px] text-neutral-500 dark:text-white/40">
+                            <p className="font-medium">Neurons: {isStatsLoading ? '…' : nodesCount}</p>
+                            <p className="font-medium">Links: {isStatsLoading ? '…' : linksCount}</p>
+                          </div>
+                          {access.sharedUniversesLimit === Infinity ? (
+                            <div className="text-[10px] text-neutral-500 dark:text-white/40">
+                              Shares: {shares.length} <span className="text-purple-500/80 dark:text-purple-400/80">(Unlimited)</span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-neutral-500 dark:text-white/40">
+                              Shares: {shares.length} / {access.sharedUniversesLimit}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <>
                           <div className="space-y-1.5">
@@ -631,7 +650,7 @@ export default function LeftSidebar({
                             </div>
                           </div>
                           <div className="text-[10px] text-neutral-500 dark:text-white/40">
-                            Shared Clusters: {sharedClustersCount} / {GENESIS_SHARED_CLUSTERS_LIMIT}
+                            Shares: {shares.length} / {access.sharedUniversesLimit}
                           </div>
                         </>
                       )}
@@ -791,9 +810,9 @@ export default function LeftSidebar({
           const result = await createShare(scope, groupIds);
           return result ? { slug: result.slug, url: result.url } : null;
         }}
-        allowShareClusters={access.canShareMoreClusters(sharedClustersCount)}
-        allowCreateShare={shares.length < access.sharedUniversesLimit}
-        onUpgradeRequest={() => onRequestUpgrade?.("constellation")}
+        allowShareClusters={access.canCreateShare(shares.length)}
+        allowCreateShare={access.canCreateShare(shares.length)}
+        onUpgradeRequest={() => onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation')}
       />
     </AnimatePresence>
   );

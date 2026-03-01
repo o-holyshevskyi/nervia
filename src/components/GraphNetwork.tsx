@@ -5,10 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from 'next/dynamic';
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const ForceGraph2D = dynamic(() => import ('react-force-graph-2d'), {
+    ssr: false,
+});
+
+const ForceGraph3D = dynamic(() => import ('react-force-graph-3d'), {
     ssr: false,
 });
 
@@ -254,6 +258,14 @@ interface GraphNetworkProps {
     readOnly?: boolean;
     /** Optional extra toolbar button(s) below the built-in zoom/recenter, same style. Receives the toolbar button class. */
     renderToolbarExtra?: (buttonClassName: string) => React.ReactNode;
+    /** When true, user can switch to 3D view (Singularity). When false, 3D button shows lock and triggers onRequest3DUpgrade. */
+    canUse3DGraph?: boolean;
+    /** Called when non-Singularity user clicks the 3D button. */
+    onRequest3DUpgrade?: () => void;
+    /** Current view mode; when '3D', ForceGraph3D is rendered. */
+    viewMode?: '2D' | '3D';
+    /** Called when user toggles 2D/3D (only when canUse3DGraph). */
+    onViewModeChange?: (mode: '2D' | '3D') => void;
 }
 
 function getLinkEnd(linkEnd: any): string | undefined {
@@ -280,11 +292,16 @@ export default function GraphNetwork({
     clusterMode = 'group',
     groups = [],
     readOnly = false,
-    renderToolbarExtra
+    renderToolbarExtra,
+    canUse3DGraph = false,
+    onRequest3DUpgrade,
+    viewMode = '2D',
+    onViewModeChange,
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
+    const fg3dRef = useRef<any>(null);
     const prevNodeCountRef = useRef(0);
 
     const groupColorsById = useMemo(() => {
@@ -879,20 +896,34 @@ export default function GraphNetwork({
         }
     }, []);
     const handleRecenter = useCallback(() => {
+        if (viewMode === '3D') {
+            fg3dRef.current?.zoomToFit?.(RECENTER_MS);
+            return;
+        }
         if (!fgRef.current) return;
         fgRef.current.centerAt(0, 0, RECENTER_MS);
         fgRef.current.zoom(RECENTER_ZOOM, RECENTER_MS);
-    }, []);
+    }, [viewMode]);
 
     const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-200 cursor-pointer";
 
+    const graphTheme = getGraphThemeColors(containerRef.current);
+    const dataFor3D = useMemo(() => {
+        if (viewMode !== '3D') return processedData;
+        return {
+            nodes: processedData.nodes.map((n: any) => ({ ...n, z: typeof n.z === 'number' ? n.z : 0 })),
+            links: processedData.links,
+        };
+    }, [viewMode, processedData]);
+
     return (
-        <div 
-            ref={containerRef} 
-            className="w-full h-screen relative"
+        <div
+            ref={containerRef}
+            className={`w-full h-screen relative ${viewMode === '3D' ? 'shadow-[0_0_80px_rgba(168,85,247,0.12)] dark:shadow-[0_0_100px_rgba(168,85,247,0.18)]' : ''}`}
             style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
+            {viewMode === '2D' && (
             <ForceGraph2D
                 ref={fgRef}
                 width={dimensions.width}
@@ -993,6 +1024,36 @@ export default function GraphNetwork({
                 backgroundColor="transparent"
                 enablePointerInteraction={true}
             />
+            )}
+            {viewMode === '3D' && (
+            <ForceGraph3D
+                ref={fg3dRef}
+                width={dimensions.width}
+                height={dimensions.height}
+                graphData={dataFor3D}
+                nodeVal={(node: any) => node.val ?? 4}
+                nodeLabel={(node: any) => getNodeLabel(node)}
+                nodeColor={(node: any) => {
+                    const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                    const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
+                    return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? graphTheme.nodeColor;
+                }}
+                linkColor={() => graphTheme.linkColor}
+                backgroundColor="transparent"
+                onNodeClick={(node: any) => {
+                    if (!readOnly) onNodeSelect(node);
+                }}
+                onNodeRightClick={(node: any, event: MouseEvent) => {
+                    if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event);
+                }}
+                onBackgroundClick={() => onBackgroundClick?.()}
+                enableNodeDrag={!readOnly}
+                enableNavigationControls={true}
+                d3AlphaDecay={0.0228}
+                d3VelocityDecay={0.4}
+                warmupTicks={100}
+            />
+            )}
             {graphData.nodes.length > 0 && (
                 <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none">
                     <div className="pointer-events-auto flex flex-col gap-1">
@@ -1005,6 +1066,31 @@ export default function GraphNetwork({
                         <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
                             <Locate size={18} />
                         </button>
+                        {canUse3DGraph ? (
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange?.(viewMode === '3D' ? '2D' : '3D')}
+                                className={viewMode === '3D'
+                                    ? "flex items-center justify-center w-10 h-10 rounded-xl text-white bg-purple-500/80 dark:bg-purple-500/80 hover:bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)] dark:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all duration-200 cursor-pointer"
+                                    : navBtnClass
+                                }
+                                title="Toggle 3D Universe"
+                                aria-label={viewMode === '3D' ? 'Switch to 2D' : 'Switch to 3D'}
+                            >
+                                <Box size={18} />
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={onRequest3DUpgrade}
+                                className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 opacity-70 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all cursor-pointer relative"
+                                title="3D Universe (Singularity only)"
+                                aria-label="3D Universe (Singularity only)"
+                            >
+                                <Box size={18} />
+                                <Lock size={10} className="absolute bottom-0.5 right-0.5 text-purple-500 dark:text-purple-400" />
+                            </button>
+                        )}
                         {renderToolbarExtra?.(navBtnClass)}
                     </div>
                 </div>

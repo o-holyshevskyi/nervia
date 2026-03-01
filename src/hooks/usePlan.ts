@@ -1,20 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 
-export type PlanId = 'explorer' | 'builder' | 'architect';
+export type PlanId = 'genesis' | 'constellation' | 'singularity';
 
 export const NEURONS_LIMIT_GENESIS = 60;
 export const SHARED_CLUSTERS_LIMIT_GENESIS = 1;
 
 const NEURONS_LIMIT_BY_PLAN: Record<PlanId, number> = {
-  explorer: 60,
-  builder: Infinity,
-  architect: Infinity,
+  genesis: 60,
+  constellation: Infinity,
+  singularity: Infinity,
 };
 
 /** Returns current plan. Replace with API/profile lookup later. */
 export function usePlan(supabase: any): { plan: PlanId; isLoading: boolean } {
-  const [plan, setPlan] = useState<PlanId>('explorer');
+  const [plan, setPlan] = useState<PlanId>('genesis');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,11 +25,11 @@ export function usePlan(supabase: any): { plan: PlanId; isLoading: boolean } {
         if (cancelled) return;
         // TODO: read plan from user.user_metadata.plan or profiles table
         const planFromMeta = user?.user_metadata?.plan as PlanId | undefined;
-        if (planFromMeta && ['explorer', 'builder', 'architect'].includes(planFromMeta)) {
+        if (planFromMeta && ['genesis', 'constellation', 'singularity'].includes(planFromMeta)) {
           setPlan(planFromMeta);
         }
       } catch {
-        // keep default explorer
+        // keep default genesis
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -46,14 +46,14 @@ export function getNeuronLimit(plan: PlanId): number {
 }
 
 export function isUnlimitedPlan(plan: PlanId): boolean {
-  return plan === 'builder' || plan === 'architect';
+  return plan === 'constellation' || plan === 'singularity';
 }
 
 /** Singularity = unlimited share links; Constellation = 5; Genesis = 1. */
 export const SHARED_UNIVERSES_LIMIT_BY_PLAN: Record<PlanId, number> = {
-  explorer: 1,
-  builder: 5,
-  architect: Infinity,
+  genesis: 1,
+  constellation: 5,
+  singularity: Infinity,
 };
 
 export function getSharedUniversesLimit(plan: PlanId): number {

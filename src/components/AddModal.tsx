@@ -36,9 +36,11 @@ interface AddModalProps {
     submitError?: string | null;
     onUpgradeRequest?: () => void;
     neuronLimit?: number;
+    /** When true, show "reaching limit" upgrade banner for Genesis. When false (Constellation/Singularity), never show it. */
+    showGenesisUpgradeBanner?: boolean;
 }
 
-export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError, onUpgradeRequest, neuronLimit = GENESIS_NEURON_LIMIT }: AddModalProps) {
+export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError, onUpgradeRequest, neuronLimit = GENESIS_NEURON_LIMIT, showGenesisUpgradeBanner = false }: AddModalProps) {
     const [activeTab, setActiveTab] = useState<'link' | 'note' | 'idea'>('link');
     const [title, setTitle] = useState("");
     const [url, setUrl] = useState("");
@@ -484,7 +486,7 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                 )}
                             </AnimatePresence>
 
-                            {existingNodes.length >= GENESIS_UPGRADE_THRESHOLD && (
+                            {showGenesisUpgradeBanner && existingNodes.length >= GENESIS_UPGRADE_THRESHOLD && (
                                 <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-lg text-xs text-neutral-700 dark:text-neutral-300">
                                     Your Genesis Universe is reaching its limit ({existingNodes.length}/{neuronLimit}).{" "}
                                     <Link

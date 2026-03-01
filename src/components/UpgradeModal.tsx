@@ -11,7 +11,7 @@ const CONSTELLATION_FEATURES = [
   { icon: Route, text: "Pathfinder & Zen Mode" },
   { icon: Filter, text: "Tags & Advanced Filters" },
   { icon: Download, text: "Data Import/Export" },
-  { icon: Share2, text: "More Shared Universes" },
+  { icon: Share2, text: "Up to 5 shares" },
 ];
 
 /** Singularity: Full AI Neural Core, Semantic Search, 3D, Time Machine, Evolution Journal, Unlimited Shared Universes + Constellation. */
@@ -20,7 +20,7 @@ const SINGULARITY_FEATURES = [
   { icon: Sparkles, text: "AI Semantic Search" },
   { icon: Box, text: "3D Graph Visualization" },
   { icon: Clock, text: "Time Machine & Evolution Journal" },
-  { icon: Share2, text: "Unlimited Shared Universes" },
+  { icon: Share2, text: "Unlimited shares" },
   { icon: Infinity, text: "All Constellation features" },
 ];
 
@@ -31,15 +31,17 @@ interface UpgradeModalProps {
   onClose: () => void;
   /** Which plan to promote; drives title, description, list, CTA, and styling. */
   targetPlan?: UpgradeTargetPlan;
+  /** Optional override for description (e.g. 3D switcher: "Unlock the 3D Perspective..."). */
+  descriptionOverride?: string;
 }
 
-export default function UpgradeModal({ isOpen, onClose, targetPlan = "constellation" }: UpgradeModalProps) {
+export default function UpgradeModal({ isOpen, onClose, targetPlan = "constellation", descriptionOverride }: UpgradeModalProps) {
   const isSingularity = targetPlan === "singularity";
 
   const title = isSingularity ? "Unlock the Singularity Perspective" : "Upgrade to Constellation";
-  const description = isSingularity
+  const description = descriptionOverride ?? (isSingularity
     ? "Experience your universe in 3D and get priority AI processing."
-    : "Unlock unlimited neurons and premium features to grow your knowledge graph without limits.";
+    : "Unlock unlimited neurons and premium features to grow your knowledge graph without limits.");
   const features = isSingularity ? SINGULARITY_FEATURES : CONSTELLATION_FEATURES;
   const ctaText = isSingularity ? "Get Singularity — $7.99" : "Get Constellation — $3.99";
 
