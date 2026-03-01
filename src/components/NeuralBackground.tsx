@@ -36,7 +36,12 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-export function NeuralBackground() {
+interface NeuralBackgroundProps {
+  /** Unique id for the clip path when multiple instances exist (e.g. app header logo). */
+  clipPathId?: string;
+}
+
+export function NeuralBackground({ clipPathId = "neural-brain-clip" }: NeuralBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number>(0);
   const mouseRef = useRef<{ x: number; y: number } | null>(null);
@@ -179,7 +184,7 @@ export function NeuralBackground() {
     <>
       <svg width={0} height={0} aria-hidden>
         <defs>
-          <clipPath id="neural-brain-clip" clipPathUnits="objectBoundingBox">
+          <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
             {/* Brain silhouette: two lobes, central dip at top, rounded bottom */}
             <path d="M0.5,0.02 C0.22,0.06 0.02,0.32 0.05,0.58 C0.08,0.8 0.32,0.98 0.5,0.98 C0.68,0.98 0.92,0.8 0.95,0.58 C0.98,0.32 0.78,0.06 0.5,0.02 Z" />
           </clipPath>
@@ -187,7 +192,7 @@ export function NeuralBackground() {
       </svg>
       <div
         className="absolute inset-0 z-0 overflow-hidden"
-        style={{ clipPath: "url(#neural-brain-clip)", pointerEvents: "auto" }}
+        style={{ clipPath: `url(#${clipPathId})`, pointerEvents: "auto" }}
       >
         <canvas
           ref={canvasRef}

@@ -49,7 +49,7 @@ export function Hero({ onWatchDemo }: HeroProps) {
           <button
             type="button"
             onClick={() => onWatchDemo?.()}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
+            className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-6 py-3.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
           >
             <Play className="h-4 w-4" />
             Watch Demo

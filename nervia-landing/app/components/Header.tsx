@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { APP_URL } from "../lib/app-url";
+import { NeuralBackground } from "./NeuralBackground";
 
 export function Header() {
   return (
@@ -12,13 +12,9 @@ export function Header() {
           href="/"
           className="flex items-center gap-2 text-lg font-semibold tracking-tight text-white"
         >
-          <Image
-            src="/icon.png"
-            alt="Nervia"
-            width={28}
-            height={28}
-            className="h-7 w-7 shrink-0"
-          />
+          <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg" aria-hidden>
+            <NeuralBackground clipPathId="neural-brain-clip-header" />
+          </span>
           Nervia
         </Link>
         <nav className="hidden items-center gap-8 md:flex" aria-label="Main">

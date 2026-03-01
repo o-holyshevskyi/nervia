@@ -26,6 +26,7 @@ import { useOnboarding } from "@/src/hooks/useOnboarding";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
+import { NeuralBackground } from "@/src/components/NeuralBackground";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -532,7 +533,12 @@ export default function Home() {
             />
             </div>
             <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
-                <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Nervia</h1>
+                <div className="flex items-center gap-3">
+                    <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg" aria-hidden>
+                        <NeuralBackground clipPathId="neural-brain-clip-app-welcome" />
+                    </span>
+                    <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Nervia</h1>
+                </div>
                 <p className="text-neutral-500 dark:text-neutral-400 mt-2">Your Visual Intelligence Universe</p>
             </div>
 
