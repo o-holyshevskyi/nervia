@@ -778,10 +778,10 @@ export default function Home() {
                 onOpenChange={setPhysicsPanelOpen}
             />
 
-            {data.nodes.length > 0 && isTimelineOpen && (
+            {isTimelineOpen && (
                 <TimelinePanel
                     datePoints={timelineDatePoints}
-                    currentDate={timelineDate}
+                    currentDate={data.nodes.length > 0 ? timelineDate : timelineMaxDate}
                     onChange={setTimelineDate}
                     isPlaying={isPlaying}
                     onTogglePlay={() => setIsPlaying((p) => !p)}

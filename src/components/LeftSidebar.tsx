@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Settings2, Route, Clock, LayoutGrid, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings2 } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -47,6 +47,26 @@ interface LeftSidebarProps {
   onNavigateToGroup?: (groupId: string) => void;
 }
 
+function SubViewHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Back"
+        className="hover:cursor-pointer flex items-center gap-1.5 px-2 py-1.5 rounded-md text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0"
+      >
+        <ChevronLeft size={18} />
+        <span className="text-xs font-semibold tracking-widest uppercase">Back</span>
+      </button>
+      <span className="text-neutral-400 dark:text-neutral-500">/</span>
+      <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">
+        {title}
+      </span>
+    </div>
+  );
+}
+
 export default function LeftSidebar({ 
   isOpen, 
   nodes, 
@@ -73,6 +93,7 @@ export default function LeftSidebar({
   markAllAsRead,
   onNavigateToGroup,
 }: LeftSidebarProps) {
+  const [activeView, setActiveView] = useState<'main' | 'discovery' | 'collections' | 'viewOptions' | 'telemetry' | 'management'>('main');
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -102,7 +123,7 @@ export default function LeftSidebar({
     const ro = new ResizeObserver(updateScrollShadows);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [updateScrollShadows, openAccordion]);
+  }, [updateScrollShadows, openAccordion, activeView]);
   const extensionDetected = useExtensionDetected();
   const router = useRouter();
   const { nodesCount, linksCount, topTag, isLoading: isStatsLoading } = useUniverseStats(nodes);
@@ -114,6 +135,10 @@ export default function LeftSidebar({
     };
     getUser();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!isOpen) setActiveView('main');
+  }, [isOpen]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -134,145 +159,6 @@ export default function LeftSidebar({
     const day = Math.floor(h / 24);
     return `${day} day${day === 1 ? "" : "s"} ago`;
   }
-
-  const sections = [
-    {
-      label: "Discovery",
-      icon: <Compass size={14} className="text-neutral-500" />,
-      items: [
-        { id: 'search', title: 'Search', icon: <Search size={16} />, shortcut: 'Ctrl+K', onClick: () => onOpenSearch?.() },
-        { id: 'pathfinder', title: 'Pathfinder', icon: <Route size={16} />, shortcut: 'Ctrl+Alt+P', onClick: () => onOpenPathfinder?.() },
-        { id: 'timeline', title: 'Time Machine', icon: <Clock size={16} />, shortcut: 'Ctrl+Alt+T', onClick: () => onOpenTimeline?.() },
-        { id: 'history', title: 'Evolution Journal', icon: <History size={16} />, shortcut: 'Ctrl+Alt+H', onClick: () => onOpenHistory?.() },
-        { id: 'chat', title: 'Neural Core', icon: <MessageCircle size={16} />, shortcut: 'Ctrl+Alt+C', onClick: () => onOpenChat?.() },
-      ]
-    },
-    {
-      label: "View Options",
-      icon: <LayoutGrid size={14} className="text-neutral-500" />,
-      items: [
-        { id: 'theme', title: 'Theme', icon: <Sun size={16} />, isThemeToggle: true },
-        { id: 'gravity-shift', title: 'Gravity Shift', icon: <Globe size={16} />, isToggle: true },
-      ]
-    },
-    {
-      label: "Collections",
-      icon: <Layers size={14} className="text-neutral-500" />,
-      items: [
-        {
-          id: 'groups',
-          title: 'Clusters',
-          icon: <Layers size={16} />,
-          content: (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">Clusters</span>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateGroupOpen(true)}
-                  className="hover:cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 transition-colors"
-                  title="Create cluster"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-              {groups.length === 0 ? (
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 italic py-2">No clusters yet</p>
-              ) : (
-                <ul className="space-y-1">
-                  {groups.map((g) => (
-                    <li
-                      key={g.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 group/list"
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: g.color }}
-                      />
-                      <span className="flex-1 min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">
-                        {g.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShareInitial({ scope: 'GROUPS', groupIds: [g.id] });
-                          setIsShareModalOpen(true);
-                        }}
-                        className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all"
-                        title="Share this cluster"
-                      >
-                        <Share2 size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteGroup(g.id)}
-                        className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all"
-                        title="Delete cluster"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )
-        },
-        {
-          id: 'filters',
-          title: 'Filters',
-          icon: <Filter size={16} />,
-          content: tags.length === 0 ? (
-            <div className="py-3 px-2 text-center bg-black/5 dark:bg-white/5 rounded-md border border-black/10 dark:border-white/10">
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 italic">No tags yet</p>
-            </div>
-          ) : (
-            <FilterPanel activeTag={activeTag} tags={tags} onClose={onClose} onTagSelect={onTagSelect} />
-          )
-        }
-      ]
-    },
-    {
-      label: "Management",
-      icon: <Settings2 size={14} className="text-neutral-500" />,
-      items: [
-        {
-          id: 'notifications',
-          title: 'Notifications',
-          icon: <Bell size={16} />,
-          shortcut: unreadCount > 0 ? String(unreadCount) : null,
-          onClick: () => setIsNotificationPanelOpen(true),
-          isNotification: true
-        },
-        {
-          id: 'share-universe',
-          title: 'Share Universe',
-          icon: <Share2 size={16} />,
-          shortcut: 'Share',
-          onClick: () => {
-            setShareInitial({ scope: 'ALL', groupIds: [] });
-            setIsShareModalOpen(true);
-          }
-        },
-        {
-          id: 'import-export',
-          title: 'Data Transfer',
-          icon: <ImportIcon size={16} />,
-          content: <ImportExport onImport={onImport} onExport={onExport} />
-        },
-        {
-          id: 'billing',
-          title: 'Billing',
-          icon: <CreditCard size={16} />,
-          shortcut: 'Billing',
-          onClick: () => {
-            router.push('/settings/billing');
-            onClose();
-          }
-        }
-      ]
-    }
-  ];
 
   const toggleAccordion = (itemId: string) => {
     setOpenAccordion(openAccordion === itemId ? null : itemId);
@@ -328,151 +214,325 @@ export default function LeftSidebar({
               onScroll={updateScrollShadows}
               className="flex-1 overflow-y-auto scroll-hint space-y-8 pr-2"
             >
-            {sections.map((section) => (
-              <div key={section.label} className="space-y-3">
-                {/* Section Header */}
-                <div className="flex items-center gap-2">
-                  {section.icon}
-                  <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">
-                    {section.label}
-                  </span>
-                </div>
+            <AnimatePresence mode="wait">
+              {activeView === 'main' && (
+                <motion.div
+                  key="main"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="space-y-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onOpenSearch?.()}
+                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Search size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                      <span>Search</span>
+                    </div>
+                    <kbd className={kbdClass}>Ctrl+K</kbd>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('discovery')}
+                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Compass size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                      <span>Discovery Tools</span>
+                    </div>
+                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('collections')}
+                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Layers size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                      <span>Collections</span>
+                    </div>
+                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('viewOptions')}
+                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Sliders size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                      <span>View Options</span>
+                    </div>
+                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('telemetry')}
+                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Activity size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                      <span>System Telemetry</span>
+                    </div>
+                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('management')}
+                    className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Settings2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                      <span>Management</span>
+                    </div>
+                    <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                  </button>
+                </motion.div>
+              )}
 
-                {/* Items in Section */}
-                <div className="space-y-1">
-                  {section.items.map((item: any) => {
-                    const isAction = item.onClick != null && item.shortcut != null;
-                    const isToggle = item.isToggle === true;
-                    const isThemeToggle = item.isThemeToggle === true;
-
-                    if (isThemeToggle && item.id === 'theme') {
-                      return (
-                        <div
-                          key={item.id}
-                          className="w-full h-10 flex items-center justify-between px-3 rounded-md"
-                        >
-                          <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
-                            <span className="text-neutral-500 dark:text-neutral-500 shrink-0">{item.icon}</span>
-                            <span>{item.title}</span>
-                          </div>
-                          <ThemeToggle />
-                        </div>
-                      );
-                    }
-
-                    if (isAction) {
-                      const isNotif = item.id === 'notifications' && (item as any).isNotification;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          {...(item.id === 'chat' ? { 'data-tour-id': 'tour-neural-chat' } : {})}
-                          onClick={item.onClick}
-                          className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <span className="relative text-neutral-500 dark:text-neutral-500 shrink-0">
-                              {item.icon}
-                              {isNotif && unreadCount > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">
-                                  {unreadCount > 99 ? "99+" : unreadCount}
-                                </span>
-                              )}
-                            </span>
-                            <span>{item.title}</span>
-                          </div>
-                          {!isNotif && <kbd className={kbdClass}>{item.shortcut}</kbd>}
-                        </button>
-                      );
-                    }
-
-                    if (isToggle && item.id === 'gravity-shift') {
-                      return (
-                        <div
-                          key={item.id}
-                          className="w-full h-10 flex items-center justify-between px-3 rounded-md"
-                        >
-                          <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
-                            <span className="text-neutral-500 dark:text-neutral-500 shrink-0">{item.icon}</span>
-                            <span>{item.title}</span>
-                          </div>
-                          <div
-                            role="group"
-                            aria-label="By cluster or tag"
-                            className="flex h-8 w-16 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
-                          >
-                            <button
-                              type="button"
-                              title="By Cluster"
-                              onClick={() => onClusterModeChange('group')}
-                              className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
-                                clusterMode === 'group'
-                                  ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]'
-                                  : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              <Globe size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              title="By Tag"
-                              onClick={() => onClusterModeChange('tag')}
-                              className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${
-                                clusterMode === 'tag'
-                                  ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]'
-                                  : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              <Tag size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div key={item.id} className="overflow-hidden">
-                        <button
-                          onClick={() => toggleAccordion(item.id)}
-                          className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors group ${
-                            openAccordion === item.id ? 'bg-black/5 dark:bg-white/5 text-neutral-900 dark:text-white' : ''
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <span className={`shrink-0 ${openAccordion === item.id ? 'text-indigo-600 dark:text-purple-400' : 'text-neutral-500 dark:text-neutral-500 group-hover:text-neutral-900 dark:group-hover:text-white'}`}>
-                              {item.icon}
-                            </span>
-                            <span>{item.title}</span>
-                          </div>
-                          <motion.div
-                            animate={{ rotate: openAccordion === item.id ? 180 : 0 }}
-                            className="text-neutral-500 dark:text-neutral-500 shrink-0"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </motion.div>
-                        </button>
-                        <AnimatePresence initial={false}>
-                          {openAccordion === item.id && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.3, ease: "easeInOut" }}
-                            >
-                              <div className="px-0 pt-1.5 pb-2">
-                                {item.content}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+              {activeView === 'discovery' && (
+                <motion.div
+                  key="discovery"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="space-y-4"
+                >
+                  <SubViewHeader title="Discovery" onBack={() => setActiveView('main')} />
+                  <div className="space-y-1 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => onOpenPathfinder?.()}
+                      className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Route size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Pathfinder</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                      <kbd className={kbdClass}>Ctrl+Alt+P</kbd>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenTimeline?.()}
+                      className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Clock size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Time Machine</span>
+                      </div>
+                      <kbd className={kbdClass}>Ctrl+Alt+T</kbd>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenHistory?.()}
+                      className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <History size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Evolution Journal</span>
+                      </div>
+                      <kbd className={kbdClass}>Ctrl+Alt+H</kbd>
+                    </button>
+                    <button
+                      type="button"
+                      data-tour-id="tour-neural-chat"
+                      onClick={() => onOpenChat?.()}
+                      className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <MessageCircle size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Neural Core</span>
+                      </div>
+                      <kbd className={kbdClass}>Ctrl+Alt+C</kbd>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeView === 'collections' && (
+                <motion.div
+                  key="collections"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="space-y-6"
+                >
+                  <SubViewHeader title="Collections" onBack={() => setActiveView('main')} />
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">Clusters</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsCreateGroupOpen(true)}
+                          className="hover:cursor-pointer p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 transition-colors"
+                          title="Create cluster"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      {groups.length === 0 ? (
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 italic py-2">No clusters yet</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {groups.map((g) => (
+                            <li
+                              key={g.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 group/list"
+                            >
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                              <span className="flex-1 min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">{g.name}</span>
+                              <button type="button" onClick={() => { setShareInitial({ scope: 'GROUPS', groupIds: [g.id] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all" title="Share this cluster"><Share2 size={12} /></button>
+                              <button type="button" onClick={() => onDeleteGroup(g.id)} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all" title="Delete cluster"><Trash2 size={12} /></button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">Filters</span>
+                      {tags.length === 0 ? (
+                        <div className="py-3 px-2 text-center bg-black/5 dark:bg-white/5 rounded-md border border-black/10 dark:border-white/10">
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400 italic">No tags yet</p>
+                        </div>
+                      ) : (
+                        <FilterPanel activeTag={activeTag} tags={tags} onClose={onClose} onTagSelect={onTagSelect} />
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeView === 'viewOptions' && (
+                <motion.div
+                  key="viewOptions"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="space-y-6"
+                >
+                  <SubViewHeader title="View Options" onBack={() => setActiveView('main')} />
+                  <div className="space-y-4 pt-2">
+                    <div className="w-full h-10 flex items-center justify-between px-3 rounded-md">
+                      <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                        <Sun size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Theme</span>
+                      </div>
+                      <ThemeToggle />
+                    </div>
+                    <div className="w-full h-10 flex items-center justify-between px-3 rounded-md">
+                      <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+                        <Globe size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
+                        <span>Gravity Shift</span>
+                      </div>
+                      <div role="group" aria-label="By cluster or tag" className="flex h-8 w-16 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-0.5 shrink-0">
+                        <button type="button" title="By Cluster" onClick={() => onClusterModeChange('group')} className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${clusterMode === 'group' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}><Globe size={14} /></button>
+                        <button type="button" title="By Tag" onClick={() => onClusterModeChange('tag')} className={`hover:cursor-pointer flex-1 flex items-center justify-center rounded-full transition-all duration-200 ${clusterMode === 'tag' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}><Tag size={14} /></button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeView === 'management' && (
+                <motion.div
+                  key="management"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="space-y-4"
+                >
+                  <SubViewHeader title="Management" onBack={() => setActiveView('main')} />
+                  <div className="space-y-1 pt-2">
+                    <button type="button" onClick={() => setIsNotificationPanelOpen(true)} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-2.5">
+                        <span className="relative text-neutral-500 dark:text-neutral-500 shrink-0"><Bell size={16} />{unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white">{unreadCount > 99 ? "99+" : unreadCount}</span>}</span>
+                        <span>Notifications</span>
+                      </div>
+                      {unreadCount > 0 && <kbd className={kbdClass}>{unreadCount}</kbd>}
+                    </button>
+                    <button type="button" onClick={() => { setShareInitial({ scope: 'ALL', groupIds: [] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-2.5"><Share2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" /><span>Share Universe</span></div>
+                      <kbd className={kbdClass}>Share</kbd>
+                    </button>
+                    <div className="overflow-hidden">
+                      <button type="button" onClick={() => toggleAccordion('import-export')} className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors group ${openAccordion === 'import-export' ? 'bg-black/5 dark:bg-white/5 text-neutral-900 dark:text-white' : ''}`}>
+                        <div className="flex items-center gap-2.5"><ImportIcon size={16} className="shrink-0 text-neutral-500 dark:text-neutral-500" /><span>Data Transfer</span></div>
+                        <motion.div animate={{ rotate: openAccordion === 'import-export' ? 180 : 0 }} className="text-neutral-500 dark:text-neutral-500 shrink-0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></motion.div>
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openAccordion === 'import-export' && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: "easeInOut" }}>
+                            <div className="px-0 pt-1.5 pb-2"><ImportExport onImport={onImport} onExport={onExport} /></div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <button type="button" onClick={() => { router.push('/settings/billing'); onClose(); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" /><span>Billing</span></div>
+                      <kbd className={kbdClass}>Billing</kbd>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeView === 'telemetry' && (
+                <motion.div
+                  key="telemetry"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="space-y-4"
+                >
+                  <SubViewHeader title="System Telemetry" onBack={() => setActiveView('main')} />
+                  <div className="space-y-3 pt-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Puzzle size={14} className="text-neutral-500 dark:text-neutral-500" />
+                        <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">Companion</span>
+                      </div>
+                      {extensionDetected ? (
+                        <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-600 dark:text-neutral-400">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <motion.div className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-400" animate={{ boxShadow: ['0 0 6px rgba(34,197,94,0.4)', '0 0 10px rgba(34,197,94,0.5)', '0 0 6px rgba(34,197,94,0.4)'] }} transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }} />
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 dark:text-white/40 font-mono truncate">SYNC: ONLINE</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <Link href="/extension" className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
+                          <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/30 font-mono truncate">CLIPPER: OFFLINE</span>
+                          <Plus size={14} className="shrink-0 text-neutral-500 dark:text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-white/60 transition-colors" />
+                        </Link>
+                      )}
+                    </div>
+                    <div className="pt-3 border-t border-black/10 dark:border-white/5 space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
+                          <span>NEURONS:</span>
+                          {isStatsLoading ? <span className="font-mono text-neutral-400 dark:text-white/30">…</span> : <AnimatedNumber value={nodesCount} active={isOpen} />}
+                          <span className="text-neutral-400 dark:text-white/20">//</span>
+                          <span>NEURAL LINKS:</span>
+                          {isStatsLoading ? <span className="font-mono text-neutral-400 dark:text-white/30">…</span> : <AnimatedNumber value={linksCount} active={isOpen} />}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
+                        <span>FOCUS:</span>
+                        <div className="h-3 w-px bg-black/10 dark:bg-white/5" />
+                        <span className="font-mono text-neutral-700 dark:text-white/70">{topTag ? `#${topTag}` : '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             </div>
             {/* Scroll hints: fade when content is scrollable */}
             {scrollShadows.top && (
@@ -489,80 +549,7 @@ export default function LeftSidebar({
             )}
           </div>
 
-          {/* System Telemetry – companion + universe stats */}
-          <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/5 space-y-3">
-            {/* Companion – system status */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Puzzle size={14} className="text-neutral-500 dark:text-neutral-500" />
-                <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase">
-                  System Telemetry
-                </span>
-              </div>
-              <div className="space-y-1">
-                {extensionDetected ? (
-                  <div className="h-10 flex items-center justify-between px-3 rounded-md text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <motion.div
-                        className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-400"
-                        animate={{
-                          boxShadow: [
-                            '0 0 6px rgba(34,197,94,0.4)',
-                            '0 0 10px rgba(34,197,94,0.5)',
-                            '0 0 6px rgba(34,197,94,0.4)',
-                          ],
-                        }}
-                        transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                      />
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 dark:text-white/40 font-mono truncate">
-                        SYNC: ONLINE
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <Link
-                    href="/extension"
-                    className="hover:cursor-pointer h-10 flex items-center justify-between px-3 rounded-md text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
-                  >
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/30 font-mono truncate">
-                      CLIPPER: OFFLINE
-                    </span>
-                    <Plus size={14} className="shrink-0 text-neutral-500 dark:text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-white/60 transition-colors" />
-                  </Link>
-                )}
-              </div>
-            </div>
-
-            {/* Universe Telemetry */}
-            <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/5 space-y-1">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
-                  <span>NEURONS:</span>
-                  {isStatsLoading ? (
-                    <span className="font-mono text-neutral-400 dark:text-white/30">…</span>
-                  ) : (
-                    <AnimatedNumber value={nodesCount} active={isOpen} />
-                  )}
-                  <span className="text-neutral-400 dark:text-white/20">//</span>
-                  <span>NEURAL LINKS:</span>
-                  {isStatsLoading ? (
-                    <span className="font-mono text-neutral-400 dark:text-white/30">…</span>
-                  ) : (
-                    <AnimatedNumber value={linksCount} active={isOpen} />
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 dark:text-white/30">
-                <span>FOCUS:</span>
-                <div className="h-3 w-px bg-black/10 dark:bg-white/5" />
-                <span className="font-mono text-neutral-700 dark:text-white/70">
-                  {topTag ? `#${topTag}` : '-'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* User Profile Card */}
+          {/* User Profile Card – persistent */}
           <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/5">
             <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center justify-between group border border-black/10 dark:border-white/5 hover:border-black/20 dark:hover:border-white/10 transition-colors">
               <div className="flex items-center gap-3">
