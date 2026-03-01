@@ -471,6 +471,7 @@ export default function Home() {
             setFlyToNodeId(null);
             setHighlightedNodes([]);
             setPathData({ nodes: [], links: [] });
+            setPhysicsPanelOpen(false);
             return;
         }
         const stillExists = (id: string | null) => id != null && nodeIdsSet.has(id);
@@ -525,11 +526,11 @@ export default function Home() {
                 solarSystemNodeId={solarSystemNodeId}
                 clusterMode={clusterMode}
                 groups={groups}
-                renderToolbarExtra={(buttonClassName) => (
+                renderToolbarExtra={data.nodes.length > 0 ? (buttonClassName) => (
                     <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
                         <Settings2 size={18} />
                     </button>
-                )}
+                ) : undefined}
             />
             </div>
             <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
@@ -771,12 +772,14 @@ export default function Home() {
 
             <CommandPalette onOpenSearch={openSearch} />
 
-            <PhysicsControl
-                config={physicsConfig}
-                onChange={setPhysicsConfig}
-                open={physicsPanelOpen}
-                onOpenChange={setPhysicsPanelOpen}
-            />
+            {data.nodes.length > 0 && (
+                <PhysicsControl
+                    config={physicsConfig}
+                    onChange={setPhysicsConfig}
+                    open={physicsPanelOpen}
+                    onOpenChange={setPhysicsPanelOpen}
+                />
+            )}
 
             {isTimelineOpen && (
                 <TimelinePanel
