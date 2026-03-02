@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   try {
     // 1. Отримуємо сире тіло запиту для перевірки підпису
     const rawBody = await req.text();
-    const signature = req.headers.get('X-Signature') || '';
+    const signature = req.headers.get('x-signature') || '';
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET!;
 
     // 2. Перевіряємо валідність вебхуку
