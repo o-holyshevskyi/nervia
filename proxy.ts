@@ -11,6 +11,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/share") ||
     pathname.startsWith("/api/extension/save") ||
     pathname.startsWith("/api/share/") ||
+    pathname.startsWith("/api/webhooks/") ||
     pathname === "/api/notifications/visit";
   if (isPublicPath) {
     return NextResponse.next({ request });
@@ -79,6 +80,5 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-    "/((?!api/webhooks/lemon-squeezy|static|.*\\..*|_next).*)"
   ],
 };
