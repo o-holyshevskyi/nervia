@@ -2,15 +2,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from 'next/dynamic';
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Lightbulb, LinkIcon, Sparkles } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
-
-const ForceGraph2D = dynamic(() => import ('react-force-graph-2d'), {
-    ssr: false,
-});
+import GraphNetwork2D from './GraphNetwork2D';
+import GraphNetwork3D from './GraphNetwork3D';
 
 const imgCache: { [key: string]: HTMLImageElement } = {};
 const iconCache: Record<string, HTMLImageElement> = {};
@@ -24,7 +21,7 @@ const groupColors: Record<number, string> = {
 };
 const groupNames: Record<number, string> = {
     1: "No Group",
-    2: "AI",
+    2: "No Group",
     3: "Finance",
     4: "Design",
     5: "Research",
@@ -67,7 +64,24 @@ function getNodeGroupKey(node: any): string | number {
     return getNodeGroup(node);
 }
 
-/** Read graph theme from CSS variables (no re-render on theme switch). */
+function looksLikeId(s: string, idStr: string): boolean {
+    if (!s || s === idStr) return true;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return true;
+    if (s.length >= 32 && /^[0-9a-f-]+$/i.test(s)) return true;
+    return false;
+}
+
+/** Prefer title/content for display; never show raw id (UUID or similar) as label. */
+function getNodeLabel(node: any): string {
+    const idStr = typeof node.id === 'string' ? node.id : node?.id != null ? String(node.id) : '';
+    const title = (node.title ?? '').toString().trim();
+    const content = (node.content ?? '').toString().trim();
+    if (title && !looksLikeId(title, idStr)) return title;
+    if (content && !looksLikeId(content, idStr)) return content;
+    return 'Untitled';
+}
+
+/** Read graph theme from CSS variables (no re-render on theme switch). Used by 2D; 3D normalizes in its own component. */
 function getGraphThemeColors(container: HTMLElement | null): { nodeColor: string; linkColor: string; graphBg: string } {
     const el = container ?? (typeof document !== 'undefined' ? document.documentElement : null);
     if (!el) return { nodeColor: '#1f2937', linkColor: 'rgba(55, 65, 81, 0.5)', graphBg: '#f9fafb' };
@@ -103,7 +117,12 @@ function getGroupColor(key: string | number, groupColorsById: Record<string, str
 }
 
 function getGroupLabel(key: string | number, groupNamesById: Record<string, string>): string {
-    if (typeof key === 'string') return groupNamesById[key] ?? key;
+    if (typeof key === 'string') {
+        const name = groupNamesById[key];
+        if (name) return name;
+        if (key.length >= 32 && /^[0-9a-f-]+$/i.test(key)) return 'New group';
+        return key;
+    }
     return groupNames[key] ?? `Group ${key}`;
 }
 
@@ -190,14 +209,11 @@ const createIconImage = (IconComponent: any, color: string, strokeWidth: number 
     const cacheKey = `${IconComponent.displayName}-${color}`;
     if (iconCache[cacheKey]) return iconCache[cacheKey];
 
-    // Конвертуємо компонент у рядок SVG
-    // strokeWidth та size можна налаштувати тут
     const svgString = renderToStaticMarkup(
         <IconComponent color={color} size={32} strokeWidth={strokeWidth} />
     );
 
     const img = new Image();
-    // Кодуємо SVG у Base64 для використання в src
     img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
     
     iconCache[cacheKey] = img;
@@ -208,6 +224,7 @@ export interface GraphGroup {
     id: string;
     name: string;
     color: string;
+    description?: string;
 }
 
 interface GraphNetworkProps {
@@ -230,10 +247,40 @@ interface GraphNetworkProps {
     onNodeContextMenu?: (node: any, event: MouseEvent) => void;
     onBackgroundClick?: () => void;
     readOnly?: boolean;
+    renderToolbarExtra?: (buttonClassName: string) => React.ReactNode;
+    canUse3DGraph?: boolean;
+    onRequest3DUpgrade?: () => void;
+    viewMode?: '2D' | '3D';
+    onViewModeChange?: (mode: '2D' | '3D') => void;
 }
 
 function getLinkEnd(linkEnd: any): string | undefined {
     return typeof linkEnd === "string" ? linkEnd : linkEnd?.id;
+}
+
+// ─── helpers shared between physics setup and initial position seeding ───────
+
+function buildClusterCenters2D(
+    nodes: any[],
+    clusterMode: 'group' | 'tag',
+    layoutRadius: number
+): Record<string | number, { x: number; y: number }> {
+    const getClusterKey = (n: any): string | number =>
+        clusterMode === 'group'
+            ? getNodeGroupKey(n)
+            : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
+
+    const rawKeys = [...new Set(nodes.map(getClusterKey))];
+    const uniqueKeys = rawKeys.sort((a, b) => String(a).localeCompare(String(b)));
+    const centers: Record<string | number, { x: number; y: number }> = {};
+    uniqueKeys.forEach((key, i) => {
+        const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
+        centers[key] = {
+            x: layoutRadius * Math.cos(angle),
+            y: layoutRadius * Math.sin(angle),
+        };
+    });
+    return centers;
 }
 
 export default function GraphNetwork({ 
@@ -255,13 +302,40 @@ export default function GraphNetwork({
     solarSystemNodeId = null,
     clusterMode = 'group',
     groups = [],
-    readOnly = false
+    readOnly = false,
+    renderToolbarExtra,
+    canUse3DGraph = false,
+    onRequest3DUpgrade,
+    viewMode = '2D',
+    onViewModeChange,
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
-    const lastTransformRef = useRef<{ k: number; x: number; y: number } | null>(null);
+    const fg3dRef = useRef<any>(null);
     const prevNodeCountRef = useRef(0);
+    const prevViewModeRef = useRef(viewMode);
+    const threeDKeyRef = useRef(0);
+    if (prevViewModeRef.current !== '3D' && viewMode === '3D') {
+        threeDKeyRef.current += 1;
+    }
+    prevViewModeRef.current = viewMode;
+
+    // ── Engine-ready signal ──────────────────────────────────────────────────
+    // Incremented when the 2D graph engine fires onEngineStop (first run or after reheat).
+    // Physics useEffect depends on this so it re-runs once the dynamic import has resolved
+    // and fgRef.current is set; otherwise the first effect run sees null and forces never apply.
+    const [engineReadyCount, setEngineReadyCount] = useState(0);
+    const handleEngineStop = useCallback(() => {
+        setEngineReadyCount((c) => c + 1);
+    }, []);
+
+    // Fallback: if onEngineStop doesn't fire (e.g. library timing), re-run physics after ref is likely set.
+    useEffect(() => {
+        if (viewMode !== '2D') return;
+        const t = setTimeout(() => setEngineReadyCount((c) => Math.max(c, 1)), 400);
+        return () => clearTimeout(t);
+    }, [viewMode]);
 
     const groupColorsById = useMemo(() => {
         const out: Record<string, string> = {};
@@ -271,6 +345,11 @@ export default function GraphNetwork({
     const groupNamesById = useMemo(() => {
         const out: Record<string, string> = {};
         for (const g of groups) out[g.id] = g.name;
+        return out;
+    }, [groups]);
+    const groupDescriptionsById = useMemo(() => {
+        const out: Record<string, string> = {};
+        for (const g of groups) if (g.description) out[g.id] = g.description;
         return out;
     }, [groups]);
 
@@ -367,19 +446,28 @@ export default function GraphNetwork({
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
-        const layoutRadius = 280;
+
+        const minDim = Math.min(dimensions.width, dimensions.height);
+        const layoutRadius = minDim * 0.48;
+        const getClusterKey = (n: any): string | number =>
+            clusterMode === 'group'
+                ? getNodeGroupKey(n)
+                : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
+        const clusterCenters = buildClusterCenters2D(workingNodes, clusterMode, layoutRadius);
+
+        const jitter = 28;
         const nodesWithVal = workingNodes.map((node: any, index: number) => {
             const id = getNodeId(node);
             const degree = degreeMap[id] ?? 0;
             const val = Math.min(4 + degree * 1.5, 20);
-            const g = getNodeGroup(node);
             const idStr = id != null ? String(id) : `i${index}`;
-            const h = hashStr(idStr);
-            const angle = h * 2 * Math.PI;
-            const r = layoutRadius * (0.3 + 0.7 * (hashStr(idStr + "r") % 1));
-            const x = r * Math.cos(angle);
-            const y = r * Math.sin(angle);
-            return { ...node, val, x: node.x ?? x, y: node.y ?? y };
+            const key = getClusterKey(node);
+            const center = clusterCenters[key];
+            const dx = center ? jitter * (hashStr(idStr + 'x') - 0.5) : 0;
+            const dy = center ? jitter * (hashStr(idStr + 'y') - 0.5) : 0;
+            const x = center ? center.x + dx : 0;
+            const y = center ? center.y + dy : 0;
+            return { ...node, val, x, y };
         });
         const linksCopy = workingLinks.map((link: any) => ({ ...link }));
         if (pathfinderActive) {
@@ -404,15 +492,15 @@ export default function GraphNetwork({
             return { nodes: [...dim, ...bright], links: linksCopy };
         }
         return { nodes: nodesWithVal, links: linksCopy };
-    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate]);
+    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate, dimensions.width, dimensions.height, clusterMode]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
             try {
                 const domain = new URL(node.url).hostname;
-                return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-            } catch (e) {
-                return `https://www.google.com/s2/favicons?domain=${node.url}&sz=64`;
+                return `/api/favicon?domain=${domain}`;
+            } catch {
+                return null;
             }
         }
         return null;
@@ -422,28 +510,23 @@ export default function GraphNetwork({
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
         const tId = typeof link.target === 'string' ? link.target : link.target?.id;
 
-        // Solar System (Deep Focus): hide links where BOTH endpoints are outside the solar set
         if (solarSystemNodeId) {
             if (!solarNeighbors.has(sId) && !solarNeighbors.has(tId)) return true;
             return false;
         }
 
-        // Pathfinder: show only path links; hide all others
         if (pathfinderActive) {
             return !isPathLink(link);
         }
 
-        // 0. Neural Search: hide links that don't touch at least one highlighted node
         if (searchActive) {
             if (!highlightedSet.has(sId) && !highlightedSet.has(tId)) return true;
         }
         
-        // 1. Zen Mode: ховаємо лінки, якщо жодна з нод не є центральною
         if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) {
             return true; 
         }
 
-        // 2. Filter Tag: ховаємо лінки, якщо хоча б одна з нод не має потрібного тегу
         if (activeTag) {
             const sTags = typeof link.source === 'object' ? link.source.tags : graphData.nodes.find((n: any) => n.id === sId)?.tags;
             const tTags = typeof link.target === 'object' ? link.target.tags : graphData.nodes.find((n: any) => n.id === tId)?.tags;
@@ -462,11 +545,10 @@ export default function GraphNetwork({
 
         const themeColors = getGraphThemeColors(containerRef.current);
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
-        const label = node.title ?? node.content ?? idStr ?? '';
+        const label = getNodeLabel(node);
         const rawSize = (node.val ?? 4) * 1;
         let size = Math.min(20, Math.max(6, rawSize));
 
-        // Solar System (Deep Focus): top priority
         let isHidden = false;
         let baseColor: string;
         let strongGlow = false;
@@ -484,7 +566,6 @@ export default function GraphNetwork({
                 strongGlow = true;
             }
         } else {
-            // Pathfinder mode overrides Zen and search
             const isPathNode = pathfinderActive && pathNodeSet.has(idStr);
             const pathStartId = pathNodes[0];
             const pathEndId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
@@ -519,7 +600,6 @@ export default function GraphNetwork({
             ? (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor)
             : baseColor;
 
-        // Neural Core context halo: pulsing semi-transparent ring (cyan/purple) when node is in context
         const isContextNode = contextNodeSet.has(idStr);
         if (isContextNode) {
             const t = Date.now() / 500;
@@ -542,7 +622,6 @@ export default function GraphNetwork({
             ctx.restore();
         }
 
-        // New-node ping: glowing circle behind the node that fades out over a few seconds
         if (node.isNew && node.newPingAt) {
             const elapsed = Date.now() - (node.newPingAt as number);
             const duration = 4000;
@@ -562,7 +641,6 @@ export default function GraphNetwork({
             }
         }
 
-        // 2. Малюємо порожнє коло (Border)
         ctx.beginPath();
         ctx.arc(x, y, size, 0, 2 * Math.PI, false);
         
@@ -570,14 +648,12 @@ export default function GraphNetwork({
         ctx.fillStyle = innerFill;
         ctx.fill();
 
-        // Налаштування бордера (stronger glow for search/path/solar highlight)
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = strongGlow ? 2.5 / globalScale : 2 / globalScale;
         ctx.shadowColor = strokeColor;
         ctx.shadowBlur = strongGlow ? 18 / globalScale : 10 / globalScale;
         ctx.stroke();
 
-        // 3. Малюємо іконку/емодзі всередині (якщо не приховано)
         if (!isHidden) {
             const iconUrl = getNodeIconUrl(node);
             const iconSize = size * 1.2;
@@ -592,7 +668,6 @@ export default function GraphNetwork({
                     const iconSize = size * 1.2;
                     ctx.save();
                     ctx.beginPath();
-                    // Кліпаємо коло трохи менше за бордер, щоб іконка не вилазила
                     ctx.arc(x, y, size * 0.8, 0, Math.PI * 2, true);
                     ctx.clip();
                     ctx.drawImage(img, x - iconSize/2, y - iconSize/2, iconSize, iconSize);
@@ -606,10 +681,8 @@ export default function GraphNetwork({
                     iconImg = createIconImage(FileText, baseColor);
                 }
 
-                // Малюємо іконку, якщо вона завантажена
                 if (iconImg && iconImg.complete) {
                     ctx.save();
-                    // Додаємо легке світіння самій іконці
                     ctx.shadowColor = baseColor;
                     ctx.shadowBlur = 8 / globalScale;
                     
@@ -625,7 +698,6 @@ export default function GraphNetwork({
             }
         }
 
-        // 4. Текст під нодою (theme-aware)
         if (globalScale > 1.5) {
             const fontSize = 12 / globalScale;
             ctx.font = `${fontSize}px Inter, sans-serif`;
@@ -655,62 +727,61 @@ export default function GraphNetwork({
         }
     }, []);
 
+    // ── 2D Physics setup ─────────────────────────────────────────────────────
+    // NOTE: `engineReadyCount` is intentionally included so this effect re-runs
+    // once the dynamic import resolves and ForceGraph2D fires its first onEngineStop.
+    // Without it, fgRef.current is null on the very first run and forces are never applied.
     useEffect(() => {
         if (!fgRef.current) return;
         const fg = fgRef.current;
-        const cx = dimensions.width / 2;
-        const cy = dimensions.height / 2;
         const minDim = Math.min(dimensions.width, dimensions.height);
-        const radius = minDim * 0.35;
+        const radius = minDim * 0.48;
 
         const getClusterKey = (node: any): string | number => {
-            if (clusterMode === 'group') {
-                return getNodeGroupKey(node);
-            }
+            if (clusterMode === 'group') return getNodeGroupKey(node);
             return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
         };
 
-        const rawKeys = [...new Set(processedData.nodes.map((n: any) => getClusterKey(n)))];
-        const uniqueKeys = clusterMode === 'group'
-            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
-            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
+        const clusterCenters = buildClusterCenters2D(processedData.nodes, clusterMode, radius);
 
-        const clusterCenters: Record<string | number, { x: number; y: number }> = {};
-        uniqueKeys.forEach((key, i) => {
-            const angle = (i * 2 * Math.PI) / Math.max(1, uniqueKeys.length);
-            clusterCenters[key] = {
-                x: cx + radius * Math.cos(angle),
-                y: cy + radius * Math.sin(angle),
-            };
+        // Seed positions deterministically so nodes start near their cluster center
+        const jitter = 28;
+        processedData.nodes.forEach((node: any) => {
+            const key = getClusterKey(node);
+            const center = clusterCenters[key];
+            if (!center) return;
+            const idStr = (typeof node.id === 'string' ? node.id : node?.id) ?? '';
+            const dx = jitter * (hashStr(String(idStr) + 'x') - 0.5);
+            const dy = jitter * (hashStr(String(idStr) + 'y') - 0.5);
+            (node as any).x = center.x + dx;
+            (node as any).y = center.y + dy;
         });
 
         const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
 
         if (solarSystemNodeId && solarNeighbors.size > 0) {
-            // Solar System mode: lock sun at center, neighbors on radial ring
             const centerNode = processedData.nodes.find(
                 (n: any) => getNodeIdStr(n) === solarSystemNodeId
             );
             if (centerNode) {
-                (centerNode as any).fx = cx;
-                (centerNode as any).fy = cy;
+                (centerNode as any).fx = 0;
+                (centerNode as any).fy = 0;
             }
             fg.d3Force('x', null);
             fg.d3Force('y', null);
-            fg.d3Force('radial', forceRadial(250, cx, cy).strength((node: any) =>
+            fg.d3Force('radial', forceRadial(250, 0, 0).strength((node: any) =>
                 solarNeighbors.has(getNodeIdStr(node)) ? 1 : 0
             ));
             fg.d3Force('collide', forceCollide(24).strength(1));
         } else {
-            // Normal mode: clear all fx/fy so no node stays pinned
             processedData.nodes.forEach((node: any) => {
                 delete (node as any).fx;
                 delete (node as any).fy;
             });
             fg.d3Force('radial', null);
             fg.d3Force('collide', null);
-            fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? cx).strength(0.15));
-            fg.d3Force('y', forceY((node: any) => clusterCenters[getClusterKey(node)]?.y ?? cy).strength(0.15));
+            fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? 0).strength(0.4));
+            fg.d3Force('y', forceY((node: any) => clusterCenters[getClusterKey(node)]?.y ?? 0).strength(0.4));
         }
 
         fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
@@ -729,15 +800,14 @@ export default function GraphNetwork({
         }
 
         fg.d3ReheatSimulation();
-    }, [physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [engineReadyCount, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
 
     useEffect(() => {
         if (!solarSystemNodeId || !fgRef.current) return;
-        const cx = dimensions.width / 2;
-        const cy = dimensions.height / 2;
-        fgRef.current.centerAt(cx, cy, 800);
+        fgRef.current.centerAt(0, 0, 800);
         fgRef.current.zoom(3, 800);
-    }, [solarSystemNodeId, dimensions.width, dimensions.height]);
+    }, [solarSystemNodeId]);
 
     useEffect(() => {
         if (!fgRef.current || contextNodeIds.length === 0) return;
@@ -768,9 +838,7 @@ export default function GraphNetwork({
         fgRef.current.zoom(k, 400);
     }, [contextNodeIds.length, contextNodeSet, processedData.nodes, dimensions.width, dimensions.height]);
 
-    const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
-        lastTransformRef.current = { k: transform.k, x: transform.x, y: transform.y };
-    }, []);
+    const handleZoom = useCallback((_transform: { k: number; x: number; y: number }) => {}, []);
 
     useEffect(() => {
         if (!flyToNodeId || !fgRef.current) return;
@@ -786,32 +854,28 @@ export default function GraphNetwork({
         onFlyToComplete?.();
     }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
+    const CENTER_ANIMATION_MS = 1000; 
+    const DEFAULT_ZOOM_ON_CENTER = 1.2;
     useEffect(() => {
         if (timelineDate != null) return;
         const nodeCount = processedData.nodes.length;
         const prevCount = prevNodeCountRef.current;
         prevNodeCountRef.current = nodeCount;
-        if (nodeCount > prevCount && prevCount > 0 && lastTransformRef.current && fgRef.current) {
-            const { k, x, y } = lastTransformRef.current;
-            const w = dimensions.width;
-            const h = dimensions.height;
-            const centerX = (w / 2 - x) / k;
-            const centerY = (h / 2 - y) / k;
-            const restore = () => {
-                if (!fgRef.current || !isFinite(centerX) || !isFinite(centerY)) return;
-                fgRef.current.centerAt(centerX, centerY, 0);
-                fgRef.current.zoom(k, 0);
-            };
-            const t1 = setTimeout(restore, 100);
-            const t2 = setTimeout(restore, 400);
-            const t3 = setTimeout(restore, 800);
-            return () => {
-                clearTimeout(t1);
-                clearTimeout(t2);
-                clearTimeout(t3);
-            };
+        if (!fgRef.current) return;
+        
+        const isFirstLoad = prevCount === 0 && nodeCount > 0;
+        const isNewNeuron = nodeCount > prevCount && prevCount > 0;
+        
+        if (isFirstLoad || isNewNeuron) {
+            // 🔥 If it's the first load, instantly pull the camera WAY back
+            // so the animation beautifully zooms all the way in
+            if (isFirstLoad) {
+                fgRef.current.zoom(0.1); 
+            }
+            fgRef.current.centerAt(0, 0, CENTER_ANIMATION_MS);
+            fgRef.current.zoom(DEFAULT_ZOOM_ON_CENTER, CENTER_ANIMATION_MS);
         }
-    }, [processedData.nodes.length, dimensions.width, dimensions.height, timelineDate]);
+    }, [processedData.nodes.length, timelineDate]);
 
     useEffect(() => {
         if (!fgRef.current || processedData.nodes.length === 0) return;
@@ -821,46 +885,131 @@ export default function GraphNetwork({
         return () => clearTimeout(t);
     }, [processedData.nodes.length]);
 
-    useEffect(() => {
-        if (lastTransformRef.current != null) return;
-        const id = setTimeout(() => {
-            if (fgRef.current) {
-                const center = fgRef.current.centerAt();
-                const zoom = fgRef.current.zoom();
-                if (center && typeof zoom === 'number' && Number.isFinite(center.x) && Number.isFinite(center.y)) {
-                    const w = dimensions.width;
-                    const h = dimensions.height;
-                    lastTransformRef.current = {
-                        k: zoom,
-                        x: w / 2 - center.x * zoom,
-                        y: h / 2 - center.y * zoom,
-                    };
+    const ZOOM_FACTOR = 1.25;
+    const NAV_DURATION_MS = 250;
+    const RECENTER_MS = 800;
+    const RECENTER_ZOOM = 1.2;
+    const handleZoomIn = useCallback(() => {
+        if (viewMode === '3D') {
+            const fg3d = fg3dRef.current;
+            if (fg3d?.cameraPosition) {
+                const pos = fg3d.cameraPosition();
+                if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' && typeof pos.z === 'number') {
+                    const scale = 1 / ZOOM_FACTOR;
+                    fg3d.cameraPosition(
+                        { x: pos.x * scale, y: pos.y * scale, z: pos.z * scale },
+                        { x: 0, y: 0, z: 0 },
+                        NAV_DURATION_MS
+                    );
                 }
             }
-        }, 600);
-        return () => clearTimeout(id);
-    }, [processedData.nodes.length, dimensions.width, dimensions.height]);
+            return;
+        }
+        if (!fgRef.current) return;
+        const k = fgRef.current.zoom();
+        if (typeof k === 'number' && Number.isFinite(k)) {
+            fgRef.current.zoom(Math.min(8, k * ZOOM_FACTOR), NAV_DURATION_MS);
+        }
+    }, [viewMode]);
+    const handleZoomOut = useCallback(() => {
+        if (viewMode === '3D') {
+            const fg3d = fg3dRef.current;
+            if (fg3d?.cameraPosition) {
+                const pos = fg3d.cameraPosition();
+                if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' && typeof pos.z === 'number') {
+                    const scale = ZOOM_FACTOR;
+                    fg3d.cameraPosition(
+                        { x: pos.x * scale, y: pos.y * scale, z: pos.z * scale },
+                        { x: 0, y: 0, z: 0 },
+                        NAV_DURATION_MS
+                    );
+                }
+            }
+            return;
+        }
+        if (!fgRef.current) return;
+        const k = fgRef.current.zoom();
+        if (typeof k === 'number' && Number.isFinite(k)) {
+            fgRef.current.zoom(Math.max(0.2, k / ZOOM_FACTOR), NAV_DURATION_MS);
+        }
+    }, [viewMode]);
+    const handleRecenter = useCallback(() => {
+        if (viewMode === '3D') {
+            const fg3d = fg3dRef.current;
+            if (typeof fg3d?.zoomToFit === 'function') {
+                fg3d.zoomToFit(RECENTER_MS, 120);
+            }
+            return;
+        }
+        if (!fgRef.current) return;
+        fgRef.current.centerAt(0, 0, RECENTER_MS);
+        fgRef.current.zoom(RECENTER_ZOOM, RECENTER_MS);
+    }, [viewMode]);
+
+    const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-200 cursor-pointer";
+
+    const graphTheme = getGraphThemeColors(containerRef.current);
+    const dataFor3D = useMemo(() => {
+        if (viewMode !== '3D') return processedData;
+        const getClusterKey = (n: any): string | number =>
+            clusterMode === 'group'
+                ? getNodeGroupKey(n)
+                : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
+        const rawKeys = [...new Set(processedData.nodes.map((n: any) => getClusterKey(n)))];
+        const uniqueKeys = clusterMode === 'group'
+            ? rawKeys.sort((a, b) => String(a).localeCompare(String(b)))
+            : (rawKeys as string[]).sort((a, b) => String(a).localeCompare(String(b)));
+        const minDim = Math.min(dimensions.width, dimensions.height);
+        const layoutRadius = minDim * 0.48;
+        const clusterZ: Record<string | number, number> = {};
+        uniqueKeys.forEach((key, i) => {
+            const t = uniqueKeys.length > 1 ? (i / (uniqueKeys.length - 1)) * 2 - 1 : 0;
+            clusterZ[key] = t * layoutRadius * 0.6;
+        });
+        const jitterZ = 20;
+        const nodes = processedData.nodes.map((n: any) => {
+            const key = getClusterKey(n);
+            const zCenter = clusterZ[key] ?? 0;
+            const idStr = (typeof n.id === 'string' ? n.id : n?.id) ?? '';
+            const j = (hashStr(idStr + 'z') - 0.5) * jitterZ;
+            const x = typeof n.x === 'number' ? n.x : 0;
+            const y = typeof n.y === 'number' ? n.y : 0;
+            return { ...n, x, y, z: zCenter + j };
+        });
+        return { nodes, links: processedData.links };
+    }, [viewMode, processedData, clusterMode, dimensions.width, dimensions.height]);
+
+    const graphTransition = { duration: 1.5, ease: [0.25, 0.1, 0.25, 1] as const };
 
     return (
-        <div 
-            ref={containerRef} 
-            className="w-full h-screen"
+        <div
+            ref={containerRef}
+            className={`w-full h-screen relative ${viewMode === '3D' ? '' : ''}`}
             style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
-            <ForceGraph2D
+            <AnimatePresence initial={false} mode="wait">
+            {viewMode === '2D' && (
+            <motion.div
+                key="graph-2d"
+                className="absolute inset-0 w-full h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: graphTransition }}
+                exit={{ opacity: 0, transition: { duration: 4, ease: [0.4, 0, 0.2, 1] as const } }}
+            >
+            <GraphNetwork2D
                 ref={fgRef}
                 width={dimensions.width}
                 height={dimensions.height}
                 graphData={processedData}
                 nodeVal={(node: any) => node.val ?? 4}
-                nodeLabel={(node: any) => node.title ?? node.content ?? (typeof node.id === 'string' ? node.id : node.id?.id) ?? ''}
+                nodeLabel={getNodeLabel}
                 nodeCanvasObject={drawNode}
                 onRenderFramePre={handleRenderFramePre}
                 onZoom={handleZoom}
-                warmupTicks={100}
+                warmupTicks={0}
                 d3AlphaDecay={0.0228}
-                d3VelocityDecay={0.4}                
+                d3VelocityDecay={0.4}
                 onNodeClick={(node: any) => {
                     if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
                         fgRef.current.centerAt(node.x, node.y, 800);
@@ -875,7 +1024,6 @@ export default function GraphNetwork({
                     if (onBackgroundClick) onBackgroundClick();
                 }}
                 onLinkHover={(link) => setHoveredLink(link)}
-                
                 nodePointerAreaPaint={(node: any, color, ctx) => {
                     const x = node.x ?? 0;
                     const y = node.y ?? 0;
@@ -945,9 +1093,104 @@ export default function GraphNetwork({
                     if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : theme.nodeColor;
                     return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : theme.linkColor;
                 }}
-                backgroundColor="transparent"
+                backgroundColor="rgba(0,0,0,0)"
                 enablePointerInteraction={true}
+                onEngineStop={handleEngineStop}
             />
+            </motion.div>
+            )}
+            {viewMode === '3D' && (
+            <motion.div
+                key="graph-3d"
+                className="absolute inset-0 w-full h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: graphTransition }}
+                exit={{ opacity: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] as const } }}
+            >
+            <GraphNetwork3D
+                key={`3d-${threeDKeyRef.current}`}
+                ref={fg3dRef}
+                width={dimensions.width}
+                height={dimensions.height}
+                graphData={dataFor3D}
+                graphTheme={graphTheme}
+                groupColorsById={groupColorsById}
+                groupNamesById={groupNamesById}
+                groupDescriptionsById={groupDescriptionsById}
+                nodeIdToGroupKeyMap={nodeIdToGroupKeyMap}
+                getNodeGroupKey={getNodeGroupKey}
+                getNodeLabel={getNodeLabel}
+                getNodeIconUrl={getNodeIconUrl}
+                linkDistance={physicsConfig.linkDistance}
+                readOnly={readOnly}
+                onNodeSelect={onNodeSelect}
+                onNodeContextMenu={onNodeContextMenu}
+                onBackgroundClick={onBackgroundClick}
+            />
+            </motion.div>
+            )}
+            </AnimatePresence>
+            {graphData.nodes.length > 0 && (
+                <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none overflow-hidden">
+                    <div className="pointer-events-auto flex flex-col gap-1 overflow-hidden">
+                        <AnimatePresence initial={false} mode="wait">
+                            {viewMode === '2D' && (
+                                <motion.div
+                                    key="nav-zoom-recenter"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{
+                                        opacity: 1,
+                                        scale: 1,
+                                        transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
+                                    }}
+                                    exit={{
+                                        opacity: 0,
+                                        scale: 0.9,
+                                        transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
+                                    }}
+                                    className="flex flex-col gap-1 origin-top"
+                                >
+                                    <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
+                                        <ZoomIn size={18} />
+                                    </button>
+                                    <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
+                                        <ZoomOut size={18} />
+                                    </button>
+                                    <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
+                                        <Locate size={18} />
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        {canUse3DGraph ? (
+                            <button
+                                type="button"
+                                onClick={() => onViewModeChange?.(viewMode === '3D' ? '2D' : '3D')}
+                                className={viewMode === '3D'
+                                    ? "flex items-center justify-center w-10 h-10 rounded-xl text-white bg-purple-500/80 dark:bg-purple-500/80 hover:bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)] dark:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all duration-200 cursor-pointer"
+                                    : navBtnClass
+                                }
+                                title="Toggle 3D Universe"
+                                aria-label={viewMode === '3D' ? 'Switch to 2D' : 'Switch to 3D'}
+                            >
+                                <Box size={18} />
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={onRequest3DUpgrade}
+                                className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 opacity-70 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all cursor-pointer relative"
+                                title="3D Universe (Singularity only)"
+                                aria-label="3D Universe (Singularity only)"
+                            >
+                                <Box size={18} />
+                                <Lock size={10} className="absolute bottom-0.5 right-0.5 text-purple-500 dark:text-purple-400" />
+                            </button>
+                        )}
+                        {renderToolbarExtra?.(navBtnClass)}
+                    </div>
+                </div>
+            )}
             <AnimatePresence>
                 {hoveredLink && (
                     <motion.div

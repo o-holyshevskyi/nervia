@@ -121,29 +121,30 @@ export function useAIProcessor(
                     }
                 }
 
-                // 1. Оновлюємо основні дані ноди в БД (включаючи AI-призначену групу по group_id)
+                // 1. Update local state first (title, content, group_id) so graph shows title before any realtime
                 const finalTags = [...new Set([...(node.tags || []), ...(aiData.tags || [])])];
                 const groupId = Object.prototype.hasOwnProperty.call(aiData, 'group_id')
                     ? (typeof aiData.group_id === 'string' && aiData.group_id.length > 0 ? aiData.group_id : null)
                     : undefined;
+                const nodeTitle = (node.title ?? node.content ?? '').toString().trim();
+                onNodeUpdate(nodeId, {
+                    title: nodeTitle || undefined,
+                    content: aiData.summary,
+                    tags: finalTags,
+                    is_ai_processed: true,
+                    ...(groupId !== undefined && { group_id: groupId }),
+                });
+
                 const dbUpdate: Record<string, unknown> = {
                     content: aiData.summary,
                     tags: finalTags,
                     is_ai_processed: true,
                 };
                 if (groupId !== undefined) dbUpdate.group_id = groupId;
-
                 await supabase.from('nodes')
                     .update(dbUpdate)
                     .eq('id', nodeId)
                     .eq('user_id', userId);
-
-                onNodeUpdate(nodeId, {
-                    content: aiData.summary,
-                    tags: finalTags,
-                    is_ai_processed: true,
-                    ...(groupId !== undefined && { group_id: groupId }),
-                });
 
                 await sleep(350);
             } catch (err) {

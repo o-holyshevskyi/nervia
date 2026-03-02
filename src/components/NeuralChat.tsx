@@ -6,8 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Send, Sparkles } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
 
-const PREMIUM_MAX_MESSAGES = 6;
-
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -18,7 +16,6 @@ interface NeuralChatProps {
   isOpen: boolean;
   onClose: () => void;
   nodes: any[];
-  isPremium?: boolean;
   setContextNodeIds?: (ids: string[]) => void;
 }
 
@@ -40,7 +37,6 @@ export default function NeuralChat({
   isOpen,
   onClose,
   nodes,
-  isPremium = false,
   setContextNodeIds,
 }: NeuralChatProps) {
   const [input, setInput] = useState("");
@@ -61,10 +57,7 @@ export default function NeuralChat({
     [nodes]
   );
 
-  const displayedMessages = useMemo(() => {
-    if (isPremium) return messages;
-    return messages.slice(-PREMIUM_MAX_MESSAGES);
-  }, [messages, isPremium]);
+  const displayedMessages = messages;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -77,7 +70,6 @@ export default function NeuralChat({
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || isLoading) return;
-    if (!isPremium && messages.length >= PREMIUM_MAX_MESSAGES) return;
 
     setInput("");
     setError(null);
@@ -167,8 +159,7 @@ export default function NeuralChat({
     }
   };
 
-  const atPremiumLimit = !isPremium && messages.length >= PREMIUM_MAX_MESSAGES;
-  const canSend = input.trim().length > 0 && !isLoading && !atPremiumLimit;
+  const canSend = input.trim().length > 0 && !isLoading;
 
   return (
     <AnimatePresence>
@@ -193,11 +184,6 @@ export default function NeuralChat({
                 <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
                   Neural Core
                 </span>
-                {!isPremium && (
-                  <span className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                    Premium
-                  </span>
-                )}
               </div>
               <CloseButton onClose={onClose} size={18} />
             </div>
@@ -316,11 +302,6 @@ export default function NeuralChat({
             </div>
 
             <div className="p-4 border-t border-black/10 dark:border-white/10 shrink-0 space-y-2">
-              {atPremiumLimit && (
-                <p className="text-xs text-amber-600 dark:text-amber-400/90">
-                  Premium: conversation history limited. Upgrade to continue.
-                </p>
-              )}
               <div className="flex gap-2">
                 <input
                   ref={inputRef}
@@ -329,7 +310,7 @@ export default function NeuralChat({
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask about your knowledge base…"
-                  disabled={isLoading || atPremiumLimit}
+                  disabled={isLoading}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-400 text-sm focus:outline-none focus:border-indigo-500/50 dark:focus:border-purple-500/50 disabled:opacity-50"
                 />
                 <button

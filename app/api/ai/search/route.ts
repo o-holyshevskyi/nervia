@@ -68,14 +68,14 @@ export async function POST(req: Request) {
       .join("\n");
 
     const model = genAI.getGenerativeModel({ model: "gemma-3-27b-it" });
-    const prompt = `You are a semantic search engine over a knowledge graph.
+    const prompt = `You are a semantic search engine over a knowledge graph (called "universe").
 
 USER QUERY: "${query.trim()}"
 
 NODES (each has id, summary, and tags):
 ${nodesList}
 
-TASK: Find the top 3 to 5 nodes that best match the query BY MEANING (not just keyword). Use summary and tags to decide relevance. Return ONLY a JSON object, no other text.
+TASK: Find the top 3 to 5 nodes (neurons) in the universe that best match the query BY MEANING (not just keyword). Use summary and tags to decide relevance. Return ONLY a JSON object, no other text.
 
 Output format (use exact field names):
 {

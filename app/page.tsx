@@ -5,7 +5,7 @@ import GraphNetwork from "@/src/components/GraphNetwork";
 import Sidebar from "@/src/components/Sidebar";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import AddModal from "@/src/components/AddModal";
-import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route, Sun } from "lucide-react";
+import { Eye, PanelLeftOpen, Plus, Loader2, Sparkles, X, Route, Sun, Settings2 } from "lucide-react";
 import LeftSidebar from "@/src/components/LeftSidebar";
 import CommandPalette from "@/src/components/CommandPalette";
 import ContextMenu from "@/src/components/ui/ContextMenu";
@@ -24,12 +24,31 @@ import NeuralChat from "@/src/components/NeuralChat";
 import OnboardingTour from "@/src/components/OnboardingTour";
 import { useOnboarding } from "@/src/hooks/useOnboarding";
 import { useNotifications } from "@/src/hooks/useNotifications";
+import { usePlan } from "@/src/hooks/usePlan";
+import { useFeatureAccess } from "@/src/hooks/useFeatureAccess";
+
+const VIEW_MODE_STORAGE_KEY = 'nervia-graph-view-mode';
+function getStoredViewMode(): '2D' | '3D' {
+    if (typeof window === 'undefined') return '2D';
+    const v = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return (v === '2D' || v === '3D') ? v : '2D';
+}
+import UpgradeModal, { type UpgradeTargetPlan } from "@/src/components/UpgradeModal";
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
+import { NeuralBackground } from "@/src/components/NeuralBackground";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
     const { hasCompletedOnboarding, isLoading: isOnboardingLoading, completeOnboarding } = useOnboarding(supabase);
+    const { plan } = usePlan(supabase);
+    const access = useFeatureAccess(plan);
+    const [upgradeModalTarget, setUpgradeModalTarget] = useState<UpgradeTargetPlan | null>(null);
+    const [upgradeModalDescriptionOverride, setUpgradeModalDescriptionOverride] = useState<string | undefined>(undefined);
+    const openUpgradeModal = useCallback((target: UpgradeTargetPlan, options?: { descriptionOverride?: string }) => {
+        setUpgradeModalTarget(target);
+        setUpgradeModalDescriptionOverride(options?.descriptionOverride);
+    }, []);
 
     const { 
         data, 
@@ -41,7 +60,7 @@ export default function Home() {
         deleteLink,
         importData,
         exportData,
-    } = useGraphData(supabase);
+    } = useGraphData(supabase, { neuronLimit: access.neuronLimit });
 
     const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
         supabase,
@@ -50,7 +69,17 @@ export default function Home() {
         data.nodes
     );
 
-    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup } = useGroups(supabase);
+    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup, refetch: refetchGroups } = useGroups(supabase);
+
+    // When any node has a group_id not in our groups list (e.g. AI-created group on backend), refetch groups so the graph shows the real name
+    const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
+    useEffect(() => {
+        const hasMissingGroup = data.nodes.some((n: any) => {
+            const gid = n?.group_id;
+            return typeof gid === 'string' && gid.length > 0 && !groupIds.has(gid);
+        });
+        if (hasMissingGroup) refetchGroups();
+    }, [data.nodes, groupIds, refetchGroups]);
 
     const handleNotificationInsert = useCallback((n: any) => {
         if (n?.type === "visit") {
@@ -149,6 +178,17 @@ export default function Home() {
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
     const [zenModeNodeId, setZenModeNodeId] = useState<string | null>(null);
     const [solarSystemNodeId, setSolarSystemNodeId] = useState<string | null>(null);
+    const [viewMode, setViewModeState] = useState<'2D' | '3D'>(getStoredViewMode);
+    const setViewMode = useCallback((mode: '2D' | '3D') => {
+        setViewModeState(mode);
+        if (typeof window !== 'undefined') localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    }, []);
+
+    // Genesis/Constellation: force 2D; only Singularity can use 3D
+    useEffect(() => {
+        if (!access.canUse3DGraph && viewMode === '3D') setViewMode('2D');
+    }, [access.canUse3DGraph, viewMode, setViewMode]);
+    const [physicsPanelOpen, setPhysicsPanelOpen] = useState(false);
     const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
         repulsion: 150,
         linkDistance: 60
@@ -236,8 +276,10 @@ export default function Home() {
     const timelineDateRef = useRef(timelineDate);
     timelineDateRef.current = timelineDate;
     const playbackRafRef = useRef<number>(0);
+    const playbackCancelledRef = useRef(false);
     useEffect(() => {
         if (!isPlaying || data.nodes.length === 0 || timelineDatePoints.length === 0) return;
+        playbackCancelledRef.current = false;
         const duration = playbackDurationSeconds * 1000;
         const start = Date.now();
         const points = timelineDatePoints;
@@ -249,6 +291,7 @@ export default function Home() {
             return;
         }
         const tick = () => {
+            if (playbackCancelledRef.current) return;
             const elapsed = Date.now() - start;
             const t = Math.min(1, elapsed / duration);
             const step = startStep + t * (endStep - startStep);
@@ -261,7 +304,10 @@ export default function Home() {
             }
         };
         playbackRafRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(playbackRafRef.current);
+        return () => {
+            playbackCancelledRef.current = true;
+            cancelAnimationFrame(playbackRafRef.current);
+        };
     }, [isPlaying, data.nodes.length, timelineDatePoints, playbackDurationSeconds]);
 
     const [contextMenu, setContextMenu] = useState({
@@ -280,6 +326,10 @@ export default function Home() {
     }, [data]);
 
     const toggleZenMode = (nodeId: string) => {
+        if (!access.canUseZenMode) {
+            openUpgradeModal("constellation");
+            return;
+        }
         if (zenModeNodeId === nodeId) {
             setZenModeNodeId(null);
         } else {
@@ -314,6 +364,10 @@ export default function Home() {
     }, [data.nodes]);
 
     const handleAddWithAI = async (nodeData: any) => {
+        if (!access.canAddNeuron(data.nodes.length)) {
+            openUpgradeModal("constellation");
+            return;
+        }
         setAddError(null);
         setAiTotal(1);
         setAiProgress(0);
@@ -323,7 +377,11 @@ export default function Home() {
         try {
             createdNode = await addNewNode(nodeData);
         } catch (e) {
-            setAddError(e instanceof Error ? e.message : 'Failed to add neuron.');
+            if (e instanceof Error && (e as Error & { code?: string }).code === 'NEURON_LIMIT_REACHED') {
+                openUpgradeModal("constellation");
+            } else {
+                setAddError(e instanceof Error ? e.message : 'Failed to add neuron.');
+            }
             setIsAIProcessing(false);
             return;
         }
@@ -428,24 +486,28 @@ export default function Home() {
             }
             if (e.key === "p" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsPathfinderOpen(true);
+                if (access.canUsePathfinder) setIsPathfinderOpen(true);
+                else openUpgradeModal("constellation");
             }
             if (e.key === "t" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsTimelineOpen(true);
+                if (access.canUseTimeMachine) setIsTimelineOpen(true);
+                else openUpgradeModal("singularity");
             }
             if (e.key === "h" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsHistoryOpen(true);
+                if (access.canUseEvolutionJournal) setIsHistoryOpen(true);
+                else openUpgradeModal("singularity");
             }
             if (e.key === "c" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                setIsChatOpen(true);
+                if (access.canUseNeuralCore) setIsChatOpen(true);
+                else openUpgradeModal("singularity");
             }
         };
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [openSearch]);
+    }, [openSearch, access.canUsePathfinder, access.canUseTimeMachine, access.canUseEvolutionJournal, access.canUseNeuralCore]);
 
     const nodeIdsSet = useMemo(() => new Set(data.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id)), [data.nodes]);
 
@@ -459,6 +521,7 @@ export default function Home() {
             setFlyToNodeId(null);
             setHighlightedNodes([]);
             setPathData({ nodes: [], links: [] });
+            setPhysicsPanelOpen(false);
             return;
         }
         const stillExists = (id: string | null) => id != null && nodeIdsSet.has(id);
@@ -491,11 +554,11 @@ export default function Home() {
         <main className="bg-white dark:bg-neutral-950 flex min-h-screen flex-col items-center justify-between">
             <OnboardingTour run={!hasCompletedOnboarding && !isOnboardingLoading} onComplete={completeOnboarding} />
             <div className="absolute inset-0" data-tour-id="tour-graph" aria-hidden="true">
-            <GraphNetwork 
+            <GraphNetwork
                 onNodeSelect={(node) => {
                     setSelectedNode(node);
                     setFocusedNodeId(typeof node.id === 'string' ? node.id : node.id?.id);
-                }} 
+                }}
                 graphData={data}
                 timelineDate={data.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
                 activeTag={activeTag}
@@ -513,10 +576,24 @@ export default function Home() {
                 solarSystemNodeId={solarSystemNodeId}
                 clusterMode={clusterMode}
                 groups={groups}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                canUse3DGraph={access.canUse3DGraph}
+                onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
+                renderToolbarExtra={data.nodes.length > 0 ? (buttonClassName) => (
+                    <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
+                        <Settings2 size={18} />
+                    </button>
+                ) : undefined}
             />
             </div>
             <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
-                <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Nervia</h1>
+                <div className="flex items-center gap-3">
+                    <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg" aria-hidden>
+                        <NeuralBackground clipPathId="neural-brain-clip-app-welcome" />
+                    </span>
+                    <h1 className="text-4xl font-bold text-neutral-900 dark:text-white tracking-tighter">Nervia</h1>
+                </div>
                 <p className="text-neutral-500 dark:text-neutral-400 mt-2">Your Visual Intelligence Universe</p>
             </div>
 
@@ -529,7 +606,7 @@ export default function Home() {
                     >
                         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
                             <div className="bg-black/5 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 p-10 rounded-3xl text-center max-w-md pointer-events-auto shadow-2xl flex flex-col items-center transform transition-all hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-neutral-900/80">
-                                <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_30px_rgba(99,102,241,0.2)] dark:shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+                                <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.1)]">
                                     <Sparkles className="text-indigo-600 dark:text-purple-400" size={32} />
                                 </div>
                                 <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-3 tracking-tight">Nothing here yet</h2>
@@ -539,7 +616,7 @@ export default function Home() {
                                 <button
                                     data-tour-id="tour-new-neuron"
                                     onClick={() => setIsAddModalOpen(true)}
-                                    className="hover:cursor-pointer flex items-center gap-2 px-8 py-3 bg-indigo-600 hover:bg-indigo-500 dark:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-full font-semibold transition-all shadow-lg shadow-indigo-900/20 dark:shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-xl hover:shadow-indigo-900/25 dark:hover:shadow-[0_0_40px_rgba(168,85,247,0.6)] hover:-translate-y-1"
+                                    className="hover:cursor-pointer flex items-center gap-2 px-8 py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                                 >
                                     <Plus size={18} />
                                     Create First Neuron
@@ -552,10 +629,12 @@ export default function Home() {
 
             {!isLeftSidebarOpen && (
                 <button
+                    type="button"
                     onClick={() => setIsLeftSidebarOpen(true)}
-                    className="hover:cursor-pointer absolute top-32 left-20 z-10 -translate-x-1/2 flex items-center gap-2 px-6 py-4 bg-black/10 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 text-neutral-900 dark:text-white rounded-full shadow-[0_0_30px_rgba(0,0,0,0.08)] dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-black/20 dark:hover:bg-white/20 hover:scale-105 transition-all z-20 group"
+                    className="absolute top-30 left-8 z-20 w-10 h-10 flex items-center justify-center rounded-xl backdrop-blur-md bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/5 text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-300 ease-out cursor-pointer"
+                    aria-label="Open left sidebar"
                 >
-                    <PanelLeftOpen size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+                    <PanelLeftOpen size={20} />
                 </button>
             )}
 
@@ -647,7 +726,7 @@ export default function Home() {
                 node={contextMenu.node}
                 isZenModeActive={zenModeNodeId !== null}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
-                onDeepFocus={(nodeId) => setSolarSystemNodeId(nodeId)}
+                onDeepFocus={(nodeId) => { if (access.canUse3DGraph) setSolarSystemNodeId(nodeId); else openUpgradeModal("singularity"); }}
                 onZenMode={toggleZenMode}
                 onEdit={(node) => {
                     setSelectedNode(node);
@@ -673,6 +752,8 @@ export default function Home() {
                     setHighlightedNodes([]);
                 }}
                 onOpenRef={searchFocusRef}
+                semanticSearchEnabled={access.canUseAISearch}
+                onRequestUpgrade={() => openUpgradeModal("singularity")}
             />
 
             <NeuralChat
@@ -682,7 +763,6 @@ export default function Home() {
                     setContextNodeIds([]);
                 }}
                 nodes={data.nodes}
-                isPremium={false}
                 setContextNodeIds={setContextNodeIds}
             />
 
@@ -710,9 +790,10 @@ export default function Home() {
                 onExport={exportData}
                 onOpenSearch={openSearch}
                 onOpenPathfinder={() => setIsPathfinderOpen(true)}
-                onOpenTimeline={() => setIsTimelineOpen(true)}
-                onOpenHistory={() => setIsHistoryOpen(true)}
-                onOpenChat={() => setIsChatOpen(true)}
+                onOpenTimeline={() => { if (access.canUseTimeMachine) setIsTimelineOpen(true); else openUpgradeModal("singularity"); }}
+                onOpenHistory={() => { if (access.canUseEvolutionJournal) setIsHistoryOpen(true); else openUpgradeModal("singularity"); }}
+                onOpenChat={() => { if (access.canUseNeuralCore) setIsChatOpen(true); else openUpgradeModal("singularity"); }}
+                onZenModeClick={() => { if (zenModeNodeId) setZenModeNodeId(null); else setIsLeftSidebarOpen(false); }}
                 clusterMode={clusterMode}
                 onClusterModeChange={setClusterMode}
                 groups={groups}
@@ -723,6 +804,13 @@ export default function Home() {
                 markAsRead={markAsRead}
                 markAllAsRead={markAllAsRead}
                 onNavigateToGroup={handleNavigateToGroup}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                plan={plan}
+                onRequestUpgrade={openUpgradeModal}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                canUse3DGraph={access.canUse3DGraph}
+                onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
             />
 
             <Sidebar 
@@ -736,26 +824,33 @@ export default function Home() {
                 onAddGroup={onAddGroup}
             />
 
-            <AddModal 
-                isOpen={isAddModalOpen} 
+<AddModal
+                isOpen={isAddModalOpen}
                 onClose={() => { setIsAddModalOpen(false); setAddError(null); }}
                 onAdd={handleAddWithAI}
                 existingNodes={data.nodes}
                 allTags={allTags}
                 submitError={addError}
+                onUpgradeRequest={() => { setIsAddModalOpen(false); openUpgradeModal("constellation"); }}
+                neuronLimit={access.neuronLimit}
+                showGenesisUpgradeBanner={plan === 'genesis'}
             />
 
             <CommandPalette onOpenSearch={openSearch} />
 
-            <PhysicsControl 
-                config={physicsConfig} 
-                onChange={setPhysicsConfig} 
-            />
+            {data.nodes.length > 0 && (
+                <PhysicsControl
+                    config={physicsConfig}
+                    onChange={setPhysicsConfig}
+                    open={physicsPanelOpen}
+                    onOpenChange={setPhysicsPanelOpen}
+                />
+            )}
 
-            {data.nodes.length > 0 && isTimelineOpen && (
+            {isTimelineOpen && (
                 <TimelinePanel
                     datePoints={timelineDatePoints}
-                    currentDate={timelineDate}
+                    currentDate={data.nodes.length > 0 ? timelineDate : timelineMaxDate}
                     onChange={setTimelineDate}
                     isPlaying={isPlaying}
                     onTogglePlay={() => setIsPlaying((p) => !p)}
@@ -778,15 +873,26 @@ export default function Home() {
                 />
             )}
 
-            {!isLoading && data.nodes.length > 0 && ( 
-                <button
+            <UpgradeModal
+                isOpen={upgradeModalTarget !== null}
+                targetPlan={upgradeModalTarget ?? "constellation"}
+                descriptionOverride={upgradeModalDescriptionOverride}
+                onClose={() => { setUpgradeModalTarget(null); setUpgradeModalDescriptionOverride(undefined); }}
+            />
+
+            {!isLoading && data.nodes.length > 0 && (
+                <motion.button
+                    type="button"
                     data-tour-id="tour-new-neuron"
                     onClick={() => setIsAddModalOpen(true)}
-                    className="hover:cursor-pointer absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 px-6 py-4 bg-black/10 dark:bg-white/10 backdrop-blur-md border border-black/20 dark:border-white/20 text-neutral-900 dark:text-white rounded-full shadow-lg shadow-neutral-900/10 dark:shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-black/20 dark:hover:bg-white/20 hover:scale-105 transition-all z-20 group"
+                    className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-white/90 dark:bg-neutral-900/50 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 >
-                    <Plus className="group-hover:rotate-90 transition-transform duration-300" size={24} />
-                    <span className="font-medium pr-2">New Neuron</span>
-                </button>
+                    <Plus size={18} className="text-purple-400 shrink-0" />
+                    <span>New Neuron</span>
+                </motion.button>
             )}
         </main>
     );

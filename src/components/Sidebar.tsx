@@ -102,7 +102,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
     const maxWidth = typeof window !== 'undefined' ? window.innerWidth / 3 : 400;
 
     useEffect(() => {
-        const displayTitle = selectedNode?.title ?? selectedNode?.content ?? selectedNode?.id ?? '';
+        const idStr = selectedNode ? (typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id ?? '') : '';
+        const rawDisplay = (selectedNode?.title ?? selectedNode?.content ?? '').toString().trim();
+        const displayTitle = rawDisplay === idStr ? '' : (rawDisplay || idStr || '');
         const titleChanged = editTitle !== displayTitle;
         const contentChanged = editContent !== (selectedNode?.content || "");
         const tagsChanged = JSON.stringify(editTags) !== JSON.stringify(selectedNode?.tags || []);
@@ -115,7 +117,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
     useEffect(() => {
         if (selectedNode) {
-            setEditTitle(selectedNode.title ?? selectedNode.content ?? selectedNode.id ?? "");
+            const idStr = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id ?? '';
+            const rawTitle = (selectedNode.title ?? selectedNode.content ?? '').toString().trim();
+            setEditTitle(rawTitle === idStr ? '' : (rawTitle || ''));
             setEditContent(selectedNode.content || "");
             setEditTags(selectedNode.tags || []);
             setEditUrl(selectedNode.url || "");

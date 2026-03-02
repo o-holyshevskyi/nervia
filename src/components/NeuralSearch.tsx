@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Sparkles, Command, FileText, Lightbulb, LinkIcon } from "lucide-react";
+import { Search, Sparkles, Command, FileText, Lightbulb, LinkIcon, Lock } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
 
 export interface NeuralSearchResult {
@@ -19,6 +19,10 @@ interface NeuralSearchProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenRef?: React.MutableRefObject<(() => void) | null>;
+  /** When false, only text (name/tags) search is available; semantic AI search is locked. */
+  semanticSearchEnabled?: boolean;
+  /** Called when user tries to use semantic search but it's locked (e.g. open upgrade modal). */
+  onRequestUpgrade?: () => void;
 }
 
 function getNodeIcon(type: string) {
@@ -35,6 +39,8 @@ export default function NeuralSearch({
   isOpen,
   onClose,
   onOpenRef,
+  semanticSearchEnabled = true,
+  onRequestUpgrade,
 }: NeuralSearchProps) {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -47,10 +53,12 @@ export default function NeuralSearch({
     if (!q) return [];
     return nodes.filter((node: any) => {
       const idStr = (typeof node.id === "string" ? node.id : node.id?.id ?? "").toLowerCase();
+      const title = (node.title ?? "").toLowerCase();
+      const content = (node.content ?? "").toLowerCase();
       const tagMatch =
         Array.isArray(node.tags) &&
         node.tags.some((t: string) => String(t).toLowerCase().includes(q));
-      return idStr.includes(q) || tagMatch;
+      return idStr.includes(q) || title.includes(q) || content.includes(q) || tagMatch;
     });
   }, [nodes, query]);
 
@@ -106,7 +114,10 @@ export default function NeuralSearch({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") runSemanticSearch();
+    if (e.key === "Enter") {
+      if (semanticSearchEnabled) runSemanticSearch();
+      else onRequestUpgrade?.();
+    }
   };
 
   const handleQueryChange = (value: string) => {
@@ -170,10 +181,11 @@ export default function NeuralSearch({
                   value={query}
                   onChange={(e) => handleQueryChange(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Search your neurons in Nervia… (Enter for semantic search)"
+                  placeholder={semanticSearchEnabled ? "Search your neurons… (Enter for semantic search)" : "Search by name or tags…"}
                   className="flex-1 bg-transparent text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-400 focus:outline-none text-base"
                   disabled={isLoading}
                 />
+                {semanticSearchEnabled ? (
                 <button
                   type="button"
                   onClick={runSemanticSearch}
@@ -182,6 +194,18 @@ export default function NeuralSearch({
                 >
                   Search
                 </button>
+                ) : (
+                <button
+                  type="button"
+                  onClick={() => onRequestUpgrade?.()}
+                  title="AI semantic search — Singularity"
+                  className="hover:cursor-pointer px-3 py-1.5 rounded-lg border border-purple-500/40 dark:border-purple-400/40 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/10 text-sm font-medium shrink-0 flex items-center gap-1.5"
+                >
+                  <Sparkles size={14} />
+                  <span className="hidden sm:inline">AI Search</span>
+                  <Lock size={12} className="text-purple-500 dark:text-purple-400" />
+                </button>
+                )}
                 <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">
                   <Command size={10} /> Ctrl+K
                 </span>
@@ -197,12 +221,12 @@ export default function NeuralSearch({
                 )}
                 {!isLoading && isEmpty && (
                   <p className="py-6 text-center text-neutral-500 dark:text-neutral-400 text-sm">
-                    Type to filter by name or tags. Press Enter for semantic search by meaning.
+                    {semanticSearchEnabled ? "Type to filter by name or tags. Press Enter for semantic search by meaning." : "Type to search by name or tags."}
                   </p>
                 )}
                 {!isLoading && showTextResults && textFilteredNodes.length === 0 && (
                   <p className="py-6 text-center text-neutral-500 dark:text-neutral-400 text-sm">
-                    Nothing found for &quot;{query.trim()}&quot;. Try Enter for semantic search.
+                    Nothing found for &quot;{query.trim()}&quot;.{semanticSearchEnabled ? " Try Enter for semantic search." : ""}
                   </p>
                 )}
                 {!isLoading && showTextResults && textFilteredNodes.length > 0 && (

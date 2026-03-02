@@ -45,7 +45,7 @@ export default function TimelinePanel({
     const isSinglePoint = datePoints.length <= 1;
     const currentStep = findCurrentStep(datePoints, currentDate);
     const displayDate = hasNoPoints
-        ? "—"
+        ? "-"
         : new Date(datePoints[currentStep] ?? currentDate).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
@@ -72,6 +72,12 @@ export default function TimelinePanel({
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
                     Replay how your neurons grew over time. <span className="font-mono text-[10px] text-neutral-500 dark:text-neutral-500">Ctrl+Alt+T</span>
                 </p>
+
+                {hasNoPoints && (
+                    <p className="text-xs text-amber-600/90 dark:text-amber-400/90 mb-4 py-2 px-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        Add neurons to your universe to use the Time Machine.
+                    </p>
+                )}
 
                 <div className="space-y-4">
                     <div className="flex items-center gap-3">

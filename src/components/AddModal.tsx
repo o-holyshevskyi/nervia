@@ -3,8 +3,12 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import Link from "next/link";
 import { FileText, GitMerge, Hash, Lightbulb, LinkIcon, Sparkles, X, Plus, AlertCircle, Globe } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
+
+const GENESIS_NEURON_LIMIT = 60;
+const GENESIS_UPGRADE_THRESHOLD = 50;
 
 export interface NodeData {
     type: 'link' | 'note' | 'idea';
@@ -30,9 +34,13 @@ interface AddModalProps {
     onClose: () => void;
     onAdd: (data: NodeData) => void;
     submitError?: string | null;
+    onUpgradeRequest?: () => void;
+    neuronLimit?: number;
+    /** When true, show "reaching limit" upgrade banner for Genesis. When false (Constellation/Singularity), never show it. */
+    showGenesisUpgradeBanner?: boolean;
 }
 
-export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError }: AddModalProps) {
+export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClose, submitError, onUpgradeRequest, neuronLimit = GENESIS_NEURON_LIMIT, showGenesisUpgradeBanner = false }: AddModalProps) {
     const [activeTab, setActiveTab] = useState<'link' | 'note' | 'idea'>('link');
     const [title, setTitle] = useState("");
     const [url, setUrl] = useState("");
@@ -53,6 +61,11 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
         e.preventDefault();
         const trimmedTitle = title.trim();
         if (!trimmedTitle) return;
+
+        if (existingNodes.length >= neuronLimit) {
+            onUpgradeRequest?.();
+            return;
+        }
 
         const isDuplicateTitle = existingNodes.some((n: any) =>
             (n.title ?? n.content ?? n.id ?? '').toString().toLowerCase() === trimmedTitle.toLowerCase()
@@ -473,10 +486,23 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                                 )}
                             </AnimatePresence>
 
+                            {showGenesisUpgradeBanner && existingNodes.length >= GENESIS_UPGRADE_THRESHOLD && (
+                                <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-lg text-xs text-neutral-700 dark:text-neutral-300">
+                                    Your Genesis Universe is reaching its limit ({existingNodes.length}/{neuronLimit}).{" "}
+                                    <Link
+                                        href="/settings/billing"
+                                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium underline underline-offset-1"
+                                    >
+                                        Upgrade to Constellation
+                                    </Link>{" "}
+                                    for unlimited space.
+                                </div>
+                            )}
+
                             <button
                                 type="submit"
                                 disabled={!title.trim()}
-                                className="hover:cursor-pointer w-full mt-4 py-3 bg-neutral-900 dark:bg-white text-white dark:text-black font-semibold rounded-xl hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg dark:shadow-none"
+                                className="hover:cursor-pointer flex items-center justify-center gap-2 w-full mt-4 py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Save to universe
                             </button>

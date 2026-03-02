@@ -2,6 +2,20 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  // Allow public routes before any auth: no Supabase call, no redirect possible.
+  const pathname = request.nextUrl.pathname;
+  const isPublicPath =
+    pathname.startsWith("/demo") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/share") ||
+    pathname.startsWith("/api/extension/save") ||
+    pathname.startsWith("/api/share/") ||
+    pathname === "/api/notifications/visit";
+  if (isPublicPath) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -33,12 +47,14 @@ export async function proxy(request: NextRequest) {
   const isPublicShare = request.nextUrl.pathname.startsWith("/share");
   const isShareApi = request.nextUrl.pathname.startsWith("/api/share/");
   const isVisitNotificationApi = request.nextUrl.pathname === "/api/notifications/visit";
+  const isDemoRoute = request.nextUrl.pathname.startsWith("/demo");
   if (
     !user &&
     !isExtensionApi &&
     !isPublicShare &&
     !isShareApi &&
     !isVisitNotificationApi &&
+    !isDemoRoute &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

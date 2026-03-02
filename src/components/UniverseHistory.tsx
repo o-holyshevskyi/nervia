@@ -122,7 +122,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
         id: "first_intelligence",
         kind: "first_intelligence",
         title: "First Intelligence",
-        description: `The universe gained pattern recognition — Neural Core analyzed “${getNodeLabel(firstAi.n)}”.`,
+        description: `The universe gained pattern recognition - Neural Core analyzed “${getNodeLabel(firstAi.n)}”.`,
         timestamp: firstAi.ts,
       });
     }
@@ -148,7 +148,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
         id: "shared_wisdom",
         kind: "shared_wisdom",
         title: "Shared Wisdom",
-        description: "A public link opened — your Universe became shareable.",
+        description: "A public link opened - your Universe became shareable.",
         timestamp: shareFirstTs,
       });
     }

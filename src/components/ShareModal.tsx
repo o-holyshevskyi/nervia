@@ -14,6 +14,11 @@ interface ShareModalProps {
   initialScope?: ShareScope;
   initialGroupIds?: string[];
   onCreateShare: (scope: ShareScope, groupIds?: string[]) => Promise<{ slug: string; url: string } | null>;
+  /** When false, creating a share (GROUPS or ALL) will trigger onUpgradeRequest. Same limit for both. */
+  allowShareClusters?: boolean;
+  /** When false, creating any share will trigger onUpgradeRequest. Same limit as allowShareClusters. */
+  allowCreateShare?: boolean;
+  onUpgradeRequest?: () => void;
 }
 
 export default function ShareModal({
@@ -23,6 +28,9 @@ export default function ShareModal({
   initialScope = "ALL",
   initialGroupIds = [],
   onCreateShare,
+  allowShareClusters = true,
+  allowCreateShare = true,
+  onUpgradeRequest,
 }: ShareModalProps) {
   const [scope, setScope] = useState<ShareScope>(initialScope);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
@@ -44,8 +52,16 @@ export default function ShareModal({
 
   const handleCreateLink = async () => {
     setError(null);
+    if (!allowCreateShare) {
+      onUpgradeRequest?.();
+      return;
+    }
     if (scope === "GROUPS" && selectedGroupIds.size === 0) {
       setError("Select at least one group.");
+      return;
+    }
+    if (scope === "GROUPS" && !allowShareClusters) {
+      onUpgradeRequest?.();
       return;
     }
     setIsCreating(true);
@@ -110,7 +126,7 @@ export default function ShareModal({
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold tracking-widest text-neutral-700 dark:text-neutral-300 uppercase flex items-center gap-2">
                 <Link2 size={18} className="text-indigo-600 dark:text-purple-400" />
-                Share Universe
+                Share
               </h3>
               <CloseButton onClose={handleClose} size={18} />
             </div>
