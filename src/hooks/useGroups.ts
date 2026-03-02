@@ -93,7 +93,7 @@ export function useGroups(supabase: any) {
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'groups' }, (payload: { new: Record<string, unknown> }) => {
                     const row = payload.new;
                     if (row.user_id !== user.id) return;
-                    const newGroup = row as Group;
+                    const newGroup = row as unknown as Group;
                     setGroups((prev) => {
                         if (prev.some((g) => g.id === newGroup.id)) return prev;
                         return [...prev, newGroup].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name));
@@ -102,7 +102,7 @@ export function useGroups(supabase: any) {
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups' }, (payload: { new: Record<string, unknown> }) => {
                     const row = payload.new;
                     if (row.user_id !== user.id) return;
-                    const updated = row as Group;
+                    const updated = row as unknown as Group;
                     setGroups((prev) =>
                         prev.map((g) => (g.id === updated.id ? { ...g, ...updated } : g))
                     );
