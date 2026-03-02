@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FadeIn } from "./FadeIn";
-import { Check } from "lucide-react";
+import { Bookmark, Box, Brain, Check, Clock, Download, Filter, InfinityIcon, LayoutGrid, MessageCircle, Route, Search, Share2, Sparkles } from "lucide-react";
 import { APP_URL } from "../lib/app-url";
 
 const tiers = [
@@ -11,11 +11,11 @@ const tiers = [
     price: "$0",
     period: "Forever",
     features: [
-      "Up to 60 Neurons",
-      "2D Knowledge Graph",
-      "Browser Web Clipper",
-      "Standard Search",
-      "Share 1 Cluster",
+      { icon: Brain, text: 'Up to 60 Neurons' },
+      { icon: LayoutGrid, text: '2D Knowledge Graph' },
+      { icon: Bookmark, text: 'Browser Web Clipper' },
+      { icon: Search, text: 'Standard Search' },
+      { icon: Share2, text: 'Share 1 Cluster' },
     ],
     cta: "Start your Universe",
     ctaHref: `${APP_URL}/`,
@@ -27,11 +27,12 @@ const tiers = [
     price: "$3,99",
     period: "month",
     features: [
-      "Unlimited Neurons",
-      "Pathfinder & Zen Mode",
-      "Tags & Advanced Filters",
-      "Data Import/Export",
-      "Up to 5 shares",
+      { icon: InfinityIcon, text: 'Unlimited Neurons' },
+      { icon: Route, text: 'Pathfinder & Zen Mode' },
+      { icon: Filter, text: 'Tags & Advanced Filters' },
+      { icon: Download, text: 'Data Import/Export' },
+      { icon: Share2, text: 'Up to 5 shares' },
+      { icon: InfinityIcon, text: 'All Gnesis features' },
     ],
     cta: "Join Constellation",
     ctaHref: `${APP_URL}/settings/billing`,
@@ -44,11 +45,12 @@ const tiers = [
     price: "$7,99",
     period: "month",
     features: [
-      "Full AI Neural Core (Chat & Search)",
-      "AI Semantic Search",
-      "3D Graph Visualization",
-      "Time Machine & Evolution Journal",
-      "Unlimited shares",
+      { icon: MessageCircle, text: 'Full AI Neural Core (Chat & Search)' },
+      { icon: Sparkles, text: 'AI Semantic Search' },
+      { icon: Box, text: '3D Graph Visualization' },
+      { icon: Clock, text: 'Time Machine & Evolution Journal' },
+      { icon: Share2, text: 'Unlimited shares' },
+      { icon: InfinityIcon, text: 'All Constellation features' },
     ],
     cta: "Reach Singularity",
     ctaHref: `${APP_URL}/settings/billing`,
@@ -92,13 +94,13 @@ export function Pricing() {
                   <span className="text-sm font-normal text-slate-400"> / {tier.period}</span>
                 </p>
                 <ul className="mt-6 flex-1 space-y-3">
-                  {tier.features.map((feature) => (
+                  {tier.features.map((feature, index) => (
                     <li
-                      key={feature}
+                      key={feature.text + '-' + index}
                       className="flex items-center gap-3 text-sm text-slate-300"
                     >
-                      <Check className="h-4 w-4 shrink-0 text-cyan-400" />
-                      {feature}
+                      <feature.icon className="h-4 w-4 shrink-0 text-cyan-400" />
+                      {feature.text}
                     </li>
                   ))}
                 </ul>

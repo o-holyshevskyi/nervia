@@ -2,26 +2,27 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Sparkles, Infinity, Route, Filter, Download, Share2, Box, MessageCircle, Clock, History } from "lucide-react";
+import { Sparkles, Infinity, Route, Filter, Download, Share2, Box, MessageCircle, Clock, InfinityIcon } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
 
-/** Constellation: matches billing — Unlimited Neurons, Pathfinder & Zen, Tags & Filters, Import/Export, more shares. */
+/** Constellation: same list as billing page with icons. */
 const CONSTELLATION_FEATURES = [
-  { icon: Infinity, text: "Unlimited Neurons" },
-  { icon: Route, text: "Pathfinder & Zen Mode" },
-  { icon: Filter, text: "Tags & Advanced Filters" },
-  { icon: Download, text: "Data Import/Export" },
-  { icon: Share2, text: "Up to 5 shares" },
+  { icon: InfinityIcon, text: 'Unlimited Neurons' },
+  { icon: Route, text: 'Pathfinder & Zen Mode' },
+  { icon: Filter, text: 'Tags & Advanced Filters' },
+  { icon: Download, text: 'Data Import/Export' },
+  { icon: Share2, text: 'Up to 5 shares' },
+  { icon: InfinityIcon, text: 'All Gnesis features' },
 ];
 
-/** Singularity: Full AI Neural Core, Semantic Search, 3D, Time Machine, Evolution Journal, Unlimited Shared Universes + Constellation. */
+/** Singularity: same list as billing page with icons. */
 const SINGULARITY_FEATURES = [
-  { icon: MessageCircle, text: "Full AI Neural Core (Chat & Search)" },
-  { icon: Sparkles, text: "AI Semantic Search" },
-  { icon: Box, text: "3D Graph Visualization" },
-  { icon: Clock, text: "Time Machine & Evolution Journal" },
-  { icon: Share2, text: "Unlimited shares" },
-  { icon: Infinity, text: "All Constellation features" },
+  { icon: MessageCircle, text: 'Full AI Neural Core (Chat & Search)' },
+  { icon: Sparkles, text: 'AI Semantic Search' },
+  { icon: Box, text: '3D Graph Visualization' },
+  { icon: Clock, text: 'Time Machine & Evolution Journal' },
+  { icon: Share2, text: 'Unlimited shares' },
+  { icon: InfinityIcon, text: 'All Constellation features' },
 ];
 
 export type UpgradeTargetPlan = "constellation" | "singularity";
