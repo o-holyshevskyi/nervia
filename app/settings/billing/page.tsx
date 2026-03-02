@@ -277,7 +277,7 @@ export default function BillingPage() {
               <motion.div transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="relative flex flex-col h-full min-w-0">
                 <div className="rounded-2xl border border-amber-500/30 dark:border-amber-400/20 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-2xl shadow-[0_0_60px_rgba(168,85,247,0.25)] dark:shadow-[0_0_80px_rgba(168,85,247,0.3),0_0_40px_rgba(251,191,36,0.15)] p-5 flex flex-col h-full min-h-0 relative z-10 overflow-hidden">
                   <div className="absolute top-0 right-0 z-10">
-                    <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 text-white text-[10px] font-bold rounded-bl-lg uppercase tracking-widest shadow-[0_0_24px_rgba(168,85,247,0.3),0_0_16px_rgba(251,191,36,0.15)]">Ultimate</span>
+                    <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 text-white text-[10px] font-bold rounded-bl-lg uppercase tracking-widest shadow-[0_0_24px_rgba(168,85,247,0.3),0_0_16px_rgba(251,191,36,0.15)]">Ultimate AI Fusion</span>
                   </div>
                   <div className="flex-1 min-h-0 flex flex-col pt-7">
                     <div className="flex items-start justify-between gap-2 mb-1">
