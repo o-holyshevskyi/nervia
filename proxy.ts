@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/share") ||
     pathname.startsWith("/api/extension/save") ||
     pathname.startsWith("/api/share/") ||
-    pathname.startsWith("/api/webhooks/") ||
+    pathname.includes("/api/webhooks") || 
+    pathname.includes("/api/billing/portal") ||
     pathname === "/api/notifications/visit";
   if (isPublicPath) {
     return NextResponse.next({ request });

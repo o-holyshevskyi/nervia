@@ -1,25 +1,39 @@
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 export async function GET() {
-  try {
-    // 1. Отримуємо сесію користувача з Supabase
-    // Примітка: використовуємо стандартний підхід для отримання юзера на сервері
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!; // Використовуємо адмін-ключ для надійності
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const cookieStore = await cookies();
 
-    // В реальному додатку ми маємо отримати Auth токен з хедерів запиту
-    // Для спрощення припустимо, що ми отримуємо поточного сесійного юзера
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Це нормально для API-роутів, якщо кукіз не можна встановити
+          }
+        },
+      },
     }
+  );
 
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
     const userEmail = user.email;
-
-    // 2. Робимо запит до Lemon Squeezy API, щоб знайти клієнта за Email
     const lsResponse = await fetch(`https://api.lemonsqueezy.com/v1/customers?filter[email]=${userEmail}`, {
       headers: {
         'Authorization': `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`,
@@ -29,18 +43,10 @@ export async function GET() {
     });
 
     const lsData = await lsResponse.json();
-
-    // 3. Отримуємо URL порталу з даних клієнта
-    // Lemon Squeezy повертає масив клієнтів. Беремо першого.
     const customer = lsData.data?.[0];
     const portalUrl = customer?.attributes?.urls?.customer_portal;
 
-    if (!portalUrl) {
-      // Якщо клієнт ще нічого не купував, відправляємо на загальну сторінку замовлень
-      return NextResponse.json({ url: 'https://app.lemonsqueezy.com/my-orders' });
-    }
-
-    return NextResponse.json({ url: portalUrl });
+    return NextResponse.json({ url: portalUrl || 'https://app.lemonsqueezy.com/my-orders' });
 
   } catch (error) {
     console.error('Portal Error:', error);

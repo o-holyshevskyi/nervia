@@ -125,7 +125,7 @@ export default function BillingPage() {
                 <button 
                   onClick={handleManageSubscription} 
                   disabled={isPortalLoading}
-                  className="flex items-center gap-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-4 py-2 rounded-xl transition-all disabled:opacity-50"
+                  className="cursor-pointer flex items-center gap-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-4 py-2 rounded-xl transition-all disabled:opacity-50"
                 >
                   {isPortalLoading ? (
                     <Loader2 size={14} className="animate-spin" />
