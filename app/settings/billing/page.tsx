@@ -22,6 +22,7 @@ export default function BillingPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [neuronsUsed, setNeuronsUsed] = useState<number | null>(null);
   const [sharedCount, setSharedCount] = useState<number | null>(null);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
 
   const neuronsLimit = getNeuronLimit(plan);
   const sharedUniversesLimit = getSharedUniversesLimit(plan);
@@ -62,10 +63,27 @@ export default function BillingPage() {
     window.location.href = checkoutUrl;
   };
 
-  const handleManageSubscription = () => {
-    // В ідеалі тут має бути запит на твій API, який генерує Customer Portal URL через LS API.
-    // Але для початку можна просто дати лінк на загальний портал або твій магазин
-    window.open(`https://app.lemonsqueezy.com/my-orders`, '_blank');
+  const handleManageSubscription = async () => {
+    try {
+      setIsPortalLoading(true);
+      
+      // Викликаємо наш новий API
+      const response = await fetch('/api/billing/portal');
+      const data = await response.json();
+  
+      if (data.url) {
+        // Відкриваємо портал у новій вкладці або в тій самій
+        window.location.href = data.url;
+      } else {
+        // Фоллбек на випадок помилки
+        window.open('https://app.lemonsqueezy.com/my-orders', '_blank');
+      }
+    } catch (error) {
+      console.error('Failed to redirect to portal', error);
+      window.open('https://app.lemonsqueezy.com/my-orders', '_blank');
+    } finally {
+      setIsPortalLoading(false);
+    }
   };
 
   const used = neuronsUsed ?? 0;
@@ -104,8 +122,16 @@ export default function BillingPage() {
                 </div>
               </div>
               {isPaid && (
-                <button onClick={handleManageSubscription} className="flex items-center gap-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-4 py-2 rounded-xl transition-all">
-                  Manage Plan <ExternalLink size={14} />
+                <button 
+                  onClick={handleManageSubscription} 
+                  disabled={isPortalLoading}
+                  className="flex items-center gap-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 px-4 py-2 rounded-xl transition-all disabled:opacity-50"
+                >
+                  {isPortalLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <>Manage Plan <ExternalLink size={14} /></>
+                  )}
                 </button>
               )}
             </div>
