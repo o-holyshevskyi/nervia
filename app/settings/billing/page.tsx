@@ -51,12 +51,14 @@ export default function BillingPage() {
     if (!userId) return;
     
     const storeUrl = process.env.NEXT_PUBLIC_LS_STORE_URL;
-    const variantId = tier === 'constellation' 
-      ? process.env.NEXT_PUBLIC_CONSTELLATION_VARIANT_ID 
-      : process.env.NEXT_PUBLIC_SINGULARITY_VARIANT_ID;
+    
+    // ВИКОРИСТОВУЄМО CHECKOUT_ID ЗАМІСТЬ VARIANT_ID
+    const checkoutId = tier === 'constellation' 
+      ? process.env.NEXT_PUBLIC_CONSTELLATION_CHECKOUT_ID 
+      : process.env.NEXT_PUBLIC_SINGULARITY_CHECKOUT_ID;
 
-    // Передаємо user_id у custom_data, щоб вебхук знав, кому давати підписку
-    const checkoutUrl = `${storeUrl}/checkout/buy/${variantId}?checkout[custom][user_id]=${userId}`;
+    // Збираємо посилання
+    const checkoutUrl = `${storeUrl}/checkout/buy/${checkoutId}?checkout[custom][user_id]=${userId}`;
     window.location.href = checkoutUrl;
   };
 
