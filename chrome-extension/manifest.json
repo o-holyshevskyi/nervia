@@ -23,12 +23,9 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "background": {
-    "service_worker": "background.js"
-  },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["https://app.nervia.space/*", "https://*.nervia.space/*"],
       "js": ["content.js"],
       "run_at": "document_end"
     }
