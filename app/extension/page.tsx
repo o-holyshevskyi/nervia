@@ -2,11 +2,13 @@
 
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Package, ToggleLeft, FolderOpen, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Download, Package, CheckCircle2, ArrowLeft, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useExtensionDetected } from '@/src/hooks/useExtensionDetected';
 
 const REDIRECT_DELAY_MS = 2000;
+// ЗАМІНИ НА СВІЙ ЛІНК, КОЛИ GOOGLE ОПУБЛІКУЄ РОЗШИРЕННЯ
+const CHROME_STORE_URL = 'https://chrome.google.com/webstore/detail/ТВІЙ_ID_РОЗШИРЕННЯ'; 
 
 export default function ExtensionPage() {
   const detected = useExtensionDetected();
@@ -71,65 +73,46 @@ export default function ExtensionPage() {
                 Install Nervia Web Clipper
               </h1>
               <p className="text-neutral-500 dark:text-neutral-400 text-sm text-center mb-10">
-                Follow these steps to clip pages into your knowledge graph.
+                Transform any page into a Neuron in your 3D universe.
               </p>
 
-              {/* Step 1 */}
-              <div className="space-y-4 mb-10">
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 text-indigo-600 dark:text-purple-400 text-sm font-bold">
-                    1
-                  </span>
-                  <span className="text-sm font-semibold text-neutral-900 dark:text-white">Download the extension</span>
-                </div>
+              {/* Головна кнопка: Chrome Store */}
+              <div className="space-y-4 mb-8">
                 <a
-                  href="/api/extension/download"
-                  download="nervia-web-clipper.zip"
-                  className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
+                  href={CHROME_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-purple-600 text-white hover:bg-purple-500 font-semibold transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)]"
                 >
-                  <Download size={20} />
-                  Download nervia-web-clipper.zip
+                  <ExternalLink size={20} />
+                  Add to Chrome (Official Store)
                 </a>
               </div>
 
-              {/* Step 2 */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 text-indigo-600 dark:text-purple-400 text-sm font-bold">
-                    2
-                  </span>
-                  <span className="text-sm font-semibold text-neutral-900 dark:text-white">Load it in Chrome</span>
-                </div>
-                <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-5 space-y-5">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center shrink-0">
-                      <ToggleLeft size={20} className="text-neutral-500 dark:text-neutral-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-neutral-900 dark:text-white mb-0.5">Enable Developer mode</p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-500">
-                        Open <code className="bg-black/10 dark:bg-black/30 px-1.5 py-0.5 rounded text-neutral-600 dark:text-neutral-400">chrome://extensions</code> and turn on Developer mode (top-right).
-                      </p>
-                    </div>
-                  </div>
-                  <div className="h-px bg-black/10 dark:bg-white/10" />
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 flex items-center justify-center shrink-0">
-                      <FolderOpen size={20} className="text-neutral-500 dark:text-neutral-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-neutral-900 dark:text-white mb-0.5">Load unpacked</p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-500">
-                        Click &quot;Load unpacked&quot; and select the folder you extracted from the zip.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              {/* Альтернатива: Ручне встановлення */}
+              <div className="relative flex items-center py-5">
+                <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+                <span className="flex-shrink-0 mx-4 text-xs text-neutral-400 dark:text-neutral-500 uppercase tracking-widest">or</span>
+                <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+              </div>
+
+              <div className="text-center">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-2">
+                  Are you a beta tester or developer?
+                </p>
+                <a
+                  href="/api/extension/download"
+                  download="nervia-web-clipper.zip"
+                  className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-purple-400 hover:text-indigo-800 dark:hover:text-purple-300 transition-colors"
+                >
+                  <Download size={14} />
+                  Download ZIP manually
+                </a>
               </div>
 
               <Link
                 href="/"
-                className="hover:cursor-pointer mt-8 flex items-center justify-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
+                className="hover:cursor-pointer mt-10 flex items-center justify-center gap-2 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
               >
                 <ArrowLeft size={16} />
                 Back to dashboard

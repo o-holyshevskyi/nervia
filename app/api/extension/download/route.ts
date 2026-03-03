@@ -22,7 +22,7 @@ export async function GET() {
   return new NextResponse(webStream, {
     headers: {
       'Content-Type': 'application/zip',
-      'Content-Disposition': 'attachment; filename="synapse-clipper.zip"',
+      'Content-Disposition': 'attachment; filename="nervia-web-clipper.zip"',
     },
   });
 }
