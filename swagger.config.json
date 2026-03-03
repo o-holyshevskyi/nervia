@@ -1,0 +1,23 @@
+{
+    "apiFolder": "app/api",
+    "outputFormat": "json",
+    "outputFile": "public/swagger.json",
+    "definition": {
+      "openapi": "3.0.0",
+      "info": {
+        "title": "Nervia API Documentation",
+        "version": "1.0.0",
+        "description": "API for Nervia Web Clipper and Knowledge Graph integration"
+      },
+      "components": {
+        "securitySchemes": {
+          "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+          }
+        }
+      },
+      "security": []
+    }
+  }
