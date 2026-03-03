@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "description": "Save pages to your Nervia knowledge graph",
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+  "host_permissions": ["http://localhost:3000/*", "http://127.0.0.1:3000/*", "https://*.nervia.space/*"],
   "content_scripts": [
     {
-      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
+      "matches": ["http://localhost:3000/*", "http://127.0.0.1:3000/*", "https://*.nervia.space/*"],
       "js": ["content.js"],
       "run_at": "document_end"
     }
