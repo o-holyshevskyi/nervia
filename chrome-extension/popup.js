@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000/api/extension/save';
+const API_URL = 'https://app.nervia.space/api/extension/save';
 
 const pageTitleEl = document.getElementById('pageTitle');
 const pageUrlEl = document.getElementById('pageUrl');
