@@ -1,5 +1,24 @@
 import { NextRequest } from 'next/server';
 
+/**
+ * @swagger
+ * /api/favicon:
+ *   get:
+ *     description: Fetches favicon/logo for a domain. Tries Clearbit logo and Google favicon service.
+ *     parameters:
+ *       - in: query
+ *         name: domain
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Favicon image (Content-Type from source).
+ *       204:
+ *         description: No favicon found.
+ *       400:
+ *         description: Missing domain.
+ */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const domain = searchParams.get('domain');

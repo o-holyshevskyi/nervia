@@ -3,9 +3,24 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 /**
- * Returns the current session's access_token for the extension.
- * Only works when called same-origin (from the app page) so cookies are sent.
- * The app page fetches this and posts the token to the extension via postMessage.
+ * @swagger
+ * /api/extension/token:
+ *   get:
+ *     description: Returns the current session's access token for the extension. Only works when called same-origin (from the app page) so cookies are sent.
+ *     responses:
+ *       200:
+ *         description: Access token returned.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 access_token:
+ *                   type: string
+ *       401:
+ *         description: Not authenticated.
+ *       500:
+ *         description: Internal server error.
  */
 export async function GET() {
   try {

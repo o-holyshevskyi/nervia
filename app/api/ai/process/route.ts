@@ -89,6 +89,37 @@ async function resolveOrCreateGroupId(
     return (inserted as { id: string })?.id ?? null;
 }
 
+/**
+ * @swagger
+ * /api/ai/process:
+ *   post:
+ *     description: AI processing for the knowledge graph. Modes - suggest_connections (find related neurons + category) or analyze_link (summary, tags, connections for a new link).
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               mode:
+ *                 type: string
+ *                 enum: [suggest_connections, analyze_link]
+ *               newNode:
+ *                 type: object
+ *               existingNodes:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: Processed result (description/summary, connections, group_id, tags).
+ *       401:
+ *         description: Unauthorized.
+ *       429:
+ *         description: Rate limit (RATE_LIMIT, retryAfterSeconds).
+ *       500:
+ *         description: API key missing or server error.
+ */
 export async function POST(req: Request) {
     try {
         if (!process.env.GEMINI_API_KEY) {

@@ -2,6 +2,28 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
+/**
+ * @swagger
+ * /api/billing/portal:
+ *   get:
+ *     description: Returns the Lemon Squeezy customer portal URL for the authenticated user.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Portal URL (or fallback to Lemon Squeezy my-orders).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 url:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized.
+ *       500:
+ *         description: Internal server error.
+ */
 export async function GET() {
   const cookieStore = await cookies();
 

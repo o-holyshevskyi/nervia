@@ -6,6 +6,22 @@ import { Readable } from 'stream';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * @swagger
+ * /api/extension/download:
+ *   get:
+ *     description: Downloads the Nervia Web Clipper Chrome extension as a ZIP file.
+ *     responses:
+ *       200:
+ *         description: ZIP file containing the extension.
+ *         content:
+ *           application/zip:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Extension not found.
+ */
 export async function GET() {
   const extensionDir = path.join(process.cwd(), 'chrome-extension');
 

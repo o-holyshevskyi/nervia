@@ -20,6 +20,42 @@ export interface ChatResponseBody {
   reply: string;
 }
 
+/**
+ * @swagger
+ * /api/ai/chat:
+ *   post:
+ *     description: Chat with the Nervia Neural Core using context from the user's knowledge base. Answers based on provided context nodes.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userQuestion, contextNodes]
+ *             properties:
+ *               userQuestion:
+ *                 type: string
+ *               contextNodes:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                     summary:
+ *                       type: string
+ *                     tags:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *     responses:
+ *       200:
+ *         description: Reply from the neural core.
+ *       400:
+ *         description: userQuestion or contextNodes missing or invalid.
+ *       500:
+ *         description: API key missing or chat failed.
+ */
 export async function POST(req: Request) {
   try {
     if (!process.env.GEMINI_API_KEY) {

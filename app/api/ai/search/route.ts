@@ -28,6 +28,42 @@ export interface SearchResponseBody {
   results: SearchResultItem[];
 }
 
+/**
+ * @swagger
+ * /api/ai/search:
+ *   post:
+ *     description: Semantic search over the user's knowledge graph. Returns top 3–5 neurons that best match the query by meaning.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [query, contextNodes]
+ *             properties:
+ *               query:
+ *                 type: string
+ *               contextNodes:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     summary:
+ *                       type: string
+ *                     tags:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *     responses:
+ *       200:
+ *         description: Search results (id, relevance, reason per item).
+ *       400:
+ *         description: query or contextNodes missing or invalid.
+ *       500:
+ *         description: API key missing or search failed.
+ */
 export async function POST(req: Request) {
   try {
     if (!process.env.GEMINI_API_KEY) {

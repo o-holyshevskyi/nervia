@@ -2,6 +2,27 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/src/lib/supabase/admin';
 
+/**
+ * @swagger
+ * /api/share/{slug}:
+ *   get:
+ *     description: Returns shared knowledge graph data (nodes, links, groups) for a public share by slug.
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Shared graph data (nodes, links, groups).
+ *       400:
+ *         description: Missing slug.
+ *       404:
+ *         description: Share not found.
+ *       500:
+ *         description: Internal server error.
+ */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> }

@@ -26,6 +26,39 @@ export async function OPTIONS() {
   });
 }
 
+/**
+ * @swagger
+ * /api/extension/save:
+ *   post:
+ *     description: Saves a new web page (Neuron) to the user's knowledge graph.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, url]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               url:
+ *                 type: string
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Neuron successfully created.
+ *       400:
+ *         description: Missing or invalid title or url.
+ *       401:
+ *         description: Unauthorized - missing or invalid token.
+ *       409:
+ *         description: Conflict - neuron with same title or URL already exists.
+ *       500:
+ *         description: Internal server error.
+ */
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization');

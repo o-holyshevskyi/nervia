@@ -2,6 +2,32 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/src/lib/supabase/admin';
 
+/**
+ * @swagger
+ * /api/notifications/visit:
+ *   post:
+ *     description: Records a visit to a shared collection (used when someone opens a shared link). Creates a "New Visit" notification for the share owner.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [slug]
+ *             properties:
+ *               slug:
+ *                 type: string
+ *                 description: Share slug from the shared URL
+ *     responses:
+ *       201:
+ *         description: Visit recorded.
+ *       400:
+ *         description: Missing slug.
+ *       404:
+ *         description: Share not found.
+ *       500:
+ *         description: Failed to record visit or internal server error.
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));

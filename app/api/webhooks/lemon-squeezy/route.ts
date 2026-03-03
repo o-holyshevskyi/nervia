@@ -8,6 +8,32 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/**
+ * @swagger
+ * /api/webhooks/lemon-squeezy:
+ *   post:
+ *     description: Lemon Squeezy webhook for subscription events. Validates signature and updates user plan (subscription_created/updated → constellation/singularity; cancelled/expired → genesis).
+ *     parameters:
+ *       - in: header
+ *         name: x-signature
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Webhook received.
+ *       400:
+ *         description: No user_id in custom_data.
+ *       401:
+ *         description: Invalid signature.
+ *       500:
+ *         description: Internal server error.
+ */
 export async function POST(req: Request) {
   try {
     // 1. Отримуємо сире тіло запиту для перевірки підпису
