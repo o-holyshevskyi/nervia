@@ -778,34 +778,50 @@ export default function LeftSidebar({
                 </>
               )}
             </AnimatePresence>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setProfileMenuOpen((v) => !v);
-              }}
-              className="cursor-pointer w-full bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center gap-3 text-left group border border-black/10 dark:border-white/5 hover:border-black/20 dark:hover:border-white/10 transition-colors"
-            >
-              <div className="relative">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 overflow-hidden flex items-center justify-center">
-                  {user?.user_metadata?.avatar_url ? (
-                    <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" width={50} height={50} />
-                  ) : (
-                    <UserIcon size={20} className="text-indigo-600 dark:text-purple-400" />
-                  )}
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full" />
+            {/* Rotating gradient border – running border strictly on perimeter */}
+            <div className="relative w-full rounded-xl overflow-hidden p-[1px]">
+              {/* Animated layer: large conic gradient, rotates so 1px edge is visible as border */}
+              <motion.div
+                className="absolute inset-[-100%] blur-sm pointer-events-none"
+                style={{
+                  background: 'conic-gradient(from 0deg, #6366f1, #a855f7, transparent, #6366f1)',
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                aria-hidden
+              />
+              {/* Content layer: solid mask so only the 1px perimeter shows the gradient */}
+              <div className="relative z-10 rounded-[11px] bg-white dark:bg-[#050505] min-w-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProfileMenuOpen((v) => !v);
+                  }}
+                  className="cursor-pointer w-full p-4 flex items-center dark:bg-neutral-900/50 gap-3 text-left group hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors min-w-0 rounded-[11px]"
+                >
+                  <div className="relative shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 overflow-hidden flex items-center justify-center">
+                      {user?.user_metadata?.avatar_url ? (
+                        <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" width={50} height={50} />
+                      ) : (
+                        <UserIcon size={20} className="text-indigo-600 dark:text-purple-400" />
+                      )}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full" />
+                  </div>
+                  <div className="flex flex-col max-w-[120px] min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                      {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                    </span>
+                    <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
+                      {user?.email}
+                    </span>
+                  </div>
+                  <ChevronRight size={18} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
+                </button>
               </div>
-              <div className="flex flex-col max-w-[120px] min-w-0 flex-1">
-                <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
-                </span>
-                <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
-                  {user?.email}
-                </span>
-              </div>
-              <ChevronRight size={18} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
-            </button>
+            </div>
           </div>
         </motion.div>
       )}
