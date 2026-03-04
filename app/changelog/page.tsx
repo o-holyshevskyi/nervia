@@ -117,6 +117,12 @@ const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
           "Native Documentation / Astronaut Manual page: sticky ToC, Introduction, Exocortex (3D graph), Web Clipper, Tags & Organization. Linked in sidebar.",
         ],
       },
+      {
+        tag: "Analytics",
+        items: [
+          "Vercel Web Analytics added to root layout for usage insights.",
+        ],
+      },
     ],
   },
   {

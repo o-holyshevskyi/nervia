@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import ExtensionTokenBroadcast from "@/src/components/ExtensionTokenBroadcast";
 import ThemeProvider from "@/src/components/ThemeProvider";
@@ -85,6 +86,7 @@ export default function RootLayout({
                     <ExtensionTokenBroadcast />
                     {children}
                     <Toaster richColors position="top-right" />
+                    <Analytics />
                 </ThemeProvider>
             </body>
         </html>
