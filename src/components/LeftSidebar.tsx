@@ -9,6 +9,7 @@ import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
 import ShareModal from "./ShareModal";
 import MissionFeedbackModal from "./MissionFeedbackModal";
+import DeleteAccountModal from "./DeleteAccountModal";
 import type { Group } from "../hooks/useGroups";
 import { useSharing } from "../hooks/useSharing";
 import type { ShareScope } from "../hooks/useSharing";
@@ -124,6 +125,7 @@ export default function LeftSidebar({
   const [shareInitial, setShareInitial] = useState<{ scope: ShareScope; groupIds: string[] }>({ scope: 'ALL', groupIds: [] });
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const supabase = useMemo(() => createClient(), []);
   const { createShare, shares } = useSharing(supabase);
@@ -756,10 +758,21 @@ export default function LeftSidebar({
                         setProfileMenuOpen(false);
                         handleSignOut();
                       }}
-                      className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-600 dark:text-neutral-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 rounded-b-xl transition-colors"
+                      className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-600 dark:text-neutral-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                     >
                       <LogOut size={16} className="shrink-0" />
                       Sign Out
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteAccountModalOpen(true);
+                        setProfileMenuOpen(false);
+                      }}
+                      className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-b-xl transition-colors"
+                    >
+                      <Trash2 size={16} className="shrink-0" />
+                      Delete Account
                     </button>
                   </motion.div>
                 </>
@@ -797,6 +810,7 @@ export default function LeftSidebar({
         </motion.div>
       )}
       <MissionFeedbackModal key="mission-feedback-modal" isOpen={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
+      <DeleteAccountModal key="delete-account-modal" isOpen={deleteAccountModalOpen} onClose={() => setDeleteAccountModalOpen(false)} />
       {/* Notification center panel */}
       <AnimatePresence key="notification-panel">
         {isOpen && isNotificationPanelOpen && (
