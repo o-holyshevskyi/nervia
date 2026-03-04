@@ -3,11 +3,12 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings2, Lock, Eye, Box } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
 import ShareModal from "./ShareModal";
+import MissionFeedbackModal from "./MissionFeedbackModal";
 import type { Group } from "../hooks/useGroups";
 import { useSharing } from "../hooks/useSharing";
 import type { ShareScope } from "../hooks/useSharing";
@@ -121,6 +122,8 @@ export default function LeftSidebar({
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareInitial, setShareInitial] = useState<{ scope: ShareScope; groupIds: string[] }>({ scope: 'ALL', groupIds: [] });
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const supabase = useMemo(() => createClient(), []);
   const { createShare, shares } = useSharing(supabase);
@@ -705,46 +708,101 @@ export default function LeftSidebar({
             )}
           </div>
 
-          {/* User Profile Card – persistent */}
-          <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/5">
-            <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center justify-between group border border-black/10 dark:border-white/5 hover:border-black/20 dark:hover:border-white/10 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 overflow-hidden flex items-center justify-center">
-                    {user?.user_metadata?.avatar_url ? (
-                      <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" width={50} height={50} />
-                    ) : (
-                      <UserIcon size={20} className="text-indigo-600 dark:text-purple-400" />
-                    )}
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full" />
+          {/* User Profile Card – dropdown trigger */}
+          <div className="mt-6 pt-6 border-t border-black/10 dark:border-white/5 relative">
+            <AnimatePresence>
+              {profileMenuOpen && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-30"
+                    aria-hidden
+                    onClick={() => setProfileMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    className="absolute bottom-full left-0 right-0 z-40 mb-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-neutral-900/95 shadow-xl backdrop-blur"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedbackModalOpen(true);
+                        setProfileMenuOpen(false);
+                      }}
+                      className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 rounded-t-xl transition-colors"
+                    >
+                      <SmilePlus size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      Mission Feedback
+                    </button>
+                    <a
+                      href="https://nervia.space/support"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <LifeBuoy size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      Houston Support
+                    </a>
+                    <div className="border-t border-neutral-200 dark:border-neutral-700" />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProfileMenuOpen(false);
+                        handleSignOut();
+                      }}
+                      className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-600 dark:text-neutral-400 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 rounded-b-xl transition-colors"
+                    >
+                      <LogOut size={16} className="shrink-0" />
+                      Sign Out
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setProfileMenuOpen((v) => !v);
+              }}
+              className="cursor-pointer w-full bg-black/5 dark:bg-white/5 rounded-2xl p-4 flex items-center gap-3 text-left group border border-black/10 dark:border-white/5 hover:border-black/20 dark:hover:border-white/10 transition-colors"
+            >
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 overflow-hidden flex items-center justify-center">
+                  {user?.user_metadata?.avatar_url ? (
+                    <Image src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" width={50} height={50} />
+                  ) : (
+                    <UserIcon size={20} className="text-indigo-600 dark:text-purple-400" />
+                  )}
                 </div>
-                <div className="flex flex-col max-w-[120px]">
-                  <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
-                    {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
-                  </span>
-                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
-                    {user?.email}
-                  </span>
-                </div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full" />
               </div>
-
-              <button 
-                onClick={handleSignOut}
-                className="hover:cursor-pointer p-2 text-neutral-500 dark:text-neutral-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                title="Sign Out"
-              >
-                <LogOut size={18} />
-              </button>
-            </div>
+              <div className="flex flex-col max-w-[120px] min-w-0 flex-1">
+                <span className="text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                </span>
+                <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono truncate">
+                  {user?.email}
+                </span>
+              </div>
+              <ChevronRight size={18} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
+            </button>
           </div>
         </motion.div>
       )}
+      <MissionFeedbackModal key="mission-feedback-modal" isOpen={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
       {/* Notification center panel */}
-      <AnimatePresence>
+      <AnimatePresence key="notification-panel">
         {isOpen && isNotificationPanelOpen && (
           <>
             <motion.div
+              key="notification-backdrop"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -753,6 +811,7 @@ export default function LeftSidebar({
               onClick={() => setIsNotificationPanelOpen(false)}
             />
             <motion.div
+              key="notification-drawer"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
