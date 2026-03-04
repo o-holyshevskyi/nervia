@@ -3,13 +3,14 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
 import ShareModal from "./ShareModal";
 import MissionFeedbackModal from "./MissionFeedbackModal";
 import DeleteAccountModal from "./DeleteAccountModal";
+import SettingsModal from "./SettingsModal";
 import type { Group } from "../hooks/useGroups";
 import { useSharing } from "../hooks/useSharing";
 import type { ShareScope } from "../hooks/useSharing";
@@ -126,6 +127,7 @@ export default function LeftSidebar({
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [deleteAccountModalOpen, setDeleteAccountModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const supabase = useMemo(() => createClient(), []);
   const { createShare, shares } = useSharing(supabase);
@@ -750,6 +752,17 @@ export default function LeftSidebar({
                       <LifeBuoy size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
                       Houston Support
                     </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsModalOpen(true);
+                        setProfileMenuOpen(false);
+                      }}
+                      className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <Settings size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      Account Settings
+                    </button>
                     <div className="border-t border-neutral-200 dark:border-neutral-700" />
                     <button
                       type="button"
@@ -827,6 +840,15 @@ export default function LeftSidebar({
       )}
       <MissionFeedbackModal key="mission-feedback-modal" isOpen={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
       <DeleteAccountModal key="delete-account-modal" isOpen={deleteAccountModalOpen} onClose={() => setDeleteAccountModalOpen(false)} />
+      <SettingsModal
+        key="settings-modal"
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        user={user}
+        onSuccess={() => {
+          supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
+        }}
+      />
       {/* Notification center panel */}
       <AnimatePresence key="notification-panel">
         {isOpen && isNotificationPanelOpen && (
