@@ -114,6 +114,7 @@ const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
         items: [
           "Transmission Logs (Changelog) page and What's New link in the profile dropdown.",
           "Swagger API documentation for developers.",
+          "Native Documentation / Astronaut Manual page: sticky ToC, Introduction, Exocortex (3D graph), Web Clipper, Tags & Organization. Linked in sidebar.",
         ],
       },
     ],

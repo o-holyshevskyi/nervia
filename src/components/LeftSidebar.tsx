@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy, Rocket } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy, Rocket, BookOpen, Satellite } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -740,7 +740,7 @@ export default function LeftSidebar({
                       }}
                       className="hover:cursor-pointer flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 rounded-t-xl transition-colors"
                     >
-                      <SmilePlus size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      <Satellite size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
                       Mission Feedback
                     </button>
                     <a
@@ -759,6 +759,14 @@ export default function LeftSidebar({
                     >
                       <Rocket size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
                       What&apos;s New
+                    </Link>
+                    <Link
+                      href="/docs"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <BookOpen size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      Documentation
                     </Link>
                     <button
                       type="button"
