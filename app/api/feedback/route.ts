@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const { error } = await resend.emails.send({
       from: 'Nervia App <hello@nervia.space>',
       to: 'hello@nervia.space',
-      reply_to: user.email,
+      replyTo: user.email,
       subject: 'Mission Feedback from Nervia',
       html: `
         <div style="font-family: sans-serif; color: #e5e5e5; max-width: 600px;">
