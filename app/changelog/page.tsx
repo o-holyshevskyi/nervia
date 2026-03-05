@@ -1,11 +1,8 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-
-export const metadata: Metadata = {
-  title: "Changelog | Nervia",
-  description: "The latest updates and improvements to the Nervia universe.",
-};
+import { motion } from "framer-motion";
 
 type BadgeType = "New" | "Improved" | "Fixed";
 
@@ -21,11 +18,18 @@ interface ChangelogItemProps {
   sections?: ChangelogSection[];
   badges?: BadgeType[];
   isLast?: boolean;
+  index?: number;
 }
 
-function ChangelogItem({ version, title, description, sections = [], badges = [], isLast = false }: ChangelogItemProps) {
+function ChangelogItem({ version, title, description, sections = [], badges = [], isLast = false, index = 0 }: ChangelogItemProps) {
   return (
-    <li className="relative flex gap-4 pb-8">
+    <motion.li
+      className="relative flex gap-4 pb-8"
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: "easeOut", delay: index * 0.08 }}
+    >
       {!isLast && (
         <span
           className="absolute left-[7px] top-6 bottom-0 w-px bg-neutral-700 dark:bg-neutral-800"
@@ -77,7 +81,7 @@ function ChangelogItem({ version, title, description, sections = [], badges = []
           </div>
         )}
       </div>
-    </li>
+    </motion.li>
   );
 }
 
@@ -174,6 +178,7 @@ export default function ChangelogPage() {
               key={`${entry.version}-${entry.title}`}
               {...entry}
               isLast={i === CHANGELOG_ENTRIES.length - 1}
+              index={i}
             />
           ))}
         </ul>
