@@ -83,6 +83,19 @@ function ChangelogItem({ version, title, description, sections = [], badges = []
 
 const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
   {
+    version: "v1.2.0 - 5 Mar 2026",
+    title: "Nervia Landing",
+    badges: ["New"],
+    sections: [
+      {
+        tag: "Docs & discovery",
+        items: [
+          "Flight Plan (Roadmap) page with Now / Next / Later columns and sidebar link (4 Mar 2026).",
+        ],
+      },
+    ],
+  },
+  {
     version: "v1.1.0 - 4 Mar 2026",
     title: "Identity, profile & feedback",
     badges: ["New", "Improved"],
@@ -114,7 +127,7 @@ const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
         items: [
           "Transmission Logs (Changelog) page and What's New link in the profile dropdown.",
           "Swagger API documentation for developers.",
-          "Native Documentation / Astronaut Manual page: sticky ToC, Introduction, Exocortex (3D graph), Web Clipper, Tags & Organization. Linked in sidebar.",
+          "Native Documentation / Astronaut Manual page: sticky ToC, Introduction, Exocortex (3D graph), Web Clipper, Tags & Organization. Linked in sidebar."
         ],
       },
       {

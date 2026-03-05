@@ -3,7 +3,7 @@
 
 import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy, Rocket, BookOpen, Satellite } from "lucide-react";
+import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy, Rocket, BookOpen, Satellite, Telescope } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
 import CreateGroupModal from "./CreateGroupModal";
@@ -23,6 +23,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useExtensionDetected } from "../hooks/useExtensionDetected";
 import { useUniverseStats } from "../hooks/useUniverseStats";
+import packageJson from "../../package.json";
 import ThemeToggle from "./ThemeToggle";
 import type { UpgradeTargetPlan } from "./UpgradeModal";
 
@@ -761,6 +762,14 @@ export default function LeftSidebar({
                       What&apos;s New
                     </Link>
                     <Link
+                      href="/roadmap"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <Telescope size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
+                      Flight Plan
+                    </Link>
+                    <Link
                       href="/docs"
                       onClick={() => setProfileMenuOpen(false)}
                       className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-neutral-800 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
@@ -851,6 +860,9 @@ export default function LeftSidebar({
                 </button>
               </div>
             </div>
+            <p className="mt-2 text-center text-[10px] font-mono text-neutral-400 dark:text-neutral-500">
+              v{packageJson.version}
+            </p>
           </div>
         </motion.div>
       )}
