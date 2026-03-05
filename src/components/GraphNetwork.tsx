@@ -1333,6 +1333,7 @@ export default function GraphNetwork({
                             backgroundColor="rgba(0,0,0,0)"
                             enablePointerInteraction={true}
                             onEngineStop={handleEngineStop}
+                            graphTheme={graphTheme}
                         />
                     </motion.div>
                 )}

@@ -229,6 +229,7 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
     const orbitMapRef = useRef<Map<any, { radius: number; theta: number; phi: number; speedTheta: number; speedPhi: number }>>(new Map());
     const clusterOrbitMapRef = useRef<Map<string, { radius: number; theta: number; phi: number; speedTheta: number; speedPhi: number }>>(new Map());
     const orbitInitializedRef = useRef(false);
+    const starsRef = useRef<THREE.Points | null>(null);
     
     useImperativeHandle(ref, () => fgRef.current ?? null, []);
 
@@ -485,6 +486,28 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             // Додаємо кластер у загальну туманність
             group.add(clusterGroup);
         });
+
+        if (!starsRef.current) {
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 2000;
+            const posArr = new Float32Array(starCount * 3);
+            for(let i = 0; i < starCount * 3; i++) {
+                // Розкидаємо пил у радіусі 4000 одиниць
+                posArr[i] = (Math.random() - 0.5) * 4000; 
+            }
+            starGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+            const starMat = new THREE.PointsMaterial({
+                color: isLightTheme ? 0x00050d : 0xffffff, // Темніші зірки для світлої теми
+                size: isLightTheme ? 3 : 1.5,
+                transparent: true,
+                opacity: isLightTheme ? 0.9 : 0.6,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            });
+            const stars = new THREE.Points(starGeo, starMat);
+            scene.add(stars);
+            starsRef.current = stars;
+        }
     
         scene.add(group);
         nebulaRef.current = group;
@@ -552,6 +575,11 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             lastTime  = now;
     
             if (fg) {
+                if (starsRef.current) {
+                    starsRef.current.rotation.y -= dt * 0.000015; // Повільно крутиться
+                    starsRef.current.rotation.x -= dt * 0.000005; // Трохи нахиляється
+                }
+                
                 if (!orbitInitializedRef.current) {
                     orbitInitializedRef.current = init();
                 }
