@@ -87,6 +87,29 @@ function ChangelogItem({ version, title, description, sections = [], badges = []
 
 const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
   {
+    version: "v1.2.1 - 6 Mar 2026",
+    title: "Exocortex loading & ambient orbits",
+    badges: ["Improved", "New"],
+    sections: [
+      {
+        tag: "Exocortex (3D graph)",
+        items: [
+          "Cinematic loading sequence: “Connecting to Exocortex” → “Calculating Gravity” → “Mapping Neural Paths” → “Stabilizing Universe” → “Ready” / “Connection Stable” / “Synchronized” with spinner and overlay.",
+          "Ambient orbit animation in 2D: nodes orbit around their cluster center; clusters orbit around the global center, with golden-ratio speed variation.",
+          "Cluster force positioning (forceX/forceY) so nodes settle around cluster centers; initial zoom-to-fit and loading overlay dismissal when the engine is ready, with fallback timeout.",
+          "D3 simulation alpha minimum (d3AlphaMin) configurable on the 2D graph for smoother settling.",
+        ],
+      },
+      {
+        tag: "UI",
+        items: [
+          "Refined loading screen typography for “Initializing Universe…” (smaller, letter-spaced, bold).",
+          "Visibility change handling: loading overlay dismisses when returning to the tab if the engine has already finished.",
+        ],
+      },
+    ],
+  },
+  {
     version: "v1.2.0 - 5 Mar 2026",
     title: "Nervia Landing",
     badges: ["New"],

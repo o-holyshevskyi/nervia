@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock, Loader2, OrbitIcon, Orbit } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import GraphNetwork2D from './GraphNetwork2D';
 import GraphNetwork3D from './GraphNetwork3D';
@@ -26,6 +26,16 @@ const groupNames: Record<number, string> = {
     4: "Design",
     5: "Research",
 };
+
+const loadingLabels = [
+    "Connecting to Exocortex",   // 0 — initial handshake
+    "Calculating Gravity",       // 1 — physics warmup
+    "Mapping Neural Paths",      // 2 — link resolution
+    "Stabilizing Universe",      // 3 — simulation settling
+    "Ready",                     // 4 — engine done (success sequence starts)
+    "Connection Stable",         // 5
+    "Synchronized",              // 6 — final, then overlay exits
+];
 
 /** Neon palette for tag-based clusters (cinematic, consistent per tag). */
 const tagNeonPalette = [
@@ -309,31 +319,82 @@ export default function GraphNetwork({
     viewMode = '2D',
     onViewModeChange,
 }: GraphNetworkProps) {
-    const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+    const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+    const [isInitialFitting, setIsInitialFitting] = useState(true);
+    const [loadingStep, setLoadingStep] = useState(0);
+    
+    const engineIsDone = useRef(false);
+    
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
     const fg3dRef = useRef<any>(null);
-    const prevNodeCountRef = useRef(0);
-    const prevViewModeRef = useRef(viewMode);
+    const physicsAppliedRef = useRef(false);
+    const zoomScheduledRef = useRef(false);
+    const clusterCentersRef = useRef<Record<string | number, { x: number; y: number }>>({});
+    const ambientRafRef = useRef<number>(0);
+    const draggingNodeRef = useRef<any>(null);
+
+    const initialFitDone = useRef(false);
     const threeDKeyRef = useRef(0);
-    if (prevViewModeRef.current !== '3D' && viewMode === '3D') {
-        threeDKeyRef.current += 1;
-    }
-    prevViewModeRef.current = viewMode;
 
     // ── Engine-ready signal ──────────────────────────────────────────────────
     // Incremented when the 2D graph engine fires onEngineStop (first run or after reheat).
     // Physics useEffect depends on this so it re-runs once the dynamic import has resolved
     // and fgRef.current is set; otherwise the first effect run sees null and forces never apply.
     const [engineReadyCount, setEngineReadyCount] = useState(0);
+
+    useEffect(() => {
+        if (!isInitialFitting) return;
+    
+        // Cycle through loading states 0→3, then hold until engine signals done
+        const interval = setInterval(() => {
+            setLoadingStep((prev) => {
+                if (engineIsDone.current) return prev; // success sequence handled by handleEngineStop
+                if (prev >= 3) return prev;            // hold at "Stabilizing Universe"
+                return prev + 1;
+            });
+        }, 1200);
+    
+        // Hard fallback: if onEngineStop never fires, force the success sequence
+        const hardTimeout = setTimeout(() => {
+            if (!engineIsDone.current) {
+                engineIsDone.current = true;
+                initialFitDone.current = true;
+                physicsAppliedRef.current = true;
+                fgRef.current?.zoomToFit(450, 100);
+                setLoadingStep(4);
+                setTimeout(() => setLoadingStep(5), 220);
+                setTimeout(() => setLoadingStep(6), 440);
+                setTimeout(() => setIsInitialFitting(false), 650);
+            }
+        }, 1500);
+    
+        return () => {
+            clearInterval(interval);
+            clearTimeout(hardTimeout);
+        };
+    }, [isInitialFitting]);
+    
+
     const handleEngineStop = useCallback(() => {
-        setEngineReadyCount((c) => c + 1);
+        setEngineReadyCount((c) => Math.max(c, 1));
     }, []);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            // Якщо користувач повернувся і двигун вже "вистрілив"
+            if (document.visibilityState === 'visible' && engineIsDone.current && isInitialFitting) {
+                setIsInitialFitting(false);
+            }
+        };
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [isInitialFitting]);
 
     // Fallback: if onEngineStop doesn't fire (e.g. library timing), re-run physics after ref is likely set.
     useEffect(() => {
-        if (viewMode !== '2D') return;
-        const t = setTimeout(() => setEngineReadyCount((c) => Math.max(c, 1)), 400);
+        if (viewMode !== '2D') return;  // ← must be present
+        const t = setTimeout(() => setEngineReadyCount((c) => Math.max(c, 1)), 50);
         return () => clearTimeout(t);
     }, [viewMode]);
 
@@ -505,6 +566,119 @@ export default function GraphNetwork({
         }
         return null;
     }, []);
+
+    useEffect(() => {
+        if (viewMode !== '2D') return;
+    
+        const orbitMap = new Map<any, {
+            radius: number;
+            angle: number;
+            speed: number;
+        }>();
+    
+        // Cluster centers also orbit the global center
+        const clusterOrbitMap = new Map<string | number, {
+            radius: number;
+            angle: number;
+            speed: number;
+        }>();
+    
+        let initialized = false;
+        const GOLDEN = 2.399;
+        const BASE_SPEED = 0.00008;          // node orbit speed around cluster center
+        const CLUSTER_SPEED = 0.000022;      // cluster orbit speed around global center (slower)
+    
+        const getClusterKey = (node: any): string | number =>
+            clusterMode === 'group'
+                ? getNodeGroupKey(node)
+                : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
+    
+        const init = (): boolean => {
+            const centers = clusterCentersRef.current;
+            const nodes = processedData.nodes;
+            if (!nodes.length || !Object.keys(centers).length) return false;
+    
+            const settled = nodes.filter((n: any) =>
+                isFinite(n.x) && isFinite(n.y) && (Math.abs(n.x) > 1 || Math.abs(n.y) > 1)
+            );
+            if (settled.length < nodes.length * 0.8) return false;
+    
+            // Initialize cluster orbits around global center (0,0)
+            Object.entries(centers).forEach(([keyStr, center], i) => {
+                const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
+                const radius = Math.hypot(center.x, center.y);
+                const angle = Math.atan2(center.y, center.x);
+                // Each cluster orbits at slightly different speed
+                const speed = CLUSTER_SPEED * (0.8 + ((i * GOLDEN) % 1) * 0.4);
+                clusterOrbitMap.set(key, { radius: Math.max(10, radius), angle, speed });
+            });
+    
+            // Initialize node orbits around their cluster center
+            nodes.forEach((node: any, i: number) => {
+                if (node.fx != null) return;
+                const key = getClusterKey(node);
+                const center = centers[key];
+                if (!center) return;
+                const dx = (node.x ?? 0) - center.x;
+                const dy = (node.y ?? 0) - center.y;
+                const radius = Math.max(10, Math.hypot(dx, dy));
+                const angle = Math.atan2(dy, dx);
+                const speed = BASE_SPEED * (0.7 + ((i * GOLDEN) % 1) * 0.6);
+                orbitMap.set(node, { radius, angle, speed });
+            });
+    
+            return orbitMap.size > 0;
+        };
+    
+        let lastTime = 0;
+        const tick = (now: number) => {
+            const fg = fgRef.current;
+            const dt = Math.min(lastTime ? now - lastTime : 16, 64);
+            lastTime = now;
+    
+            if (fg) {
+                if (!initialized) {
+                    initialized = init();
+                }
+    
+                if (initialized) {
+                    // Step 1 — advance cluster center orbits around (0,0)
+                    const liveCenters: Record<string | number, { x: number; y: number }> = {};
+                    clusterOrbitMap.forEach((orbit, key) => {
+                        orbit.angle += orbit.speed * dt;
+                        liveCenters[key] = {
+                            x: Math.cos(orbit.angle) * orbit.radius,
+                            y: Math.sin(orbit.angle) * orbit.radius,
+                        };
+                    });
+    
+                    // Step 2 — advance node orbits around their (now moving) cluster center
+                    orbitMap.forEach((orbit, node) => {
+                        orbit.angle += orbit.speed * dt;
+                        const key = getClusterKey(node);
+                        const center = liveCenters[key] ?? clusterCentersRef.current[key] ?? { x: 0, y: 0 };
+                        node.x = center.x + Math.cos(orbit.angle) * orbit.radius;
+                        node.y = center.y + Math.sin(orbit.angle) * orbit.radius;
+                    });
+    
+                    fg.refresh?.();
+                }
+            }
+    
+            ambientRafRef.current = requestAnimationFrame(tick);
+        };
+    
+        const startTimer = setTimeout(() => {
+            ambientRafRef.current = requestAnimationFrame(tick);
+        }, 700);
+    
+        return () => {
+            clearTimeout(startTimer);
+            cancelAnimationFrame(ambientRafRef.current);
+            orbitMap.clear();
+            clusterOrbitMap.clear();
+        };
+    }, [viewMode, processedData.nodes, clusterMode]);
 
     const isLinkHidden = useCallback((link: any) => {
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
@@ -732,6 +906,7 @@ export default function GraphNetwork({
     // once the dynamic import resolves and ForceGraph2D fires its first onEngineStop.
     // Without it, fgRef.current is null on the very first run and forces are never applied.
     useEffect(() => {
+        if (viewMode !== '2D') return;   // ← add this
         if (!fgRef.current) return;
         const fg = fgRef.current;
         const minDim = Math.min(dimensions.width, dimensions.height);
@@ -743,6 +918,10 @@ export default function GraphNetwork({
         };
 
         const clusterCenters = buildClusterCenters2D(processedData.nodes, clusterMode, radius);
+        clusterCentersRef.current = clusterCenters;
+
+        fg.d3Force('x', forceX((node: any) => clusterCentersRef.current[getClusterKey(node)]?.x ?? 0).strength(0.4));
+        fg.d3Force('y', forceY((node: any) => clusterCentersRef.current[getClusterKey(node)]?.y ?? 0).strength(0.4));
 
         // Seed positions deterministically so nodes start near their cluster center
         const jitter = 28;
@@ -800,8 +979,24 @@ export default function GraphNetwork({
         }
 
         fg.d3ReheatSimulation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [engineReadyCount, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
+        if (!initialFitDone.current && !zoomScheduledRef.current) {
+            zoomScheduledRef.current = true;
+            setTimeout(() => {
+                if (initialFitDone.current) return;
+                initialFitDone.current = true;
+                engineIsDone.current = true;
+                fgRef.current?.zoomToFit(450, 100);
+                setLoadingStep(4);
+                setTimeout(() => setLoadingStep(5), 220);
+                setTimeout(() => setLoadingStep(6), 440);
+                setTimeout(() => setIsInitialFitting(false), 650);
+            }, 350);
+            // Note: cleanup is handled by existing effect cleanup or hard timeout guard
+        }
+        
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode, engineReadyCount, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
 
     useEffect(() => {
         if (!solarSystemNodeId || !fgRef.current) return;
@@ -854,41 +1049,8 @@ export default function GraphNetwork({
         onFlyToComplete?.();
     }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
 
-    const CENTER_ANIMATION_MS = 1000; 
-    const DEFAULT_ZOOM_ON_CENTER = 1.2;
-    useEffect(() => {
-        if (timelineDate != null) return;
-        const nodeCount = processedData.nodes.length;
-        const prevCount = prevNodeCountRef.current;
-        prevNodeCountRef.current = nodeCount;
-        if (!fgRef.current) return;
-        
-        const isFirstLoad = prevCount === 0 && nodeCount > 0;
-        const isNewNeuron = nodeCount > prevCount && prevCount > 0;
-        
-        if (isFirstLoad || isNewNeuron) {
-            // 🔥 If it's the first load, instantly pull the camera WAY back
-            // so the animation beautifully zooms all the way in
-            if (isFirstLoad) {
-                fgRef.current.zoom(0.1); 
-            }
-            fgRef.current.centerAt(0, 0, CENTER_ANIMATION_MS);
-            fgRef.current.zoom(DEFAULT_ZOOM_ON_CENTER, CENTER_ANIMATION_MS);
-        }
-    }, [processedData.nodes.length, timelineDate]);
-
-    useEffect(() => {
-        if (!fgRef.current || processedData.nodes.length === 0) return;
-        const t = setTimeout(() => {
-            fgRef.current?.d3ReheatSimulation();
-        }, 50);
-        return () => clearTimeout(t);
-    }, [processedData.nodes.length]);
-
     const ZOOM_FACTOR = 1.25;
     const NAV_DURATION_MS = 250;
-    const RECENTER_MS = 800;
-    const RECENTER_ZOOM = 1.2;
     const handleZoomIn = useCallback(() => {
         if (viewMode === '3D') {
             const fg3d = fg3dRef.current;
@@ -933,17 +1095,16 @@ export default function GraphNetwork({
             fgRef.current.zoom(Math.max(0.2, k / ZOOM_FACTOR), NAV_DURATION_MS);
         }
     }, [viewMode]);
+
     const handleRecenter = useCallback(() => {
         if (viewMode === '3D') {
-            const fg3d = fg3dRef.current;
-            if (typeof fg3d?.zoomToFit === 'function') {
-                fg3d.zoomToFit(RECENTER_MS, 120);
-            }
+            fg3dRef.current?.zoomToFit(1000, 150);
             return;
         }
-        if (!fgRef.current) return;
-        fgRef.current.centerAt(0, 0, RECENTER_MS);
-        fgRef.current.zoom(RECENTER_ZOOM, RECENTER_MS);
+        if (fgRef.current) {
+            // zoomToFit(час_анімації, відступ_у_пікселях)
+            fgRef.current.zoomToFit(1000, 150);
+        }
     }, [viewMode]);
 
     const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-200 cursor-pointer";
@@ -979,157 +1140,235 @@ export default function GraphNetwork({
         return { nodes, links: processedData.links };
     }, [viewMode, processedData, clusterMode, dimensions.width, dimensions.height]);
 
-    const graphTransition = { duration: 1.5, ease: [0.25, 0.1, 0.25, 1] as const };
-
     return (
         <div
             ref={containerRef}
-            className={`w-full h-screen relative ${viewMode === '3D' ? '' : ''}`}
+            className="w-full h-screen relative overflow-hidden"
             style={{ backgroundColor: 'var(--graph-bg)' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
-            <AnimatePresence initial={false} mode="wait">
-            {viewMode === '2D' && (
-            <motion.div
-                key="graph-2d"
-                className="absolute inset-0 w-full h-full"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: graphTransition }}
-                exit={{ opacity: 0, transition: { duration: 4, ease: [0.4, 0, 0.2, 1] as const } }}
-            >
-            <GraphNetwork2D
-                ref={fgRef}
-                width={dimensions.width}
-                height={dimensions.height}
-                graphData={processedData}
-                nodeVal={(node: any) => node.val ?? 4}
-                nodeLabel={getNodeLabel}
-                nodeCanvasObject={drawNode}
-                onRenderFramePre={handleRenderFramePre}
-                onZoom={handleZoom}
-                warmupTicks={0}
-                d3AlphaDecay={0.0228}
-                d3VelocityDecay={0.4}
-                onNodeClick={(node: any) => {
-                    if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
-                        fgRef.current.centerAt(node.x, node.y, 800);
-                        fgRef.current.zoom(4, 800);
-                    }
-                    if (!readOnly) onNodeSelect(node);
-                }}
-                onNodeRightClick={(node, event) => {
-                    if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
-                }}
-                onBackgroundClick={() => {
-                    if (onBackgroundClick) onBackgroundClick();
-                }}
-                onLinkHover={(link) => setHoveredLink(link)}
-                nodePointerAreaPaint={(node: any, color, ctx) => {
-                    const x = node.x ?? 0;
-                    const y = node.y ?? 0;
-                    if (!isFinite(x) || !isFinite(y)) return;
-                    const rawSize = (node.val ?? 4) * 1;
-                    let radius = Math.min(20, Math.max(6, rawSize));
-                    const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
-                    if (pathfinderActive && pathNodeSet.has(nodeId)) radius = radius * 1.2;
-                    else if (searchActive && highlightedSet.has(nodeId)) radius = radius * 1.2;
-                    ctx.fillStyle = color;
-                    ctx.beginPath();
-                    ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
-                    ctx.fill();
-                }}
-                nodeColor={(node: any) => {
-                    const theme = getGraphThemeColors(containerRef.current);
-                    const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
-                    const dimColor = theme.nodeColor.startsWith('#') ? hexToRgba(theme.nodeColor, 0.12) : theme.nodeColor;
-                    if (solarSystemNodeId) {
-                        if (!solarNeighbors.has(nodeId)) return dimColor;
-                        if (nodeId === solarSystemNodeId) return "#eab308";
-                        const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
-                        return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#06b6d4";
-                    }
-                    if (pathfinderActive) {
-                        if (pathNodeSet.has(nodeId)) {
-                            const startId = pathNodes[0];
-                            const endId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
-                            if (nodeId === startId) return "#06b6d4";
-                            if (endId != null && nodeId === endId) return "#f97316";
-                            return "#06b6d4";
-                        }
-                        return dimColor;
-                    }
-                    if (searchActive) {
-                        if (highlightedSet.has(nodeId)) return "#a855f7";
-                        return dimColor;
-                    }
-                    if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return dimColor;
-                    if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return dimColor;
-                    if (nodeId === focusedNodeId) return "#fbbf24";
-                    const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
-                    return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899";
-                }}
-                linkWidth={(link: any) => {
-                    if (solarSystemNodeId && !isLinkHidden(link)) return 2;
-                    if (pathfinderActive) return isPathLink(link) ? 4 : 0.5;
-                    return link === hoveredLink ? 2 : link.weight || 1;
-                }}
-                linkDirectionalParticles={(link: any) => {
-                    if (isLinkHidden(link)) return 0;
-                    if (pathfinderActive && isPathLink(link)) return 4;
-                    return link.relationType === 'ai' ? physicsConfig.linkDistance / 20 : 0;
-                }}
-                linkDirectionalParticleSpeed={pathfinderActive ? 0.01 : 0.005}
-                linkDirectionalParticleWidth={4}
-                linkDirectionalParticleColor={() => {
-                    const theme = getGraphThemeColors(containerRef.current);
-                    return pathfinderActive ? theme.nodeColor : theme.nodeColor;
-                }}
-                linkColor={(link: any) => {
-                    const theme = getGraphThemeColors(containerRef.current);
-                    if (isLinkHidden(link)) return "rgba(0,0,0,0)";
-                    if (solarSystemNodeId) return "rgba(251, 191, 36, 0.9)";
-                    if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
-                    if (pathfinderActive) return "rgba(0,0,0,0)";
-                    if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : theme.nodeColor;
-                    return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : theme.linkColor;
-                }}
-                backgroundColor="rgba(0,0,0,0)"
-                enablePointerInteraction={true}
-                onEngineStop={handleEngineStop}
-            />
-            </motion.div>
-            )}
-            {viewMode === '3D' && (
-            <motion.div
-                key="graph-3d"
-                className="absolute inset-0 w-full h-full"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: graphTransition }}
-                exit={{ opacity: 0, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] as const } }}
-            >
-            <GraphNetwork3D
-                key={`3d-${threeDKeyRef.current}`}
-                ref={fg3dRef}
-                width={dimensions.width}
-                height={dimensions.height}
-                graphData={dataFor3D}
-                graphTheme={graphTheme}
-                groupColorsById={groupColorsById}
-                groupNamesById={groupNamesById}
-                groupDescriptionsById={groupDescriptionsById}
-                nodeIdToGroupKeyMap={nodeIdToGroupKeyMap}
-                getNodeGroupKey={getNodeGroupKey}
-                getNodeLabel={getNodeLabel}
-                getNodeIconUrl={getNodeIconUrl}
-                linkDistance={physicsConfig.linkDistance}
-                readOnly={readOnly}
-                onNodeSelect={onNodeSelect}
-                onNodeContextMenu={onNodeContextMenu}
-                onBackgroundClick={onBackgroundClick}
-            />
-            </motion.div>
-            )}
+            <AnimatePresence>
+                {isInitialFitting && (
+                    <motion.div 
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0, scale: 1.2, filter: "blur(10px)", transition: { duration: 0.3, ease: "easeIn" } }}
+                        className="absolute inset-0 z-[100] flex items-center justify-center bg-white dark:bg-[#050505]"
+                    >
+                        <div className="flex flex-col items-center gap-10">
+                            {/* Іконка Орбіти */}
+                            <div className="relative">
+                                <motion.div
+                                    animate={loadingStep < 4 ? { rotate: 360 } : { rotate: 0, scale: [1, 1.2, 1] }}
+                                    transition={loadingStep < 4 
+                                        ? { duration: 2, repeat: Infinity, ease: "linear" } 
+                                        : { duration: 0.4, ease: "easeOut" }
+                                    }
+                                    className={loadingStep >= 4 ? "text-emerald-500" : "text-indigo-600 dark:text-purple-500"}
+                                >
+                                    <Orbit size={48} strokeWidth={1.5} />
+                                </motion.div>
+                                
+                                {/* Маленьке мерехтіння навколо іконки */}
+                                {loadingStep < 4 && (
+                                    <motion.div 
+                                        animate={{ opacity: [0, 1, 0] }}
+                                        transition={{ duration: 1, repeat: Infinity }}
+                                        className="absolute -inset-4 border border-indigo-500/20 rounded-full" 
+                                    />
+                                )}
+                            </div>
+
+                            <div className="flex flex-col items-center gap-3">
+                                {/* Основний текст станів */}
+                                <div className="h-6 overflow-hidden flex items-center justify-center">
+                                    <AnimatePresence mode="wait">
+                                        <motion.p 
+                                            key={loadingStep}
+                                            initial={{ opacity: 0, y: 15, filter: "blur(4px)" }}
+                                            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                                            exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
+                                            transition={{ duration: 0.3 }}
+                                            className={`font-mono text-[10px] md:text-xs tracking-[0.5em] uppercase font-bold ${
+                                                loadingStep >= 4 ? "text-emerald-500" : "text-neutral-500 dark:text-neutral-400"
+                                            }`}
+                                        >
+                                            {loadingLabels[loadingStep]}
+                                        </motion.p>
+                                    </AnimatePresence>
+                                </div>
+
+                                {/* Допоміжний "технічний" рядок */}
+                                <div className="h-4 flex items-center justify-center">
+                                    {loadingStep < 4 ? (
+                                        <motion.span 
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="text-[12px] font-mono text-neutral-400/50 uppercase tracking-[0.2em]"
+                                        >
+                                            {`0x${(loadingStep * 25).toString(16)}FF...${Math.floor(Math.random() * 100)}%`}
+                                        </motion.span>
+                                    ) : (
+                                        <motion.span 
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="text-[8px] font-mono text-emerald-500/60 uppercase tracking-[0.2em]"
+                                        >
+                                            Connection Stable
+                                        </motion.span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
             </AnimatePresence>
+            <>
+                {viewMode === '2D' && (
+                    <motion.div
+                        key="graph-2d"
+                        className="absolute inset-0 w-full h-full"
+                        initial={{ opacity: 0, filter: "blur(10px)", scale: 0.97 }}
+                        animate={{ opacity: 1, filter: "blur(0px)", scale: 1,
+                            transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
+                        exit={{ opacity: 0, filter: "blur(10px)", scale: 0.97,
+                            transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
+                    >
+                        <GraphNetwork2D
+                            ref={fgRef}
+                            width={dimensions.width}
+                            height={dimensions.height}
+                            graphData={processedData}
+                            nodeVal={(node: any) => node.val ?? 4}
+                            nodeLabel={getNodeLabel}
+                            nodeCanvasObject={drawNode}
+                            onRenderFramePre={handleRenderFramePre}
+                            onZoom={handleZoom}
+                            warmupTicks={0}
+                            d3AlphaDecay={0.4}
+                            d3VelocityDecay={0.35}
+                            d3AlphaMin={0.001}
+                            onNodeClick={(node: any) => {
+                                if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
+                                    fgRef.current.centerAt(node.x, node.y, 800);
+                                    fgRef.current.zoom(4, 800);
+                                }
+                                if (!readOnly) onNodeSelect(node);
+                            }}
+                            onNodeRightClick={(node, event) => {
+                                if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
+                            }}
+                            onBackgroundClick={() => {
+                                if (onBackgroundClick) onBackgroundClick();
+                            }}
+                            onLinkHover={(link) => setHoveredLink(link)}
+                            nodePointerAreaPaint={(node: any, color, ctx) => {
+                                const x = node.x ?? 0;
+                                const y = node.y ?? 0;
+                                if (!isFinite(x) || !isFinite(y)) return;
+                                const rawSize = (node.val ?? 4) * 1;
+                                let radius = Math.min(20, Math.max(6, rawSize));
+                                const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                                if (pathfinderActive && pathNodeSet.has(nodeId)) radius = radius * 1.2;
+                                else if (searchActive && highlightedSet.has(nodeId)) radius = radius * 1.2;
+                                ctx.fillStyle = color;
+                                ctx.beginPath();
+                                ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+                                ctx.fill();
+                            }}
+                            nodeColor={(node: any) => {
+                                const theme = getGraphThemeColors(containerRef.current);
+                                const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
+                                const dimColor = theme.nodeColor.startsWith('#') ? hexToRgba(theme.nodeColor, 0.12) : theme.nodeColor;
+                                if (solarSystemNodeId) {
+                                    if (!solarNeighbors.has(nodeId)) return dimColor;
+                                    if (nodeId === solarSystemNodeId) return "#eab308";
+                                    const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
+                                    return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#06b6d4";
+                                }
+                                if (pathfinderActive) {
+                                    if (pathNodeSet.has(nodeId)) {
+                                        const startId = pathNodes[0];
+                                        const endId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
+                                        if (nodeId === startId) return "#06b6d4";
+                                        if (endId != null && nodeId === endId) return "#f97316";
+                                        return "#06b6d4";
+                                    }
+                                    return dimColor;
+                                }
+                                if (searchActive) {
+                                    if (highlightedSet.has(nodeId)) return "#a855f7";
+                                    return dimColor;
+                                }
+                                if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return dimColor;
+                                if (activeTag && (!node.tags || !node.tags.includes(activeTag))) return dimColor;
+                                if (nodeId === focusedNodeId) return "#fbbf24";
+                                const groupKey = nodeIdToGroupKeyMap.get(nodeId) ?? getNodeGroupKey(node);
+                                return getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899";
+                            }}
+                            linkWidth={(link: any) => {
+                                if (solarSystemNodeId && !isLinkHidden(link)) return 2;
+                                if (pathfinderActive) return isPathLink(link) ? 4 : 0.5;
+                                return link === hoveredLink ? 2 : link.weight || 1;
+                            }}
+                            linkDirectionalParticles={(link: any) => {
+                                if (isLinkHidden(link)) return 0;
+                                if (pathfinderActive && isPathLink(link)) return 4;
+                                return link.relationType === 'ai' ? physicsConfig.linkDistance / 20 : 0;
+                            }}
+                            linkDirectionalParticleSpeed={pathfinderActive ? 0.01 : 0.005}
+                            linkDirectionalParticleWidth={4}
+                            linkDirectionalParticleColor={() => {
+                                const theme = getGraphThemeColors(containerRef.current);
+                                return pathfinderActive ? theme.nodeColor : theme.nodeColor;
+                            }}
+                            linkColor={(link: any) => {
+                                const theme = getGraphThemeColors(containerRef.current);
+                                if (isLinkHidden(link)) return "rgba(0,0,0,0)";
+                                if (solarSystemNodeId) return "rgba(251, 191, 36, 0.9)";
+                                if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
+                                if (pathfinderActive) return "rgba(0,0,0,0)";
+                                if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : theme.nodeColor;
+                                return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : theme.linkColor;
+                            }}
+                            backgroundColor="rgba(0,0,0,0)"
+                            enablePointerInteraction={true}
+                            onEngineStop={handleEngineStop}
+                        />
+                    </motion.div>
+                )}
+                {viewMode === '3D' && (
+                    <motion.div
+                        key="graph-3d"
+                        className="absolute inset-0 w-full h-full"
+                        initial={{ opacity: 0, filter: "blur(10px)", scale: 1.03 }}
+                        animate={{ opacity: 1, filter: "blur(0px)", scale: 1,
+                            transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
+                        exit={{ opacity: 0, filter: "blur(10px)", scale: 1.03,
+                            transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
+                    >
+                        <GraphNetwork3D
+                            key={`3d-${threeDKeyRef.current}`}
+                            ref={fg3dRef}
+                            width={dimensions.width}
+                            height={dimensions.height}
+                            graphData={dataFor3D}
+                            graphTheme={graphTheme}
+                            groupColorsById={groupColorsById}
+                            groupNamesById={groupNamesById}
+                            groupDescriptionsById={groupDescriptionsById}
+                            nodeIdToGroupKeyMap={nodeIdToGroupKeyMap}
+                            getNodeGroupKey={getNodeGroupKey}
+                            getNodeLabel={getNodeLabel}
+                            getNodeIconUrl={getNodeIconUrl}
+                            linkDistance={physicsConfig.linkDistance}
+                            readOnly={readOnly}
+                            onNodeSelect={onNodeSelect}
+                            onNodeContextMenu={onNodeContextMenu}
+                            onBackgroundClick={onBackgroundClick}
+                        />
+                    </motion.div>
+                )}
+            </>
             {graphData.nodes.length > 0 && (
                 <div className="absolute bottom-6 left-6 z-20 flex flex-col gap-1 p-1.5 rounded-2xl backdrop-blur-xl bg-black/[0.05] border border-black/10 dark:bg-white/[0.03] dark:border-white/10 shadow-lg pointer-events-none overflow-hidden">
                     <div className="pointer-events-auto flex flex-col gap-1 overflow-hidden">

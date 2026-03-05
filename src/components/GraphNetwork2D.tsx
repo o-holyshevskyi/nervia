@@ -34,6 +34,7 @@ export interface GraphNetwork2DProps {
     enablePointerInteraction: boolean;
     /** Called once the d3 simulation has initialised and the engine is running. Use this to apply d3 forces after mount. */
     onEngineStop?: () => void;
+    d3AlphaMin: number;
 }
 
 /**
@@ -67,6 +68,7 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
         backgroundColor,
         enablePointerInteraction,
         onEngineStop,
+        d3AlphaMin,
     },
     ref
 ) {
@@ -99,6 +101,7 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
             backgroundColor={backgroundColor}
             enablePointerInteraction={enablePointerInteraction}
             onEngineStop={onEngineStop}
+            d3AlphaMin={d3AlphaMin}
         />
     );
 });

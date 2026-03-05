@@ -225,6 +225,11 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
     const nebulaRef = useRef<THREE.Group | null>(null);
     const fgRef = useRef<any>(null);
     const initialZoomDoneRef = useRef(false);
+    const orbitRafRef = useRef<number>(0);
+    const orbitMapRef = useRef<Map<any, { radius: number; theta: number; phi: number; speedTheta: number; speedPhi: number }>>(new Map());
+    const clusterOrbitMapRef = useRef<Map<string, { radius: number; theta: number; phi: number; speedTheta: number; speedPhi: number }>>(new Map());
+    const orbitInitializedRef = useRef(false);
+    
     useImperativeHandle(ref, () => fgRef.current ?? null, []);
 
     const [hoveredLink, setHoveredLink] = useState<any | null>(null);
@@ -361,11 +366,10 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
                 // 🔥 Reduced delay from 800ms to 100ms so it starts moving immediately
                 zoomTimer = setTimeout(() => {
                     try {
-                        // 🔥 Increased animation duration from 1200ms to 3500ms for a slow, smooth fly-in
-                        fg.zoomToFit?.(3500, 120);
+                        fg.zoomToFit?.(0, 120); // instant — transition already handled by parent crossfade
                         initialZoomDoneRef.current = true;
                     } catch { /* ignore */ }
-                }, 100); 
+                }, 80);
             }
         } catch (err) {
             console.warn('[GraphNetwork3D] physics setup:', err);
@@ -415,9 +419,9 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
     useEffect(() => {
         const fg = fgRef.current;
         if (!fg) return;
-
+    
         const scene: THREE.Scene = fg.scene();
-
+    
         if (nebulaRef.current) {
             scene.remove(nebulaRef.current);
             nebulaRef.current.traverse((obj: any) => {
@@ -425,39 +429,34 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
                 obj.material?.dispose();
             });
         }
-
+    
         const group = new THREE.Group();
         group.name = 'nebula';
-
+    
         const labelColor = graphTheme.nodeColor?.trim() && graphTheme.nodeColor !== 'transparent'
             ? graphTheme.nodeColor
             : '#e2e8f0';
-
-        Object.values(groupCentroids).forEach((c) => {
+    
+        // 🔥 Змінили Object.values на Object.entries, щоб мати доступ до key
+        Object.entries(groupCentroids).forEach(([key, c]) => {
+            // Створюємо групу для КОНКРЕТНОГО кластера
+            const clusterGroup = new THREE.Group();
+            clusterGroup.name = `cluster-${key}`; // Даємо ім'я для пошуку
+            clusterGroup.position.set(c.x, c.y, c.z); // Ставимо групу на стартову позицію
+    
             const tex = createNebulaTexture(c.color);
             const mat = new THREE.SpriteMaterial({
                 map: tex,
                 transparent: true,
-                // FIX: Use Normal blending on light themes, Additive on dark themes
                 blending: THREE.NormalBlending,
                 depthWrite: false,
                 opacity: c.opacity ? c.opacity * (isLightTheme ? 12 : 6) : 0.35,
             });
             const sprite = new THREE.Sprite(mat);
-            sprite.position.set(c.x, c.y, c.z);
-
             sprite.scale.set(450, 450, 1); 
-            group.add(sprite);
-
-            // const [r, g, b] = hexRgb(c.color);
-            // const light = new THREE.PointLight(
-            //     new THREE.Color(r / 255, g / 255, b / 255),
-            //     0.6,
-            //     900
-            // );
-            // light.position.set(c.x, c.y, c.z);
-            // group.add(light);
-
+            sprite.position.set(0, 0, 0); // Відносно clusterGroup
+            clusterGroup.add(sprite);
+    
             const nameTex = createSimpleLabelTexture(c.name, labelColor);
             const nameMat = new THREE.SpriteMaterial({
                 map: nameTex,
@@ -465,10 +464,10 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
                 depthWrite: false,
             });
             const nameSprite = new THREE.Sprite(nameMat);
-            nameSprite.position.set(c.x, c.y, c.z);
             nameSprite.scale.set(Math.max(120, c.name.length * 8), 24, 1);
-            group.add(nameSprite);
-
+            nameSprite.position.set(0, 0, 0); // Відносно clusterGroup
+            clusterGroup.add(nameSprite);
+    
             if (c.description) {
                 const descTex = createSimpleLabelTexture(c.description, labelColor);
                 const descMat = new THREE.SpriteMaterial({
@@ -478,15 +477,141 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
                     opacity: 0.85,
                 });
                 const descSprite = new THREE.Sprite(descMat);
-                descSprite.position.set(c.x, c.y - 28, c.z);
                 descSprite.scale.set(Math.min(280, c.description.length * 6), 18, 1);
-                group.add(descSprite);
+                descSprite.position.set(0, -28, 0); // Відносно clusterGroup
+                clusterGroup.add(descSprite);
             }
+    
+            // Додаємо кластер у загальну туманність
+            group.add(clusterGroup);
         });
-
+    
         scene.add(group);
         nebulaRef.current = group;
-    }, [engineReadyCount, groupCentroids, graphTheme.nodeColor]);
+    }, [engineReadyCount, groupCentroids, graphTheme.nodeColor, isLightTheme]);
+
+    useEffect(() => {
+        if (!graphDataReady) return;
+    
+        const GOLDEN = 2.399;
+        const BASE_SPEED    = 0.00008;   // node orbit around cluster
+        const CLUSTER_SPEED = 0.000022;  // cluster orbit around global center
+    
+        const init = (): boolean => {
+            const nodes = cleanData.nodes;
+            const centers = groupCentroids;
+            if (!nodes.length || !Object.keys(centers).length) return false;
+    
+            const settled = nodes.filter((n: any) =>
+                isFinite(n.x) && isFinite(n.y) && isFinite(n.z) &&
+                (Math.abs(n.x) > 1 || Math.abs(n.y) > 1 || Math.abs(n.z) > 1)
+            );
+            if (settled.length < nodes.length * 0.8) return false;
+    
+            // Cluster centroids orbit global center
+            Object.entries(centers).forEach(([key, center], i) => {
+                const radius = Math.hypot(center.x, center.y, center.z);
+                const theta  = Math.atan2(center.y, center.x);
+                const phi    = Math.acos(center.z / Math.max(radius, 1));
+                const speed  = CLUSTER_SPEED * (0.8 + ((i * GOLDEN) % 1) * 0.4);
+                clusterOrbitMapRef.current.set(key, {
+                    radius: Math.max(10, radius),
+                    theta, phi,
+                    speedTheta: speed,
+                    speedPhi:   speed * 0.618, // different axis speed for 3D feel
+                });
+            });
+    
+            // Nodes orbit their cluster centroid
+            nodes.forEach((node: any, i: number) => {
+                if (node.fx != null) return;
+                const key = String(nodeIdToGroupKeyMap.get(node.id) ?? getNodeGroupKey(node));
+                const center = centers[key];
+                if (!center) return;
+                const dx = (node.x ?? 0) - center.x;
+                const dy = (node.y ?? 0) - center.y;
+                const dz = (node.z ?? 0) - center.z;
+                const radius = Math.max(10, Math.hypot(dx, dy, dz));
+                const theta  = Math.atan2(dy, dx);
+                const phi    = Math.acos(dz / Math.max(radius, 1));
+                const speed  = BASE_SPEED * (0.7 + ((i * GOLDEN) % 1) * 0.6);
+                orbitMapRef.current.set(node, {
+                    radius, theta, phi,
+                    speedTheta: speed,
+                    speedPhi:   speed * 0.618,
+                });
+            });
+    
+            return orbitMapRef.current.size > 0;
+        };
+    
+        let lastTime = 0;
+        const tick = (now: number) => {
+            const fg  = fgRef.current;
+            const dt  = Math.min(lastTime ? now - lastTime : 16, 64);
+            lastTime  = now;
+    
+            if (fg) {
+                if (!orbitInitializedRef.current) {
+                    orbitInitializedRef.current = init();
+                }
+    
+                if (orbitInitializedRef.current) {
+                    // Step 1 — advance cluster centroids
+                    const liveCenters: Record<string, { x: number; y: number; z: number }> = {};
+                    clusterOrbitMapRef.current.forEach((orbit, key) => {
+                        orbit.theta += orbit.speedTheta * dt;
+                        orbit.phi   += orbit.speedPhi   * dt * 0.3;
+                        const sinPhi = Math.sin(orbit.phi);
+                        
+                        const cx = orbit.radius * Math.cos(orbit.theta) * sinPhi;
+                        const cy = orbit.radius * Math.sin(orbit.theta) * sinPhi;
+                        const cz = orbit.radius * Math.cos(orbit.phi);
+                        
+                        liveCenters[key] = { x: cx, y: cy, z: cz };
+                
+                        if (nebulaRef.current) {
+                            const clusterGroup = nebulaRef.current.getObjectByName(`cluster-${key}`);
+                            if (clusterGroup) {
+                                clusterGroup.position.set(cx, cy, cz);
+                            }
+                        }
+                    });
+                
+                    // Step 2 — advance nodes
+                    orbitMapRef.current.forEach((orbit, node) => {
+                        orbit.theta += orbit.speedTheta * dt;
+                        orbit.phi   += orbit.speedPhi   * dt * 0.3;
+                        const sinPhi = Math.sin(orbit.phi);
+                        const key    = String(nodeIdToGroupKeyMap.get(node.id) ?? getNodeGroupKey(node));
+                        const center = liveCenters[key] ?? { x: 0, y: 0, z: 0 };
+                        
+                        // ВАЖЛИВО: Використовуємо fx, fy, fz. 
+                        // Це каже D3: "Я керую цією нодою, припини симулювати її фізику"
+                        node.fx = center.x + orbit.radius * Math.cos(orbit.theta) * sinPhi;
+                        node.fy = center.y + orbit.radius * Math.sin(orbit.theta) * sinPhi;
+                        node.fz = center.z + orbit.radius * Math.cos(orbit.phi);
+                    });
+                
+                    // ❌ ТУТ БУВ fg.refresh?.() — ВІН ВБИВАВ БРАУЗЕР. МИ ЙОГО ВИДАЛИЛИ!
+                }
+            }
+    
+            orbitRafRef.current = requestAnimationFrame(tick);
+        };
+    
+        const startTimer = setTimeout(() => {
+            orbitRafRef.current = requestAnimationFrame(tick);
+        }, 900); // slightly longer than 2D — 3D simulation takes longer to settle
+    
+        return () => {
+            clearTimeout(startTimer);
+            cancelAnimationFrame(orbitRafRef.current);
+            orbitMapRef.current.clear();
+            clusterOrbitMapRef.current.clear();
+            orbitInitializedRef.current = false;
+        };
+    }, [graphDataReady, cleanData.nodes, groupCentroids, nodeIdToGroupKeyMap, getNodeGroupKey]);
 
     // ── Node THREE object ──────────────────────────────────────────────────
     const nodeThreeObject = useCallback(
@@ -577,11 +702,18 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             if (readOnly) return;
             const fg = fgRef.current;
             if (fg) {
-                const dist  = 180;
-                const ratio = 1 + dist / Math.hypot(node.x ?? 1, node.y ?? 1, node.z ?? 1);
+                const dist = 180;
+                const nx = node.x ?? 0;
+                const ny = node.y ?? 0;
+                const nz = node.z ?? 0;
+                const hyp = Math.max(1, Math.hypot(nx, ny, nz)); 
+                const ratio = 1 + dist / hyp;
+                
+                // ВАЖЛИВО: Передаємо {x,y,z} замість об'єкта `node`
+                // Тоді камера підлетить, подивиться на точку і НЕ БУДЕ блокувати мишку
                 fg.cameraPosition(
-                    { x: (node.x ?? 0) * ratio, y: (node.y ?? 0) * ratio, z: (node.z ?? 0) * ratio },
-                    node,
+                    { x: nx * ratio, y: ny * ratio, z: nz * ratio },
+                    { x: nx, y: ny, z: nz }, 
                     800
                 );
             }
@@ -633,7 +765,7 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
 
     return (
         <div
-            style={{ width, height, position: 'relative' }}
+            style={{ width, height, position: 'relative', overflow: 'hidden' }}
             onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
         >
             <ForceGraph3D
