@@ -241,7 +241,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                     animate={{ opacity: 1, height: 'auto' }}
                                     exit={{ opacity: 0, x: 0 }}
                                     onClick={handleSave}
-                                    className="hover:cursor-pointer flex items-center gap-2 px-4 py-1.5 bg-purple-600 text-white text-xs font-semibold rounded-full hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+                                    className="hover:cursor-pointer flex items-center gap-2 px-4 py-1.5 bg-indigo-600 dark:bg-purple-600 text-white text-xs font-semibold rounded-full hover:bg-indigo-500 dark:hover:bg-purple-500 shadow-lg shadow-indigo-500/20 dark:shadow-purple-500/20"
                                 >
                                     <Save size={14} /> Save
                                 </motion.button>

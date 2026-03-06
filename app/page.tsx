@@ -85,6 +85,9 @@ export default function Home() {
         if (n?.type === "visit") {
             playNotificationPlink();
             const groupId = typeof n?.metadata?.group_id === "string" ? (n.metadata.group_id as string) : null;
+            const isDarkTheme = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+            const accentGlow = isDarkTheme ? "0 0 30px rgba(168,85,247,0.18)" : "0 0 30px rgba(99,102,241,0.18)";
+            const accentBorder = isDarkTheme ? "rgba(192,132,252,0.30)" : "rgba(129,140,248,0.30)"; // indigo-400/30-ish
             toast.custom(
                 (t) => (
                     <motion.div
@@ -95,12 +98,12 @@ export default function Home() {
                             filter: 'blur(0px)',
                             boxShadow: [
                                 '0 0 22px rgba(6,182,212,0.18)',
-                                '0 0 30px rgba(168,85,247,0.18)',
+                                accentGlow,
                                 '0 0 22px rgba(6,182,212,0.18)',
                             ],
                             borderColor: [
                                 'rgba(34,211,238,0.30)', // cyan-400/30-ish
-                                'rgba(192,132,252,0.30)', // purple-400/30-ish
+                                accentBorder,
                                 'rgba(34,211,238,0.30)',
                             ],
                         }}
@@ -606,7 +609,7 @@ export default function Home() {
                     >
                         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
                             <div className="bg-black/5 dark:bg-neutral-900/60 backdrop-blur-xl border border-black/10 dark:border-white/10 p-10 rounded-3xl text-center max-w-md pointer-events-auto shadow-2xl flex flex-col items-center transform transition-all hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-neutral-900/80">
-                                <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.1)]">
+                                <div className="w-16 h-16 bg-indigo-500/20 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_40px_rgba(99,102,241,0.1)] dark:shadow-[0_0_40px_rgba(168,85,247,0.1)]">
                                     <Sparkles className="text-indigo-600 dark:text-purple-400" size={32} />
                                 </div>
                                 <h2 className="text-2xl font-bold text-neutral-900 dark:text-white mb-3 tracking-tight">Nothing here yet</h2>
@@ -885,12 +888,12 @@ export default function Home() {
                     type="button"
                     data-tour-id="tour-new-neuron"
                     onClick={() => setIsAddModalOpen(true)}
-                    className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-white/90 dark:bg-neutral-900/50 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
+                    className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-white/90 dark:bg-neutral-900/50 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(99,102,241,0.15)] dark:shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 >
-                    <Plus size={18} className="text-purple-400 shrink-0" />
+                    <Plus size={18} className="text-indigo-500 dark:text-purple-400 shrink-0" />
                     <span>New Neuron</span>
                 </motion.button>
             )}

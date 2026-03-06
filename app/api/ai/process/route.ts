@@ -34,7 +34,7 @@ const DEFAULT_GROUP_COLOR = '#64748b';
 /** Palette of distinct colors for auto-created groups (AI-suggested). */
 const GROUP_COLOR_PALETTE = [
     '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308',
-    '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#64748b', '#a855f7',
+    '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#64748b', '#4f46e5',
 ];
 
 function randomGroupColor(): string {

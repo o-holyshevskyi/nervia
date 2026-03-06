@@ -82,7 +82,7 @@ export default function ExtensionPage() {
                   href={CHROME_STORE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-purple-600 text-white hover:bg-purple-500 font-semibold transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+                  className="hover:cursor-pointer flex items-center justify-center gap-2 w-full py-4 rounded-xl bg-indigo-600 dark:bg-purple-600 text-white hover:bg-indigo-500 dark:hover:bg-purple-500 font-semibold transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] dark:shadow-[0_0_20px_rgba(168,85,247,0.4)]"
                 >
                   <ExternalLink size={20} />
                   Add to Chrome (Official Store)

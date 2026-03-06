@@ -243,8 +243,8 @@ export default function BillingPage() {
 
               {/* Constellation — matches UpgradeModal styling */}
               <motion.div transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="relative flex flex-col h-full min-w-0">
-                <div className="rounded-2xl border border-white/20 dark:border-purple-500/20 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-2xl shadow-[0_0_60px_rgba(168,85,247,0.15)] dark:shadow-[0_0_60px_rgba(168,85,247,0.2)] p-5 flex flex-col h-full min-h-0 relative z-10 overflow-hidden">
-                  {plan === 'genesis' && <div className="absolute top-0 right-0 px-3 py-1 bg-purple-500 text-white text-[10px] font-bold rounded-bl-lg uppercase tracking-wider">Popular</div>}
+                <div className="rounded-2xl border border-white/20 dark:border-purple-500/20 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-2xl shadow-[0_0_60px_rgba(99,102,241,0.15)] dark:shadow-[0_0_60px_rgba(168,85,247,0.2)] p-5 flex flex-col h-full min-h-0 relative z-10 overflow-hidden">
+                  {plan === 'genesis' && <div className="absolute top-0 right-0 px-3 py-1 bg-indigo-600 dark:bg-purple-500 text-white text-[10px] font-bold rounded-bl-lg uppercase tracking-wider">Popular</div>}
                   <div className="flex-1 min-h-0 flex flex-col pt-5">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="font-bold text-neutral-900 dark:text-white text-lg shrink-0">Constellation</p>
@@ -254,7 +254,7 @@ export default function BillingPage() {
                     <ul className="space-y-2 mb-4 flex-1 min-h-0">
                       {CONSTELLATION_FEATURES.map(({ icon: Icon, text }) => (
                         <li key={text} className="flex items-center gap-2.5 text-sm text-neutral-700 dark:text-neutral-300">
-                          <Icon size={16} className="text-purple-500 dark:text-purple-400 shrink-0" />
+                          <Icon size={16} className="text-indigo-500 dark:text-purple-400 shrink-0" />
                           {text}
                         </li>
                       ))}
@@ -265,7 +265,7 @@ export default function BillingPage() {
                     const onClick = btn.variant === 'upgrade' ? () => handleUpgrade('constellation') : () => {};
                     const isCurrent = btn.variant === 'current';
                     return (
-                      <button onClick={onClick} disabled={btn.disabled} className="cursor-pointer flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-xl font-medium text-sm transition-all shrink-0 disabled:cursor-default text-white bg-purple-500 hover:bg-purple-600 shadow-[0_0_24px_rgba(168,85,247,0.4)] hover:shadow-[0_0_32px_rgba(168,85,247,0.5)] disabled:opacity-80 disabled:saturate-75 disabled:bg-purple-500/70 disabled:shadow-none">
+                      <button onClick={onClick} disabled={btn.disabled} className="cursor-pointer flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-xl font-medium text-sm transition-all shrink-0 disabled:cursor-default text-white bg-indigo-600 dark:bg-purple-500 hover:bg-indigo-700 dark:hover:bg-purple-600 shadow-[0_0_24px_rgba(99,102,241,0.35)] dark:shadow-[0_0_24px_rgba(168,85,247,0.4)] hover:shadow-[0_0_32px_rgba(99,102,241,0.45)] dark:hover:shadow-[0_0_32px_rgba(168,85,247,0.5)] disabled:opacity-80 disabled:saturate-75 disabled:bg-indigo-600/70 dark:disabled:bg-purple-500/70 disabled:shadow-none">
                         {isCurrent ? <><Check size={16} className="shrink-0" /> Current Orbit</> : btn.label}
                       </button>
                     );
@@ -275,9 +275,9 @@ export default function BillingPage() {
 
               {/* Singularity — matches UpgradeModal styling */}
               <motion.div transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="relative flex flex-col h-full min-w-0">
-                <div className="rounded-2xl border border-amber-500/30 dark:border-amber-400/20 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-2xl shadow-[0_0_60px_rgba(168,85,247,0.25)] dark:shadow-[0_0_80px_rgba(168,85,247,0.3),0_0_40px_rgba(251,191,36,0.15)] p-5 flex flex-col h-full min-h-0 relative z-10 overflow-hidden">
+                <div className="rounded-2xl border border-amber-500/30 dark:border-amber-400/20 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-2xl shadow-[0_0_60px_rgba(99,102,241,0.22)] dark:shadow-[0_0_80px_rgba(168,85,247,0.3),0_0_40px_rgba(251,191,36,0.15)] p-5 flex flex-col h-full min-h-0 relative z-10 overflow-hidden">
                   <div className="absolute top-0 right-0 z-10">
-                    <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 text-white text-[10px] font-bold rounded-bl-lg uppercase tracking-widest shadow-[0_0_24px_rgba(168,85,247,0.3),0_0_16px_rgba(251,191,36,0.15)]">Ultimate AI Fusion</span>
+                    <span className="inline-flex px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 text-white text-[10px] font-bold rounded-bl-lg uppercase tracking-widest shadow-[0_0_24px_rgba(99,102,241,0.22)] dark:shadow-[0_0_24px_rgba(168,85,247,0.3),0_0_16px_rgba(251,191,36,0.15)]">Ultimate AI Fusion</span>
                   </div>
                   <div className="flex-1 min-h-0 flex flex-col pt-7">
                     <div className="flex items-start justify-between gap-2 mb-1">
@@ -299,7 +299,7 @@ export default function BillingPage() {
                     const onClick = btn.variant === 'upgrade' ? () => handleUpgrade('singularity') : () => {};
                     const isCurrent = btn.variant === 'current';
                     return (
-                      <button onClick={onClick} disabled={btn.disabled} className="cursor-pointer flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-xl font-bold text-sm transition-all shrink-0 disabled:cursor-default text-white bg-gradient-to-r from-purple-600 to-amber-600 hover:from-purple-500 hover:to-amber-500 shadow-[0_0_28px_rgba(168,85,247,0.45),0_0_16px_rgba(251,191,36,0.2)] hover:shadow-[0_0_36px_rgba(168,85,247,0.5),0_0_20px_rgba(251,191,36,0.25)] disabled:opacity-80 disabled:saturate-75 disabled:from-purple-600 disabled:to-amber-600">
+                      <button onClick={onClick} disabled={btn.disabled} className="cursor-pointer flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-xl font-bold text-sm transition-all shrink-0 disabled:cursor-default text-white bg-gradient-to-r from-indigo-600 dark:from-purple-600 to-amber-600 hover:from-indigo-500 dark:hover:from-purple-500 hover:to-amber-500 shadow-[0_0_28px_rgba(99,102,241,0.35),0_0_16px_rgba(251,191,36,0.2)] dark:shadow-[0_0_28px_rgba(168,85,247,0.45),0_0_16px_rgba(251,191,36,0.2)] hover:shadow-[0_0_36px_rgba(99,102,241,0.45),0_0_20px_rgba(251,191,36,0.25)] dark:hover:shadow-[0_0_36px_rgba(168,85,247,0.5),0_0_20px_rgba(251,191,36,0.25)] disabled:opacity-80 disabled:saturate-75 disabled:from-indigo-600 dark:disabled:from-purple-600 disabled:to-amber-600">
                         {isCurrent ? <><Check size={16} className="shrink-0" /> Current Orbit</> : btn.label}
                       </button>
                     );

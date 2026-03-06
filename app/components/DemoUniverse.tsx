@@ -356,12 +356,12 @@ export default function DemoUniverse() {
       <motion.button
         type="button"
         onClick={() => setIsAddModalOpen(true)}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-black/40 dark:bg-neutral-900/50 border border-white/10 text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-black/40 dark:bg-neutral-900/50 border border-white/10 text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(99,102,241,0.15)] dark:shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400, damping: 17 }}
       >
-        <Plus size={18} className="text-purple-400 shrink-0" />
+        <Plus size={18} className="text-indigo-400 dark:text-purple-400 shrink-0" />
         <span>New Neuron</span>
       </motion.button>
     </main>

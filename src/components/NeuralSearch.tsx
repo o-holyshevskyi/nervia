@@ -199,11 +199,11 @@ export default function NeuralSearch({
                   type="button"
                   onClick={() => onRequestUpgrade?.()}
                   title="AI semantic search — Singularity"
-                  className="hover:cursor-pointer px-3 py-1.5 rounded-lg border border-purple-500/40 dark:border-purple-400/40 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 dark:hover:bg-purple-500/10 text-sm font-medium shrink-0 flex items-center gap-1.5"
+                  className="hover:cursor-pointer px-3 py-1.5 rounded-lg border border-indigo-500/40 dark:border-purple-400/40 text-indigo-600 dark:text-purple-400 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 text-sm font-medium shrink-0 flex items-center gap-1.5"
                 >
                   <Sparkles size={14} />
                   <span className="hidden sm:inline">AI Search</span>
-                  <Lock size={12} className="text-purple-500 dark:text-purple-400" />
+                  <Lock size={12} className="text-indigo-500 dark:text-purple-400" />
                 </button>
                 )}
                 <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] text-neutral-500 dark:text-neutral-400 font-mono">

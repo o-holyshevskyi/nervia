@@ -3,7 +3,7 @@
 /** Mock groups for demo cluster mode (GraphGroup shape). */
 export const mockGroups = [
   { id: "g-ai", name: "AI", color: "#10b981" },
-  { id: "g-research", name: "Research", color: "#a855f7" },
+  { id: "g-research", name: "Research", color: "#6366f1" },
   { id: "g-design", name: "Design", color: "#f97316" },
   { id: "g-product", name: "Product", color: "#06b6d4" },
 ];

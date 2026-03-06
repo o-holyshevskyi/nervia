@@ -184,7 +184,7 @@ export default function RoadmapPage() {
         {/* Орбіта 5: Proxy (Фіолетова) */}
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 90, repeat: Infinity, ease: "linear" }} className="absolute w-[800px] h-[800px] rounded-full border border-black/5 dark:border-white/5 border-dashed flex items-center justify-start transition-colors duration-500">
           <div className="flex items-center gap-2 -translate-x-2">
-            <div className="w-3.5 h-3.5 rounded-full bg-purple-500 shadow-[0_0_20px_4px_rgba(168,85,247,0.5)]" />
+            <div className="w-3.5 h-3.5 rounded-full bg-indigo-500 dark:bg-purple-500 shadow-[0_0_20px_4px_rgba(99,102,241,0.5)] dark:shadow-[0_0_20px_4px_rgba(168,85,247,0.5)]" />
             <p className="text-[9px] font-mono tracking-tighter text-neutral-400 dark:text-neutral-500 -rotate-90">PROXY_NODE</p>
           </div>
         </motion.div>
@@ -238,7 +238,7 @@ export default function RoadmapPage() {
         // Лінія конекту до ядра (зліва для правих панелей, справа для лівих)
         const borderClass = isRightSide
           ? "md:border-l-2 md:pl-10 lg:pl-16 border-indigo-500/30 dark:border-indigo-500/40"
-          : "md:border-r-2 md:pr-10 lg:pr-16 border-purple-500/30 dark:border-purple-500/40";
+          : "md:border-r-2 md:pr-10 lg:pr-16 border-indigo-500/30 dark:border-purple-500/40";
 
         // Вирівнювання тексту
         const alignClass = isRightSide

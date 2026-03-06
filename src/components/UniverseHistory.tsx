@@ -167,7 +167,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: "100%", opacity: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed bottom-8 right-8 z-[80] w-[420px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/90 dark:bg-neutral-900/80 backdrop-blur-2xl border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_45px_rgba(168,85,247,0.12)] dark:shadow-[0_0_55px_rgba(6,182,212,0.12)] p-5"
+        className="fixed bottom-8 right-8 z-[80] w-[420px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/90 dark:bg-neutral-900/80 backdrop-blur-2xl border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_45px_rgba(99,102,241,0.12)] dark:shadow-[0_0_55px_rgba(6,182,212,0.12)] p-5"
         role="dialog"
         aria-label="Evolution Journal"
       >
@@ -190,7 +190,7 @@ export default function UniverseHistory({ nodes, groups, supabase, onClose }: Un
           </div>
         ) : empty ? (
           <div className="py-8 text-center">
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 flex items-center justify-center shadow-[0_0_28px_rgba(168,85,247,0.25)] mb-4">
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/30 dark:border-purple-500/30 flex items-center justify-center shadow-[0_0_28px_rgba(99,102,241,0.25)] dark:shadow-[0_0_28px_rgba(168,85,247,0.25)] mb-4">
               <Sparkles size={22} className="text-indigo-600 dark:text-purple-300" />
             </div>
             <p className="text-sm font-medium text-neutral-900 dark:text-white">No milestones yet</p>

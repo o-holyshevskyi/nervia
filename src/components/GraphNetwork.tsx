@@ -15,7 +15,7 @@ const iconCache: Record<string, HTMLImageElement> = {};
 const groupColors: Record<number, string> = {
     1: "#64748b",
     2: "#10b981",
-    3: "#a855f7",
+    3: "#6366f1",
     4: "#f97316",
     5: "#06b6d4",
 };
@@ -39,7 +39,7 @@ const loadingLabels = [
 
 /** Neon palette for tag-based clusters (cinematic, consistent per tag). */
 const tagNeonPalette = [
-    "#06b6d4", "#a855f7", "#f97316", "#10b981", "#ec4899",
+    "#06b6d4", "#4f46e5", "#f97316", "#10b981", "#ec4899",
     "#eab308", "#6366f1", "#14b8a6", "#f43f5e", "#8b5cf6",
 ];
 
@@ -110,6 +110,18 @@ function hexToRgba(hex: string, alpha: number): string {
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const ACCENT_INDIGO = "#6366f1";
+const ACCENT_PURPLE = "#a855f7";
+function isDarkTheme(): boolean {
+    return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+}
+function accentHex(): string {
+    return isDarkTheme() ? ACCENT_PURPLE : ACCENT_INDIGO;
+}
+function accentRgba(alpha: number): string {
+    return isDarkTheme() ? `rgba(168, 85, 247, ${alpha})` : `rgba(99, 102, 241, ${alpha})`;
 }
 
 function getClusterKeyForDraw(node: any, clusterMode: 'group' | 'tag', nodeIdToGroupKey: Map<string | number, string | number>): number | string | null {
@@ -765,7 +777,7 @@ export default function GraphNetwork({
                 else baseColor = themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor;
             } else {
                 const groupKey = nodeIdToGroupKeyMap.get(idStr) ?? getNodeGroupKey(node);
-                baseColor = isSearchHighlighted ? "#a855f7" : (getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899");
+                baseColor = isSearchHighlighted ? accentHex() : (getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899");
             }
             strongGlow = (searchActive && highlightedSet.has(idStr)) || (pathfinderActive && pathNodeSet.has(idStr));
         }
@@ -784,13 +796,13 @@ export default function GraphNetwork({
             ctx.arc(x, y, haloRadius, 0, 2 * Math.PI);
             ctx.strokeStyle = `rgba(6, 182, 212, ${pulse * 0.9})`;
             ctx.lineWidth = 3 / globalScale;
-            ctx.shadowColor = "rgba(168, 85, 247, 0.8)";
+            ctx.shadowColor = accentRgba(0.8);
             ctx.shadowBlur = 20 / globalScale;
             ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.beginPath();
             ctx.arc(x, y, haloRadius + 2 / globalScale, 0, 2 * Math.PI);
-            ctx.strokeStyle = `rgba(168, 85, 247, ${pulse * 0.5})`;
+            ctx.strokeStyle = accentRgba(pulse * 0.5);
             ctx.lineWidth = 2 / globalScale;
             ctx.stroke();
             ctx.restore();
@@ -806,9 +818,9 @@ export default function GraphNetwork({
                 ctx.beginPath();
                 ctx.arc(x, y, pingRadius, 0, 2 * Math.PI);
                 const gradient = ctx.createRadialGradient(x, y, size, x, y, pingRadius);
-                gradient.addColorStop(0, `rgba(168, 85, 247, ${alpha * 0.5})`);
-                gradient.addColorStop(0.6, `rgba(168, 85, 247, ${alpha * 0.2})`);
-                gradient.addColorStop(1, 'rgba(168, 85, 247, 0)');
+                gradient.addColorStop(0, accentRgba(alpha * 0.5));
+                gradient.addColorStop(0.6, accentRgba(alpha * 0.2));
+                gradient.addColorStop(1, accentRgba(0));
                 ctx.fillStyle = gradient;
                 ctx.fill();
                 ctx.restore();
@@ -1296,7 +1308,7 @@ export default function GraphNetwork({
                                     return dimColor;
                                 }
                                 if (searchActive) {
-                                    if (highlightedSet.has(nodeId)) return "#a855f7";
+                                    if (highlightedSet.has(nodeId)) return accentHex();
                                     return dimColor;
                                 }
                                 if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return dimColor;
@@ -1327,8 +1339,8 @@ export default function GraphNetwork({
                                 if (solarSystemNodeId) return "rgba(251, 191, 36, 0.9)";
                                 if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
                                 if (pathfinderActive) return "rgba(0,0,0,0)";
-                                if (link === hoveredLink) return link.relationType === 'ai' ? "#a855f7" : theme.nodeColor;
-                                return link.relationType === 'ai' ? "rgba(168, 85, 247, 0.4)" : theme.linkColor;
+                                if (link === hoveredLink) return link.relationType === 'ai' ? accentHex() : theme.nodeColor;
+                                return link.relationType === 'ai' ? accentRgba(0.4) : theme.linkColor;
                             }}
                             backgroundColor="rgba(0,0,0,0)"
                             enablePointerInteraction={true}
@@ -1407,7 +1419,7 @@ export default function GraphNetwork({
                                 type="button"
                                 onClick={() => onViewModeChange?.(viewMode === '3D' ? '2D' : '3D')}
                                 className={viewMode === '3D'
-                                    ? "flex items-center justify-center w-10 h-10 rounded-xl text-white bg-purple-500/80 dark:bg-purple-500/80 hover:bg-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)] dark:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all duration-200 cursor-pointer"
+                                    ? "flex items-center justify-center w-10 h-10 rounded-xl text-white bg-indigo-600/80 dark:bg-purple-500/80 hover:bg-indigo-600 dark:hover:bg-purple-500 shadow-[0_0_20px_rgba(99,102,241,0.45)] dark:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all duration-200 cursor-pointer"
                                     : navBtnClass
                                 }
                                 title="Toggle 3D Universe"
@@ -1419,12 +1431,12 @@ export default function GraphNetwork({
                             <button
                                 type="button"
                                 onClick={onRequest3DUpgrade}
-                                className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 opacity-70 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all cursor-pointer relative"
+                                className="flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 opacity-70 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all cursor-pointer relative"
                                 title="3D Universe (Singularity only)"
                                 aria-label="3D Universe (Singularity only)"
                             >
                                 <Box size={18} />
-                                <Lock size={10} className="absolute bottom-0.5 right-0.5 text-purple-500 dark:text-purple-400" />
+                                <Lock size={10} className="absolute bottom-0.5 right-0.5 text-indigo-500 dark:text-purple-400" />
                             </button>
                         )}
                         {renderToolbarExtra?.(navBtnClass)}

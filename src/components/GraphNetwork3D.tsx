@@ -46,7 +46,19 @@ function getCircularAlphaMaskTexture(): THREE.CanvasTexture {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function ensureHex(color: string): string {
-    return color.startsWith('#') ? color : '#a855f7';
+    return color.startsWith('#') ? color : '#6366f1';
+}
+
+const AI_ACCENT_INDIGO = '#6366f1';
+const AI_ACCENT_PURPLE = '#a855f7';
+function isDarkTheme(): boolean {
+    return typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+}
+function aiAccentHex(): string {
+    return isDarkTheme() ? AI_ACCENT_PURPLE : AI_ACCENT_INDIGO;
+}
+function aiAccentRgba(alpha: number): string {
+    return isDarkTheme() ? `rgba(168, 85, 247, ${alpha})` : `rgba(99, 102, 241, ${alpha})`;
 }
 
 function hexRgb(hex: string): [number, number, number] {
@@ -172,7 +184,7 @@ function createNebulaTexture(color: string): THREE.CanvasTexture {
 const FALLBACK_COLORS: Record<string, string> = {
     '1': '#64748b',
     '2': '#10b981',
-    '3': '#a855f7',
+    '3': '#6366f1',
     '4': '#f97316',
     '5': '#06b6d4',
 };
@@ -265,7 +277,7 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
         (groupKey: string | number): string =>
             groupColorsById[String(groupKey)] ??
             FALLBACK_COLORS[String(groupKey)] ??
-            '#a855f7',
+            aiAccentHex(),
         [groupColorsById]
     );
 
@@ -770,10 +782,10 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
 
             if (isHovered) {
                 // При наведенні: фіолетовий для AI або основний колір теми для логічних
-                return isAI ? '#a855f7' : graphTheme.nodeColor;
+                return isAI ? aiAccentHex() : graphTheme.nodeColor;
             }
 
-            if (isAI) return 'rgba(168, 85, 247, 0.45)';
+            if (isAI) return aiAccentRgba(0.45);
             
             // Використовуємо колір з CSS змінних для звичайних ліній
             return graphTheme.linkColor;

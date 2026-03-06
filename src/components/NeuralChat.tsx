@@ -45,6 +45,9 @@ export default function NeuralChat({
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isDarkTheme = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  const accentBorder = isDarkTheme ? "rgba(168, 85, 247, 0.4)" : "rgba(99, 102, 241, 0.4)";
+  const accentGlow = isDarkTheme ? "0 0 20px rgba(168, 85, 247, 0.2)" : "0 0 20px rgba(99, 102, 241, 0.2)";
 
   const nodeById = useMemo(
     () =>
@@ -224,12 +227,12 @@ export default function NeuralChat({
                       filter: "blur(0px)",
                       borderColor: [
                         "rgba(6, 182, 212, 0.4)",
-                        "rgba(168, 85, 247, 0.4)",
+                        accentBorder,
                         "rgba(6, 182, 212, 0.4)",
                       ],
                       boxShadow: [
                         "0 0 20px rgba(6, 182, 212, 0.2)",
-                        "0 0 20px rgba(168, 85, 247, 0.2)",
+                        accentGlow,
                         "0 0 20px rgba(6, 182, 212, 0.2)",
                       ],
                     }}

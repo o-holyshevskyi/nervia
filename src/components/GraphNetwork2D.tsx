@@ -171,7 +171,8 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
                 const y = parseFloat(yStr);
 
                 const glowSize = (1.5 + glow * 2.5) / transform.k;
-                ctx.fillStyle = `rgba(168, 85, 247, ${glow * 0.8})`; 
+                const isDarkTheme = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+                ctx.fillStyle = isDarkTheme ? `rgba(168, 85, 247, ${glow * 0.8})` : `rgba(99, 102, 241, ${glow * 0.8})`;
                 ctx.rect(x - glowSize/2, y - glowSize/2, glowSize, glowSize);
             }
             ctx.fill();

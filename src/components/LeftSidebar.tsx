@@ -234,7 +234,7 @@ export default function LeftSidebar({
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-indigo-500 dark:bg-purple-500 animate-pulse" />
               <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400 uppercase tracking-[0.2em]">Dashboard</span>
             </div>
             <CloseButton onClose={onClose} />
@@ -388,7 +388,7 @@ export default function LeftSidebar({
                       <button
                         type="button"
                         onClick={() => onRequestUpgrade?.("constellation")}
-                        className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all"
+                        className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all"
                       >
                         <div className="flex items-center gap-2.5">
                           <Route size={16} className="shrink-0" />
@@ -396,20 +396,20 @@ export default function LeftSidebar({
                         </div>
                         <span className="flex items-center gap-2 shrink-0">
                           <kbd className={kbdClass}>Ctrl+Alt+P</kbd>
-                          <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                          <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                         </span>
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => access.canUseZenMode ? onZenModeClick?.() : onRequestUpgrade?.("constellation")}
-                      className={`w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${access.canUseZenMode ? 'hover:cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5' : 'opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] text-neutral-500 dark:text-neutral-500 cursor-pointer'}`}
+                      className={`w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${access.canUseZenMode ? 'hover:cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5' : 'opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] text-neutral-500 dark:text-neutral-500 cursor-pointer'}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <Eye size={16} className="shrink-0" />
                         <span>Zen Mode</span>
                       </div>
-                      {access.canUseZenMode ? <kbd className={kbdClass}>—</kbd> : <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>}
+                      {access.canUseZenMode ? <kbd className={kbdClass}>—</kbd> : <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>}
                     </button>
                     {access.canUseTimeMachine ? (
                     <button type="button" onClick={() => onOpenTimeline?.()} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -417,11 +417,11 @@ export default function LeftSidebar({
                       <kbd className={kbdClass}>Ctrl+Alt+T</kbd>
                     </button>
                     ) : (
-                    <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
+                    <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
                       <div className="flex items-center gap-2.5"><Clock size={16} className="shrink-0" /><span>Time Machine</span></div>
                       <span className="flex items-center gap-2 shrink-0">
                         <kbd className={kbdClass}>Ctrl+Alt+T</kbd>
-                        <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                        <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                       </span>
                     </button>
                     )}
@@ -431,11 +431,11 @@ export default function LeftSidebar({
                       <kbd className={kbdClass}>Ctrl+Alt+H</kbd>
                     </button>
                     ) : (
-                    <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
+                    <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
                       <div className="flex items-center gap-2.5"><History size={16} className="shrink-0" /><span>Evolution Journal</span></div>
                       <span className="flex items-center gap-2 shrink-0">
                         <kbd className={kbdClass}>Ctrl+Alt+H</kbd>
-                        <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                        <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                       </span>
                     </button>
                     )}
@@ -445,11 +445,11 @@ export default function LeftSidebar({
                       <kbd className={kbdClass}>Ctrl+Alt+C</kbd>
                     </button>
                     ) : (
-                    <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
+                    <button type="button" onClick={() => onRequestUpgrade?.("singularity")} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
                       <div className="flex items-center gap-2.5"><MessageCircle size={16} className="shrink-0" /><span>Neural Core</span></div>
                       <span className="flex items-center gap-2 shrink-0">
                         <kbd className={kbdClass}>Ctrl+Alt+C</kbd>
-                        <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                        <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                       </span>
                     </button>
                     )}
@@ -501,12 +501,12 @@ export default function LeftSidebar({
                     <div className="space-y-2">
                       <span className="text-xs font-semibold tracking-widest text-neutral-500 dark:text-neutral-400 uppercase flex items-center justify-between gap-1.5 w-full">
                         Filters
-                        {!access.canUseFilters && <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={12} /></span>}
+                        {!access.canUseFilters && <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={12} /></span>}
                       </span>
                       {!access.canUseFilters ? (
-                        <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full py-3 px-2 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
+                        <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full py-3 px-2 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400">
                           <span>Advanced Filters (Constellation)</span>
-                          <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                          <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                         </button>
                       ) : tags.length === 0 ? (
                         <div className="py-3 px-2 text-center bg-black/5 dark:bg-white/5 rounded-md border border-black/10 dark:border-white/10">
@@ -558,9 +558,9 @@ export default function LeftSidebar({
                         {canUse3DGraph ? (
                           <button type="button" title="3D" onClick={() => onViewModeChange?.('3D')} className={`hover:cursor-pointer px-3 flex items-center justify-center rounded-full text-xs font-medium transition-all duration-200 ${viewMode === '3D' ? 'bg-indigo-500/20 dark:bg-purple-500/20 text-indigo-600 dark:text-purple-400 border border-indigo-500/30 dark:border-purple-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] dark:shadow-[0_0_12px_rgba(168,85,247,0.15)]' : 'text-neutral-500 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5'}`}>3D</button>
                         ) : (
-                          <button type="button" title="3D (Singularity only)" onClick={onRequest3DUpgrade} className="hover:cursor-pointer px-3 flex items-center justify-center rounded-full text-xs font-medium text-neutral-500 dark:text-neutral-500 opacity-70 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all gap-1">
+                          <button type="button" title="3D (Singularity only)" onClick={onRequest3DUpgrade} className="hover:cursor-pointer px-3 flex items-center justify-center rounded-full text-xs font-medium text-neutral-500 dark:text-neutral-500 opacity-70 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all gap-1">
                             <span>3D</span>
-                            <Lock size={10} className="text-purple-500 dark:text-purple-400 shrink-0" />
+                            <Lock size={10} className="text-indigo-500 dark:text-purple-400 shrink-0" />
                           </button>
                         )}
                       </div>
@@ -606,9 +606,9 @@ export default function LeftSidebar({
                       </AnimatePresence>
                     </div>
                     ) : (
-                    <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
+                    <button type="button" onClick={() => onRequestUpgrade?.("constellation")} className="w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-500 dark:text-neutral-500 opacity-60 hover:opacity-100 hover:bg-indigo-500/10 dark:hover:bg-purple-500/10 hover:shadow-[0_0_12px_rgba(99,102,241,0.2)] dark:hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] transition-all">
                       <div className="flex items-center gap-2.5"><ImportIcon size={16} className="shrink-0" /><span>Data Transfer</span></div>
-                      <span className="text-purple-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
+                      <span className="text-indigo-500 dark:text-purple-400 shrink-0" aria-hidden><Lock size={14} /></span>
                     </button>
                     )}
                     <button type="button" onClick={() => { router.push('/settings/billing'); onClose(); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -652,8 +652,8 @@ export default function LeftSidebar({
                     <div className="pt-3 border-t border-black/10 dark:border-white/5 space-y-3">
                       {access.isUnlimited ? (
                         <>
-                          <div className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 w-fit">
-                            <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Status: Unlimited</span>
+                          <div className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-indigo-500/10 dark:bg-purple-500/10 border border-indigo-500/20 dark:border-purple-500/20 w-fit">
+                            <span className="text-[10px] font-medium text-indigo-600 dark:text-purple-400 uppercase tracking-wider">Status: Unlimited</span>
                           </div>
                           <div className="space-y-1 text-[10px] text-neutral-500 dark:text-white/40">
                             <p className="font-medium">Neurons: {isStatsLoading ? '…' : nodesCount}</p>
@@ -661,7 +661,7 @@ export default function LeftSidebar({
                           </div>
                           {access.sharedUniversesLimit === Infinity ? (
                             <div className="text-[10px] text-neutral-500 dark:text-white/40">
-                              Shares: {shares.length} <span className="text-purple-500/80 dark:text-purple-400/80">(Unlimited)</span>
+                              Shares: {shares.length} <span className="text-indigo-500/80 dark:text-purple-400/80">(Unlimited)</span>
                             </div>
                           ) : (
                             <div className="text-[10px] text-neutral-500 dark:text-white/40">
@@ -677,7 +677,7 @@ export default function LeftSidebar({
                             </p>
                             <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-300"
+                                className="h-full rounded-full bg-indigo-500 dark:bg-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] dark:shadow-[0_0_10px_rgba(168,85,247,0.5)] transition-all duration-300"
                                 style={{ width: `${Math.min(100, (nodesCount / access.neuronLimit) * 100)}%` }}
                               />
                             </div>
@@ -820,10 +820,7 @@ export default function LeftSidebar({
             <div className="relative w-full rounded-xl overflow-hidden p-[1px]">
               {/* Animated layer: large conic gradient, rotates so 1px edge is visible as border */}
               <motion.div
-                className="absolute inset-[-100%] blur-sm pointer-events-none"
-                style={{
-                  background: 'conic-gradient(from 0deg, #6366f1, #a855f7, transparent, #6366f1)',
-                }}
+                className="absolute inset-[-100%] blur-sm pointer-events-none bg-[conic-gradient(from_0deg,#6366f1,#818cf8,transparent,#6366f1)] dark:bg-[conic-gradient(from_0deg,#6366f1,#a855f7,transparent,#6366f1)]"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
                 aria-hidden

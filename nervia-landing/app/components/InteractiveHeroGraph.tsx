@@ -8,7 +8,7 @@ const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false 
 
 const BRAND = {
   cyan: "#06b6d4",
-  purple: "#a855f7",
+  purple: "#6366f1",
   emerald: "#10b981",
 };
 

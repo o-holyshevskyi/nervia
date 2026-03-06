@@ -133,7 +133,7 @@ export default function AIStatusBar({ isVisible, current, total, label, failed }
                         <div className="h-1.5 w-full bg-black/10 dark:bg-white/5 rounded-full overflow-hidden relative">
                             {/* Смужка прогресу */}
                             <motion.div 
-                                className={`h-full relative ${isDone ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-gradient-to-r from-purple-600 via-purple-400 to-indigo-500'}`}
+                                className={`h-full relative ${isDone ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-gradient-to-r from-indigo-600 via-indigo-400 to-indigo-500 dark:from-purple-600 dark:via-purple-400 dark:to-indigo-500'}`}
                                 initial={{ width: 0 }}
                                 animate={{ width: `${displayPercent}%` }}
                                 transition={{ type: "spring", stiffness: 45, damping: 20 }}

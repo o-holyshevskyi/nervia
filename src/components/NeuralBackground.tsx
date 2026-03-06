@@ -8,6 +8,7 @@ const MOUSE_RADIUS = 150;
 const PARTICLE_RADIUS = 2;
 const BRAND_CYAN = "#06b6d4";
 const BRAND_PURPLE = "#a855f7";
+const BRAND_INDIGO = "#6366f1";
 
 interface Particle {
   x: number;
@@ -17,9 +18,9 @@ interface Particle {
   color: string;
 }
 
-function createParticles(width: number, height: number): Particle[] {
+function createParticles(width: number, height: number, accentColor: string): Particle[] {
   const particles: Particle[] = [];
-  const colors = [BRAND_CYAN, BRAND_PURPLE];
+  const colors = [BRAND_CYAN, accentColor];
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     particles.push({
       x: Math.random() * width,
@@ -50,7 +51,9 @@ export function NeuralBackground({ clipPathId = "neural-brain-clip" }: NeuralBac
 
   const initOrResizeParticles = useCallback((width: number, height: number) => {
     if (particlesRef.current.length === 0) {
-      particlesRef.current = createParticles(width, height);
+      const isDarkTheme = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+      const accent = isDarkTheme ? BRAND_PURPLE : BRAND_INDIGO;
+      particlesRef.current = createParticles(width, height, accent);
     } else {
       particlesRef.current.forEach((p) => {
         p.x = p.x % (width + 1);
@@ -134,13 +137,16 @@ export function NeuralBackground({ clipPathId = "neural-brain-clip" }: NeuralBac
       }
 
       if (mouse) {
+        const isDarkTheme = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+        const accentRgb = isDarkTheme ? "168, 85, 247" : "99, 102, 241";
+        const accentHex = isDarkTheme ? BRAND_PURPLE : BRAND_INDIGO;
         ctx.lineWidth = 1;
         particles.forEach((p) => {
           const d = dist(p, mouse);
           if (d < MOUSE_RADIUS) {
             const opacity = 1 - d / MOUSE_RADIUS;
-            ctx.strokeStyle = `rgba(168, 85, 247, ${opacity * 0.5})`;
-            ctx.shadowColor = BRAND_PURPLE;
+            ctx.strokeStyle = `rgba(${accentRgb}, ${opacity * 0.5})`;
+            ctx.shadowColor = accentHex;
             ctx.shadowBlur = 8;
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);

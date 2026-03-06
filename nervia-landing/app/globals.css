@@ -6,7 +6,7 @@
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.1);
   --accent-cyan: rgba(6, 182, 212, 0.2);
-  --accent-purple: rgba(168, 85, 247, 0.2);
+  --accent-purple: rgba(99, 102, 241, 0.2);
 }
 
 @theme inline {
@@ -54,7 +54,7 @@ body {
 }
 
 .orb-purple {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(99, 102, 241, 0.2);
   filter: blur(80px);
   animation: orb-float-2 25s ease-in-out infinite;
 }

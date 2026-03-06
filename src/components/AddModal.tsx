@@ -487,11 +487,11 @@ export default function AddModal({ isOpen, existingNodes, allTags, onAdd, onClos
                             </AnimatePresence>
 
                             {showGenesisUpgradeBanner && existingNodes.length >= GENESIS_UPGRADE_THRESHOLD && (
-                                <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded-lg text-xs text-neutral-700 dark:text-neutral-300">
+                                <div className="bg-indigo-500/10 dark:bg-purple-500/10 border border-indigo-500/20 dark:border-purple-500/20 p-2 rounded-lg text-xs text-neutral-700 dark:text-neutral-300">
                                     Your Genesis Universe is reaching its limit ({existingNodes.length}/{neuronLimit}).{" "}
                                     <Link
                                         href="/settings/billing"
-                                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium underline underline-offset-1"
+                                        className="text-indigo-600 dark:text-purple-400 hover:text-indigo-700 dark:hover:text-purple-300 font-medium underline underline-offset-1"
                                     >
                                         Upgrade to Constellation
                                     </Link>{" "}
