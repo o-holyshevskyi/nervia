@@ -4,7 +4,7 @@ import { Footer } from "../components/Footer";
 import { HolographicArticle } from "../components/HolographicArticle";
 
 export const metadata = {
-  title: "Cookie Policy – Nervia",
+  title: "Cookie Policy - Nervia",
   description:
     "How Nervia uses cookies and similar technologies when you use our Visual Intelligence Universe.",
 };

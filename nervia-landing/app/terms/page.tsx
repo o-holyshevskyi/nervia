@@ -4,7 +4,7 @@ import { Footer } from "../components/Footer";
 import { HolographicArticle } from "../components/HolographicArticle";
 
 export const metadata = {
-  title: "Terms & Conditions – Nervia",
+  title: "Terms & Conditions - Nervia",
   description:
     "Terms and Conditions for using Nervia, the Visual Intelligence Universe and 3D Knowledge Graph platform.",
 };

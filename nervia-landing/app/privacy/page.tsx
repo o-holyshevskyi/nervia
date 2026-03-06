@@ -4,7 +4,7 @@ import { Footer } from "../components/Footer";
 import { HolographicArticle } from "../components/HolographicArticle";
 
 export const metadata = {
-  title: "Privacy Policy – Nervia",
+  title: "Privacy Policy - Nervia",
   description:
     "Privacy Policy for Nervia. How we collect, use, and protect your data when you use our Visual Intelligence Universe.",
 };

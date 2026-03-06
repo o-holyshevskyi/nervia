@@ -4,7 +4,7 @@ import { Footer } from "../components/Footer";
 import { HolographicArticle } from "../components/HolographicArticle";
 
 export const metadata = {
-  title: "About – Nervia",
+  title: "About - Nervia",
   description:
     "Learn about Nervia, your Visual Intelligence Universe. Our mission, what we build, and how we help you think in 3D.",
 };

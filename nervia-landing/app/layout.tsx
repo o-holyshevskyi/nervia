@@ -12,7 +12,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://synapse-bookmark-te
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Nervia – Your Visual Intelligence Universe",
+  title: "Nervia - Your Visual Intelligence Universe",
   description:
     "Build your exocortex with interactive 3D neurons, AI-powered clusters, and shared intelligence. Stop organizing notes in flat folders.",
   icons: {
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: "Nervia – Your Visual Intelligence Universe",
+    title: "Nervia - Your Visual Intelligence Universe",
     description:
       "Build your exocortex with interactive 3D neurons, AI-powered clusters, and shared intelligence. Stop organizing notes in flat folders.",
     url: siteUrl,
@@ -32,14 +32,14 @@ export const metadata: Metadata = {
         url: "/banner.png",
         width: 1200,
         height: 630,
-        alt: "Nervia – Your Visual Intelligence Universe",
+        alt: "Nervia - Your Visual Intelligence Universe",
       },
     ],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nervia – Your Visual Intelligence Universe",
+    title: "Nervia - Your Visual Intelligence Universe",
     description:
       "Build your exocortex with interactive 3D neurons, AI-powered clusters, and shared intelligence.",
     images: ["/banner.png"],

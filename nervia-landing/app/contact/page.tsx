@@ -4,7 +4,7 @@ import { Footer } from "../components/Footer";
 import { HolographicArticle } from "../components/HolographicArticle";
 
 export const metadata = {
-  title: "Contact – Nervia",
+  title: "Contact - Nervia",
   description:
     "Get in touch with Nervia. Questions, feedback, or support for your Visual Intelligence Universe.",
 };
