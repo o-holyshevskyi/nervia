@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 const SECTIONS = [
-  { id: "hero" },
-  { id: "reason" },
-  { id: "features" },
-  { id: "pricing" },
-  { id: "why-build" },
-  { id: "faq" },
-  { id: "footer" },
+  { id: "hero", label: "Hero" },
+  { id: "reason", label: "Why" },
+  { id: "features", label: "Features" },
+  { id: "pricing", label: "Pricing" },
+  { id: "why-build", label: "Origin" },
+  { id: "faq", label: "FAQ" },
+  { id: "footer", label: "Footer" },
 ] as const;
 
 export function SectionNav() {
@@ -57,19 +57,40 @@ export function SectionNav() {
             <button
               key={section.id}
               onClick={() => scrollToSection(section.id)}
-              className="group block"
+              className="group relative block cursor-pointer"
               aria-current={isActive ? "true" : undefined}
+              data-active={isActive ? "true" : "false"}
             >
-              <motion.div
-                className="h-16 w-0.75 rounded-full"
-                initial={false}
-                animate={{
-                  backgroundColor: isActive
-                    ? "rgba(99, 102, 241, 0.9)"
-                    : "rgba(255, 255, 255, 0.25)",
-                }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              />
+              <div
+                className={[
+                  "relative h-16 rounded-full",
+                  "w-[6px] group-hover:w-[8px] data-[active=true]:w-[10px]",
+                  "bg-black/15 dark:bg-white/25",
+                  "transition-[width,background-color,box-shadow] duration-300 ease-out",
+                  "group-hover:bg-black/25 dark:group-hover:bg-white/35",
+                  "data-[active=true]:bg-[rgba(168,85,247,0.18)] data-[active=true]:shadow-[0_0_18px_rgba(168,85,247,0.22)]",
+                ].join(" ")}
+              >
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-[rgba(168,85,247,0.92)]"
+                  initial={false}
+                  animate={{ opacity: isActive ? 1 : 0, scaleY: isActive ? 1 : 0.5 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  style={{ originY: 0.5 }}
+                />
+              </div>
+
+              <span
+                className={[
+                  "pointer-events-none absolute left-full top-1/2 -translate-y-1/2 whitespace-nowrap",
+                  "ml-4 font-mono text-xs uppercase tracking-widest text-neutral-400",
+                  "opacity-0 -translate-x-2",
+                  "transition-all duration-300 ease-out",
+                  "group-hover:opacity-100 group-hover:translate-x-0",
+                ].join(" ")}
+              >
+                {section.label}
+              </span>
             </button>
           );
         })}

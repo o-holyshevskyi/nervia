@@ -53,7 +53,7 @@ export default function Home() {
           <FAQ />
         </SnapSection>
 
-        <SnapSection id="footer" alignBottom>
+        <SnapSection id="footer">
           <Footer />
         </SnapSection>
       </div>
