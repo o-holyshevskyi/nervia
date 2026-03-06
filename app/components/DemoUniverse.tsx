@@ -29,7 +29,7 @@ export default function DemoUniverse() {
   const [zenModeNodeId, setZenModeNodeId] = useState<string | null>(null);
   const [solarSystemNodeId, setSolarSystemNodeId] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({ repulsion: 150, linkDistance: 60 });
+  const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({ repulsion: 150, linkDistance: 60, nodeSpeed: 8, clusterSpeed: 22 });
   const [highlightedNodes, setHighlightedNodes] = useState<string[]>([]);
   const [pathData, setPathData] = useState<{ nodes: string[]; links: any[] }>({ nodes: [], links: [] });
   const [clusterMode, setClusterMode] = useState<"group" | "tag">("group");

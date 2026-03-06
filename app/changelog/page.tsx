@@ -87,6 +87,26 @@ function ChangelogItem({ version, title, description, sections = [], badges = []
 
 const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
   {
+    version: "v1.2.2 - 6 Mar 2026",
+    title: "Physics panel: node & cluster speed",
+    badges: ["Improved", "Fixed"],
+    sections: [
+      {
+        tag: "Physics of the Universe",
+        items: [
+          "Node speed and Cluster speed sliders in the Physics panel for tuning the 2D ambient orbit animation (nodes around cluster centers, clusters around global center).",
+          "Changes apply in real time via physicsConfig; sliders available in both controlled and uncontrolled panel variants.",
+        ],
+      },
+      {
+        tag: "Technical",
+        items: [
+          "physicsConfig type extended with nodeSpeed and clusterSpeed across GraphNetwork, PhysicsControl, DemoUniverse, ShareViewClient, and main page so TypeScript and runtime stay in sync.",
+        ],
+      },
+    ],
+  },
+  {
     version: "v1.2.1 - 6 Mar 2026",
     title: "Exocortex loading & ambient orbits",
     badges: ["Improved", "New"],

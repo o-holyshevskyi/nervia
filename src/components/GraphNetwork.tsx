@@ -237,7 +237,10 @@ interface GraphNetworkProps {
     activeTag: string | null;
     focusedNodeId: string | null;
     zenModeNodeId: string | null;
-    physicsConfig: { repulsion: number; linkDistance: number };
+    physicsConfig: {
+        clusterSpeed: number;
+        nodeSpeed: number; repulsion: number; linkDistance: number 
+};
     highlightedNodes?: string[];
     contextNodeIds?: string[];
     pathNodes?: string[];
@@ -331,13 +334,30 @@ export default function GraphNetwork({
     const ambientRafRef = useRef<number>(0);
 
     // ── CHANGE 1: promote orbit maps to refs so drag handlers can reach them ─
-    const orbitMapRef = useRef<Map<any, { radius: number; angle: number; speed: number }>>(new Map());
-    const clusterOrbitMapRef = useRef<Map<string | number, { radius: number; angle: number; speed: number }>>(new Map());
+    const orbitMapRef = useRef<Map<any, { radius: number; angle: number; speedFactor: number }>>(new Map());
+    const clusterOrbitMapRef = useRef<Map<string | number, { radius: number; angle: number; speedFactor: number }>>(new Map());
     // Live (currently-orbiting) cluster center positions, updated every RAF tick
     const liveClusterCentersRef = useRef<Record<string | number, { x: number; y: number }>>({});
 
     // Node currently being dragged — RAF tick skips it
     const draggingNodeRef = useRef<any>(null);
+
+    // Always mirrors the latest physicsConfig so the orbital tick can read
+    // nodeSpeed / clusterSpeed live without restarting the effect.
+    const physicsConfigRef = useRef(physicsConfig);
+    physicsConfigRef.current = physicsConfig;
+
+    // True while d3 is reheating after a physicsConfig change.
+    // The orbital RAF keeps the canvas refreshing but stops overwriting node
+    // positions so physics can freely move them. Cleared after settling.
+    const physicsSettlingRef = useRef(false);
+    const physicsSettlingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Whether the orbital animation has been initialized; lives at component level
+    // so the physics settling timer can reset it and trigger re-init.
+    const orbitInitializedRef = useRef(false);
+    // True only for the very first init — uses ring layout for nice spacing.
+    // Stays false after that so re-init after physics captures actual positions.
+    const orbitFirstInitRef = useRef(true);
 
     const initialFitDone = useRef(false);
     const threeDKeyRef = useRef(0);
@@ -496,7 +516,7 @@ export default function GraphNetwork({
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
         const minDim = Math.min(dimensions.width, dimensions.height);
-        const layoutRadius = minDim * 0.48;
+        const layoutRadius = minDim * 0.28;
         const getClusterKey = (n: any): string | number =>
             clusterMode === 'group'
                 ? getNodeGroupKey(n)
@@ -555,10 +575,13 @@ export default function GraphNetwork({
         orbitMapRef.current.clear();
         clusterOrbitMapRef.current.clear();
 
-        let initialized = false;
+        const initializedRef = orbitInitializedRef;
+        initializedRef.current = false; // reset on every effect run (clusterMode/nodes changed)
+
+        // speedFactor per orbit entry is the golden-ratio variation (0.7–1.3).
+        // Actual angular step = speedFactor × physicsConfigRef.current.nodeSpeed/clusterSpeed / 10000 × dt
+        // Because we read from physicsConfigRef on every tick, slider changes are instant.
         const GOLDEN = 2.399;
-        const BASE_SPEED    = 0.00008;   // node speed around cluster center
-        const CLUSTER_SPEED = 0.000022;  // cluster speed around global center
 
         const getClusterKey = (node: any): string | number =>
             clusterMode === 'group'
@@ -566,54 +589,90 @@ export default function GraphNetwork({
                 : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
 
         const init = (): boolean => {
-            const centers = clusterCentersRef.current;
-            const nodes   = processedData.nodes;
-            if (!nodes.length || !Object.keys(centers).length) return false;
+            const nodes = processedData.nodes;
+            if (!nodes.length) return false;
 
             const settled = nodes.filter((n: any) =>
                 isFinite(n.x) && isFinite(n.y) && (Math.abs(n.x) > 1 || Math.abs(n.y) > 1)
             );
             if (settled.length < nodes.length * 0.8) return false;
 
-            // ── Cluster orbits around (0,0) — unchanged from original ──────
-            Object.entries(centers).forEach(([keyStr, center], i) => {
-                const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
-                const radius = Math.hypot(center.x, center.y);
-                const angle  = Math.atan2(center.y, center.x);
-                const speed  = CLUSTER_SPEED * (0.8 + ((i * GOLDEN) % 1) * 0.4);
-                clusterOrbitMapRef.current.set(key, { radius: Math.max(10, radius), angle, speed });
-            });
+            if (orbitFirstInitRef.current) {
+                // ── First init: use geometric cluster centers + ring layout ──────
+                orbitFirstInitRef.current = false;
 
-            // ── CHANGE 2a: node orbits — evenly distributed on concentric rings ──
-            // Group nodes by cluster first so we can assign slots
-            const byCluster = new Map<string | number, any[]>();
-            nodes.forEach((node: any) => {
-                if (node.fx != null) return;
-                const key = getClusterKey(node);
-                if (!byCluster.has(key)) byCluster.set(key, []);
-                byCluster.get(key)!.push(node);
-            });
+                const centers = clusterCentersRef.current;
+                if (!Object.keys(centers).length) return false;
 
-            byCluster.forEach((clusterNodes) => {
-                const total = clusterNodes.length;
-                clusterNodes.forEach((node: any, localIdx: number) => {
-                    const ring       = Math.floor(localIdx / ORBIT_NODES_PER_RING);
-                    const posInRing  = localIdx % ORBIT_NODES_PER_RING;
-                    // How many nodes actually sit on this ring
-                    const ringCount  = Math.min(
-                        ORBIT_NODES_PER_RING,
-                        total - ring * ORBIT_NODES_PER_RING
-                    );
-                    // Evenly spread + stagger rings so they don't stack radially
-                    const angle  = (posInRing / ringCount) * 2 * Math.PI
-                                 + ring * (Math.PI / ORBIT_NODES_PER_RING);
-                    const radius = ORBIT_RING_BASE_R + ring * ORBIT_RING_GAP;
-
-                    const globalIdx = nodes.indexOf(node);
-                    const speed     = BASE_SPEED * (0.7 + ((globalIdx * GOLDEN) % 1) * 0.6);
-                    orbitMapRef.current.set(node, { radius, angle, speed });
+                Object.entries(centers).forEach(([keyStr, center], i) => {
+                    const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
+                    const radius = Math.hypot(center.x, center.y);
+                    const angle  = Math.atan2(center.y, center.x);
+                    // speedFactor: cluster variation (0.8–1.2)
+                    const speedFactor = 0.8 + ((i * GOLDEN) % 1) * 0.4;
+                    clusterOrbitMapRef.current.set(key, { radius: Math.max(10, radius), angle, speedFactor });
                 });
-            });
+
+                const byCluster = new Map<string | number, any[]>();
+                nodes.forEach((node: any) => {
+                    if (node.fx != null) return;
+                    const key = getClusterKey(node);
+                    if (!byCluster.has(key)) byCluster.set(key, []);
+                    byCluster.get(key)!.push(node);
+                });
+                byCluster.forEach((clusterNodes) => {
+                    const total = clusterNodes.length;
+                    clusterNodes.forEach((node: any, localIdx: number) => {
+                        const ring        = Math.floor(localIdx / ORBIT_NODES_PER_RING);
+                        const posInRing   = localIdx % ORBIT_NODES_PER_RING;
+                        const ringCount   = Math.min(ORBIT_NODES_PER_RING, total - ring * ORBIT_NODES_PER_RING);
+                        const angle       = (posInRing / ringCount) * 2 * Math.PI + ring * (Math.PI / ORBIT_NODES_PER_RING);
+                        const radius      = ORBIT_RING_BASE_R + ring * ORBIT_RING_GAP;
+                        const globalIdx   = nodes.indexOf(node);
+                        // speedFactor: node variation (0.7–1.3)
+                        const speedFactor = 0.7 + ((globalIdx * GOLDEN) % 1) * 0.6;
+                        orbitMapRef.current.set(node, { radius, angle, speedFactor });
+                    });
+                });
+
+            } else {
+                // ── Re-init after physicsConfig change: capture from actual positions ──
+                const actualCenters = new Map<string | number, { x: number; y: number; n: number }>();
+                nodes.forEach((node: any) => {
+                    if (node.fx != null) return;
+                    const key = getClusterKey(node);
+                    if (!actualCenters.has(key)) actualCenters.set(key, { x: 0, y: 0, n: 0 });
+                    const c = actualCenters.get(key)!;
+                    c.x += node.x ?? 0;
+                    c.y += node.y ?? 0;
+                    c.n++;
+                });
+                actualCenters.forEach(c => { c.x /= c.n; c.y /= c.n; });
+
+                let i = 0;
+                actualCenters.forEach((center, key) => {
+                    const radius      = Math.hypot(center.x, center.y);
+                    const angle       = Math.atan2(center.y, center.x);
+                    const speedFactor = 0.8 + ((i * GOLDEN) % 1) * 0.4;
+                    clusterOrbitMapRef.current.set(key, { radius: Math.max(10, radius), angle, speedFactor });
+                    i++;
+                });
+
+                nodes.forEach((node: any) => {
+                    if (node.fx != null) return;
+                    const key         = getClusterKey(node);
+                    const center      = actualCenters.get(key) ?? { x: 0, y: 0 };
+                    const dx          = (node.x ?? 0) - center.x;
+                    const dy          = (node.y ?? 0) - center.y;
+                    const globalIdx   = nodes.indexOf(node);
+                    const speedFactor = 0.7 + ((globalIdx * GOLDEN) % 1) * 0.6;
+                    orbitMapRef.current.set(node, {
+                        radius: Math.max(10, Math.hypot(dx, dy)),
+                        angle:  Math.atan2(dy, dx),
+                        speedFactor,
+                    });
+                });
+            }
 
             return orbitMapRef.current.size > 0;
         };
@@ -625,26 +684,35 @@ export default function GraphNetwork({
             lastTime = now;
 
             if (fg) {
-                if (!initialized) initialized = init();
+                if (!initializedRef.current) initializedRef.current = init();
 
-                if (initialized) {
+                if (initializedRef.current) {
+                    // While physics is reheating (slider change), let d3 move nodes freely.
+                    if (physicsSettlingRef.current) {
+                        fg.refresh?.();
+                        ambientRafRef.current = requestAnimationFrame(tick);
+                        return;
+                    }
+
+                    // Read live speed values from ref — responds instantly to slider changes.
+                    const nodeSpeedBase    = physicsConfigRef.current.nodeSpeed    / 1000000;
+                    const clusterSpeedBase = physicsConfigRef.current.clusterSpeed / 1000000;
+
                     // Step 1 — advance cluster centers around (0,0)
                     const liveCenters: Record<string | number, { x: number; y: number }> = {};
                     clusterOrbitMapRef.current.forEach((orbit, key) => {
-                        orbit.angle += orbit.speed * dt;
+                        orbit.angle += orbit.speedFactor * clusterSpeedBase * dt;
                         liveCenters[key] = {
                             x: Math.cos(orbit.angle) * orbit.radius,
                             y: Math.sin(orbit.angle) * orbit.radius,
                         };
                     });
-                    // Expose live centers so drag handler can use them
                     liveClusterCentersRef.current = liveCenters;
 
                     // Step 2 — advance node orbits around their moving cluster center
-                    // CHANGE 2b: skip the node being dragged
                     orbitMapRef.current.forEach((orbit, node) => {
                         if (node === draggingNodeRef.current) return;
-                        orbit.angle += orbit.speed * dt;
+                        orbit.angle += orbit.speedFactor * nodeSpeedBase * dt;
                         const key    = getClusterKey(node);
                         const center = liveCenters[key] ?? clusterCentersRef.current[key] ?? { x: 0, y: 0 };
                         node.x = center.x + Math.cos(orbit.angle) * orbit.radius;
@@ -658,15 +726,21 @@ export default function GraphNetwork({
             ambientRafRef.current = requestAnimationFrame(tick);
         };
 
+        // First load: 700ms. Re-init after physicsConfig change: 900ms so the
+        // reheat simulation has time to fully settle before orbit re-captures positions.
+        const isReInit = orbitMapRef.current.size > 0;
+        const startDelay = isReInit ? 900 : 700;
+
         const startTimer = setTimeout(() => {
             ambientRafRef.current = requestAnimationFrame(tick);
-        }, 700);
+        }, startDelay);
 
         return () => {
             clearTimeout(startTimer);
             cancelAnimationFrame(ambientRafRef.current);
             orbitMapRef.current.clear();
             clusterOrbitMapRef.current.clear();
+            orbitFirstInitRef.current = true; // next run starts fresh with ring layout
         };
     }, [viewMode, processedData.nodes, clusterMode]);
 
@@ -911,7 +985,7 @@ export default function GraphNetwork({
         if (!fgRef.current) return;
         const fg = fgRef.current;
         const minDim = Math.min(dimensions.width, dimensions.height);
-        const radius = minDim * 0.48;
+        const radius = minDim * 0.25;
 
         const getClusterKey = (node: any): string | number => {
             if (clusterMode === 'group') return getNodeGroupKey(node);
@@ -926,6 +1000,12 @@ export default function GraphNetwork({
 
         const jitter = 28;
         processedData.nodes.forEach((node: any) => {
+            // Only seed if the node has no valid position yet (first load / new node).
+            // On physicsConfig changes nodes are already placed — resetting them here
+            // is what caused the "jumps back to original position" bug.
+            const alreadyPlaced = isFinite(node.x) && isFinite(node.y)
+                && (Math.abs(node.x) > 1 || Math.abs(node.y) > 1);
+            if (alreadyPlaced) return;
             const key = getClusterKey(node);
             const center = clusterCenters[key];
             if (!center) return;
@@ -971,6 +1051,22 @@ export default function GraphNetwork({
         }
 
         fg.d3ReheatSimulation();
+
+        // If the graph is already up (physicsConfig slider change), pause orbital
+        // writes so d3 can move nodes freely, then re-capture orbits once settled.
+        if (initialFitDone.current) {
+            physicsSettlingRef.current = true;
+            if (physicsSettlingTimerRef.current) clearTimeout(physicsSettlingTimerRef.current);
+            physicsSettlingTimerRef.current = setTimeout(() => {
+                // Re-init orbit positions from wherever physics left nodes.
+                // Must reset orbitInitializedRef so the orbital tick calls init() again.
+                orbitMapRef.current.clear();
+                clusterOrbitMapRef.current.clear();
+                orbitInitializedRef.current = false;
+                physicsSettlingRef.current = false;
+            }, 1200);
+        }
+
         if (!initialFitDone.current && !zoomScheduledRef.current) {
             zoomScheduledRef.current = true;
             setTimeout(() => {
@@ -1165,7 +1261,7 @@ export default function GraphNetwork({
                                         <motion.span
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
-                                            className="text-[12px] font-mono text-neutral-400/50 dark:text-neutral-500/50 uppercase tracking-[0.2em] text-shimmer-muted"
+                                            className="text-[12px] font-mono text-neutral-400/50 uppercase tracking-[0.2em]"
                                         >
                                             {`0x${(loadingStep * 25).toString(16)}FF...${Math.floor(Math.random() * 100)}%`}
                                         </motion.span>

@@ -192,10 +192,26 @@ export default function Home() {
         if (!access.canUse3DGraph && viewMode === '3D') setViewMode('2D');
     }, [access.canUse3DGraph, viewMode, setViewMode]);
     const [physicsPanelOpen, setPhysicsPanelOpen] = useState(false);
-    const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>({
+    const PHYSICS_STORAGE_KEY = 'nervia-physics-config';
+    const DEFAULT_PHYSICS: PhysicsConfig = {
         repulsion: 150,
-        linkDistance: 60
-    });
+        linkDistance: 50,
+        nodeSpeed: 8,
+        clusterSpeed: 11,
+    };
+    function loadPhysicsConfig(): PhysicsConfig {
+        if (typeof window === 'undefined') return DEFAULT_PHYSICS;
+        try {
+            const raw = localStorage.getItem(PHYSICS_STORAGE_KEY);
+            if (!raw) return DEFAULT_PHYSICS;
+            const parsed = JSON.parse(raw);
+            // Merge with defaults so any new fields added later are always present
+            return { ...DEFAULT_PHYSICS, ...parsed };
+        } catch {
+            return DEFAULT_PHYSICS;
+        }
+    }
+    const [physicsConfig, setPhysicsConfig] = useState<PhysicsConfig>(loadPhysicsConfig);
     const [isAIProcessing, setIsAIProcessing] = useState(false);
     const [aiProgress, setAiProgress] = useState(0);
     const [aiTotal, setAiTotal] = useState(0);
@@ -844,7 +860,10 @@ export default function Home() {
             {data.nodes.length > 0 && (
                 <PhysicsControl
                     config={physicsConfig}
-                    onChange={setPhysicsConfig}
+                    onChange={(cfg) => {
+                        setPhysicsConfig(cfg);
+                        try { localStorage.setItem(PHYSICS_STORAGE_KEY, JSON.stringify(cfg)); } catch {}
+                    }}
                     open={physicsPanelOpen}
                     onOpenChange={setPhysicsPanelOpen}
                 />

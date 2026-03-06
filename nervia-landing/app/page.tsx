@@ -29,7 +29,7 @@ export default function Home() {
         className="relative z-10 h-screen w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide bg-transparent"
         data-scrollbar-hide
       >
-        <SnapSection id="hero" className="pt-20">
+        <SnapSection id="hero" className="pt-24 pb-16" scrollable>
           <Hero onWatchDemo={() => setIsDemoOpen(true)} />
         </SnapSection>
 
@@ -37,7 +37,7 @@ export default function Home() {
           <WhySection />
         </SnapSection>
 
-        <SnapSection id="features" scrollable>
+        <SnapSection id="hero" className="pt-24 pb-16" scrollable>
           <FeaturesBento />
         </SnapSection>
 

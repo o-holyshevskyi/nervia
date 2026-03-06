@@ -9,7 +9,7 @@ import GraphNetwork from "@/src/components/GraphNetwork";
 import FilterPanel from "@/src/components/FilterPanel";
 import CloseButton from "@/src/components/ui/CloseButton";
 
-const DEFAULT_PHYSICS = { repulsion: 150, linkDistance: 60 };
+const DEFAULT_PHYSICS = { repulsion: 150, linkDistance: 60, nodeSpeed: 8, clusterSpeed: 22 };
 const VISIT_SPAM_WINDOW_MS = 60_000;
 const VISIT_SPAM_MAX = 10;
 

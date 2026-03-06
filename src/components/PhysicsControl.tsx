@@ -2,12 +2,14 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Settings2, Magnet, Activity } from "lucide-react";
+import { Settings2, Magnet, Activity, Clock, Boxes, Hexagon } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
 
 export interface PhysicsConfig {
     repulsion: number;
     linkDistance: number;
+    nodeSpeed: number;
+    clusterSpeed: number;
 }
 
 interface PhysicsControlProps {
@@ -75,6 +77,40 @@ export default function PhysicsControl({ config, onChange, open: controlledOpen,
                                     value={config.linkDistance}
                                     onChange={(e) => onChange({ ...config, linkDistance: Number(e.target.value) })}
                                     className="w-full accent-green-500 h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-xs text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5 font-medium uppercase tracking-wider">
+                                        <Hexagon size={14} className="text-rose-500 dark:text-rose-400" /> Node speed
+                                    </label>
+                                    <span className="text-xs text-neutral-600 dark:text-neutral-300 font-mono">{config.nodeSpeed}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={config.nodeSpeed}
+                                    onChange={(e) => onChange({ ...config, nodeSpeed: Number(e.target.value) })}
+                                    className="w-full accent-rose-500 h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-xs text-neutral-600 dark:text-neutral-400 flex items-center gap-1.5 font-medium uppercase tracking-wider">
+                                        <Boxes size={14} className="text-orange-500 dark:text-orange-400" /> Cluster speed
+                                    </label>
+                                    <span className="text-xs text-neutral-600 dark:text-neutral-300 font-mono">{config.clusterSpeed}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    value={config.clusterSpeed}
+                                    onChange={(e) => onChange({ ...config, clusterSpeed: Number(e.target.value) })}
+                                    className="w-full accent-orange-500 h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer"
                                 />
                             </div>
                         </div>

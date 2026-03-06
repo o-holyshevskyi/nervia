@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { FadeIn } from "./FadeIn";
-import { Play } from "lucide-react";
-import { InteractiveHeroGraph } from "./InteractiveHeroGraph";
+import { MousePointerClick } from "lucide-react"; // Замінили іконку
 import { APP_URL } from "../lib/app-url";
 
 interface HeroProps {
@@ -53,12 +52,25 @@ export function Hero({ onWatchDemo }: HeroProps) {
             onClick={() => onWatchDemo?.()}
             className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-black/25 px-6 py-3.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-black/35 hover:border-indigo-500/25 focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:ring-offset-2 focus:ring-offset-black"
           >
-            <Play className="h-4 w-4" />
-            Watch Demo
+            {/* Іконка кліку мишкою для інтерактивного демо */}
+            <MousePointerClick className="h-4 w-4" />
+            Try Interactive Demo
           </button>
         </FadeIn>
-        <FadeIn delay={0.4} className="mt-16">
-          <InteractiveHeroGraph />
+
+        {/* 🔥 ВІДЕО ПРЯМО НА СТОРІНЦІ */}
+        <FadeIn delay={0.4} className="mt-16 px-4 sm:px-0 relative mx-auto max-w-4xl">
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 shadow-[0_0_50px_rgba(99,102,241,0.15)] ring-1 ring-white/5">
+            <video
+              src="/nervia-demo.mp4" /* Твоє відео з CapCut */
+              poster="/nervia-thumbnail.jpg" /* Картинка до запуску відео */
+              controls
+              className="h-full w-full object-cover"
+              preload="metadata"
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
         </FadeIn>
       </div>
     </div>
