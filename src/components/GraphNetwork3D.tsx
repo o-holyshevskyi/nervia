@@ -333,29 +333,27 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
         try {
             const centerMap = groupCentroids;
 
-            fg.d3Force(
-                'link',
-                forceLink()
-                    .id((d: any) => d.id)
-                    .distance(linkDistance)
-                    .strength((link: any) => {
-                        const sId = typeof link.source === 'object' ? link.source.id : link.source;
-                        const tId = typeof link.target === 'object' ? link.target.id : link.target;
-                        const sNode = cleanData.nodes.find((n: any) => n.id === sId);
-                        const tNode = cleanData.nodes.find((n: any) => n.id === tId);
-                        if (!sNode || !tNode) return 0.3;
-                        const sk = String(nodeIdToGroupKeyMap.get(sNode.id) ?? getNodeGroupKey(sNode));
-                        const tk = String(nodeIdToGroupKeyMap.get(tNode.id) ?? getNodeGroupKey(tNode));
-                        return sk === tk ? 0.8 : 0.2;
-                    })
-            );
-            fg.d3Force('charge', forceManyBody().strength(-280));
-            fg.d3Force(
-                'collide',
-                forceCollide()
-                    .radius((n: any) => Math.max((n.val ?? 4) * 2, 18))
-                    .strength(0.9)
-            );
+            type NodeDatum = { id: string; val?: number; [k: string]: unknown };
+            type LinkDatum = { source: NodeDatum | string; target: NodeDatum | string };
+            const linkForce: any = (forceLink as any)()
+                .id((d: NodeDatum) => d.id)
+                .distance(linkDistance)
+                .strength((link: LinkDatum) => {
+                    const sId = typeof link.source === 'object' ? link.source.id : link.source;
+                    const tId = typeof link.target === 'object' ? link.target.id : link.target;
+                    const sNode = cleanData.nodes.find((n: any) => n.id === sId);
+                    const tNode = cleanData.nodes.find((n: any) => n.id === tId);
+                    if (!sNode || !tNode) return 0.3;
+                    const sk = String(nodeIdToGroupKeyMap.get(sNode.id) ?? getNodeGroupKey(sNode));
+                    const tk = String(nodeIdToGroupKeyMap.get(tNode.id) ?? getNodeGroupKey(tNode));
+                    return sk === tk ? 0.8 : 0.2;
+                });
+            fg.d3Force('link', linkForce as any);
+            fg.d3Force('charge', (forceManyBody as any)().strength(-280));
+            const collideForce: any = (forceCollide as any)()
+                .radius((n: NodeDatum) => Math.max((n.val ?? 4) * 2, 18))
+                .strength(0.9);
+            fg.d3Force('collide', collideForce);
 
             const d3f3d = require('d3-force-3d');
             fg.d3Force('cx', d3f3d.forceX((n: any) => {
