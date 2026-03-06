@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock, Loader2, OrbitIcon, Orbit } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock, Orbit } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import GraphNetwork2D from './GraphNetwork2D';
 import GraphNetwork3D from './GraphNetwork3D';
@@ -28,16 +28,15 @@ const groupNames: Record<number, string> = {
 };
 
 const loadingLabels = [
-    "Connecting to Exocortex",   // 0 — initial handshake
-    "Calculating Gravity",       // 1 — physics warmup
-    "Mapping Neural Paths",      // 2 — link resolution
-    "Stabilizing Universe",      // 3 — simulation settling
-    "Ready",                     // 4 — engine done (success sequence starts)
-    "Connection Stable",         // 5
-    "Synchronized",              // 6 — final, then overlay exits
+    "Connecting to Exocortex",
+    "Calculating Gravity",
+    "Mapping Neural Paths",
+    "Stabilizing Universe",
+    "Ready",
+    "Connection Stable",
+    "Synchronized",
 ];
 
-/** Neon palette for tag-based clusters (cinematic, consistent per tag). */
 const tagNeonPalette = [
     "#06b6d4", "#4f46e5", "#f97316", "#10b981", "#ec4899",
     "#eab308", "#6366f1", "#14b8a6", "#f43f5e", "#8b5cf6",
@@ -50,14 +49,12 @@ function getColorForTag(tag: string): string {
     return tagNeonPalette[idx] ?? tagNeonPalette[0];
 }
 
-/** Deterministic hash from string for reproducible initial positions. */
 function hashStr(s: string): number {
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return (h % 1e6) / 1e6;
 }
 
-/** Legacy: derive numeric group (1-5) from node when group_id is not set. */
 function getNodeGroup(node: any): number {
     if (node.group != null) {
         const g = typeof node.group === 'number' ? node.group : Number(node.group);
@@ -65,10 +62,9 @@ function getNodeGroup(node: any): number {
     }
     if (node.type === 'note') return 2;
     if (node.type === 'idea') return 3;
-    return 1; // link or default
+    return 1;
 }
 
-/** Cluster key for group mode: group_id (string) or legacy number. */
 function getNodeGroupKey(node: any): string | number {
     if (node.group_id != null && typeof node.group_id === 'string') return node.group_id;
     return getNodeGroup(node);
@@ -81,7 +77,6 @@ function looksLikeId(s: string, idStr: string): boolean {
     return false;
 }
 
-/** Prefer title/content for display; never show raw id (UUID or similar) as label. */
 function getNodeLabel(node: any): string {
     const idStr = typeof node.id === 'string' ? node.id : node?.id != null ? String(node.id) : '';
     const title = (node.title ?? '').toString().trim();
@@ -91,7 +86,6 @@ function getNodeLabel(node: any): string {
     return 'Untitled';
 }
 
-/** Read graph theme from CSS variables (no re-render on theme switch). Used by 2D; 3D normalizes in its own component. */
 function getGraphThemeColors(container: HTMLElement | null): { nodeColor: string; linkColor: string; graphBg: string } {
     const el = container ?? (typeof document !== 'undefined' ? document.documentElement : null);
     if (!el) return { nodeColor: '#1f2937', linkColor: 'rgba(55, 65, 81, 0.5)', graphBg: '#f9fafb' };
@@ -103,7 +97,6 @@ function getGraphThemeColors(container: HTMLElement | null): { nodeColor: string
     };
 }
 
-/** Hex to rgba with alpha for dimmed states. */
 function hexToRgba(hex: string, alpha: number): string {
     if (!hex.startsWith('#')) return hex;
     const r = parseInt(hex.slice(1, 3), 16);
@@ -117,9 +110,7 @@ const ACCENT_PURPLE = "#a855f7";
 function isDarkTheme(): boolean {
     return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
 }
-function accentHex(): string {
-    return isDarkTheme() ? ACCENT_PURPLE : ACCENT_INDIGO;
-}
+function accentHex(): string { return isDarkTheme() ? ACCENT_PURPLE : ACCENT_INDIGO; }
 function accentRgba(alpha: number): string {
     return isDarkTheme() ? `rgba(168, 85, 247, ${alpha})` : `rgba(99, 102, 241, ${alpha})`;
 }
@@ -180,11 +171,9 @@ function drawGroupAreas(
         const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
         const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
         if (!isFinite(centerX) || !isFinite(centerY)) continue;
-
         const maxDist = points.reduce((max, p) => Math.max(max, Math.hypot(p.x - centerX, p.y - centerY)), 0);
         const radius = Math.min(dimensions.width + dimensions.height, Math.max(80, maxDist * 1.2));
         if (!isFinite(radius) || radius <= 0) continue;
-
         const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
         const color = clusterMode === 'group'
             ? (getGroupColor(key, groupColorsById) ?? groupColors[Number(keyStr)])
@@ -209,9 +198,7 @@ function drawGroupAreas(
         const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
         if (!isFinite(centerX) || !isFinite(centerY)) continue;
         const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
-        const label = clusterMode === 'group'
-            ? getGroupLabel(key, groupNamesById)
-            : `#${keyStr}`;
+        const label = clusterMode === 'group' ? getGroupLabel(key, groupNamesById) : `#${keyStr}`;
         const themeColors = getGraphThemeColors(container);
         const labelColor = themeColors.nodeColor.startsWith('#')
             ? themeColors.nodeColor
@@ -230,14 +217,9 @@ function drawGroupAreas(
 const createIconImage = (IconComponent: any, color: string, strokeWidth: number = 2.5) => {
     const cacheKey = `${IconComponent.displayName}-${color}`;
     if (iconCache[cacheKey]) return iconCache[cacheKey];
-
-    const svgString = renderToStaticMarkup(
-        <IconComponent color={color} size={32} strokeWidth={strokeWidth} />
-    );
-
+    const svgString = renderToStaticMarkup(<IconComponent color={color} size={32} strokeWidth={strokeWidth} />);
     const img = new Image();
     img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
-    
     iconCache[cacheKey] = img;
     return img;
 };
@@ -280,8 +262,6 @@ function getLinkEnd(linkEnd: any): string | undefined {
     return typeof linkEnd === "string" ? linkEnd : linkEnd?.id;
 }
 
-// ─── helpers shared between physics setup and initial position seeding ───────
-
 function buildClusterCenters2D(
     nodes: any[],
     clusterMode: 'group' | 'tag',
@@ -291,7 +271,6 @@ function buildClusterCenters2D(
         clusterMode === 'group'
             ? getNodeGroupKey(n)
             : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
-
     const rawKeys = [...new Set(nodes.map(getClusterKey))];
     const uniqueKeys = rawKeys.sort((a, b) => String(a).localeCompare(String(b)));
     const centers: Record<string | number, { x: number; y: number }> = {};
@@ -305,14 +284,21 @@ function buildClusterCenters2D(
     return centers;
 }
 
-export default function GraphNetwork({ 
-    onNodeSelect, 
-    onBackgroundClick, 
-    onNodeContextMenu, 
-    graphData, 
+// ─── Orbit layout constants ──────────────────────────────────────────────────
+// Nodes are spread across concentric rings inside each cluster.
+const ORBIT_NODES_PER_RING = 6;   // max nodes on the innermost ring
+const ORBIT_RING_BASE_R    = 60;  // px from cluster center to ring-0
+const ORBIT_RING_GAP       = 52;  // extra px per ring
+const ORBIT_MAX_DRAG_R     = 160; // max px a node may be dragged from its live cluster center
+
+export default function GraphNetwork({
+    onNodeSelect,
+    onBackgroundClick,
+    onNodeContextMenu,
+    graphData,
     timelineDate,
-    activeTag, 
-    focusedNodeId, 
+    activeTag,
+    focusedNodeId,
     zenModeNodeId,
     physicsConfig,
     highlightedNodes = [],
@@ -334,9 +320,8 @@ export default function GraphNetwork({
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
     const [isInitialFitting, setIsInitialFitting] = useState(true);
     const [loadingStep, setLoadingStep] = useState(0);
-    
+
     const engineIsDone = useRef(false);
-    
     const containerRef = useRef<HTMLDivElement>(null);
     const fgRef = useRef<any>(null);
     const fg3dRef = useRef<any>(null);
@@ -344,30 +329,29 @@ export default function GraphNetwork({
     const zoomScheduledRef = useRef(false);
     const clusterCentersRef = useRef<Record<string | number, { x: number; y: number }>>({});
     const ambientRafRef = useRef<number>(0);
+
+    // ── CHANGE 1: promote orbit maps to refs so drag handlers can reach them ─
+    const orbitMapRef = useRef<Map<any, { radius: number; angle: number; speed: number }>>(new Map());
+    const clusterOrbitMapRef = useRef<Map<string | number, { radius: number; angle: number; speed: number }>>(new Map());
+    // Live (currently-orbiting) cluster center positions, updated every RAF tick
+    const liveClusterCentersRef = useRef<Record<string | number, { x: number; y: number }>>({});
+
+    // Node currently being dragged — RAF tick skips it
     const draggingNodeRef = useRef<any>(null);
 
     const initialFitDone = useRef(false);
     const threeDKeyRef = useRef(0);
-
-    // ── Engine-ready signal ──────────────────────────────────────────────────
-    // Incremented when the 2D graph engine fires onEngineStop (first run or after reheat).
-    // Physics useEffect depends on this so it re-runs once the dynamic import has resolved
-    // and fgRef.current is set; otherwise the first effect run sees null and forces never apply.
     const [engineReadyCount, setEngineReadyCount] = useState(0);
 
     useEffect(() => {
         if (!isInitialFitting) return;
-    
-        // Cycle through loading states 0→3, then hold until engine signals done
         const interval = setInterval(() => {
             setLoadingStep((prev) => {
-                if (engineIsDone.current) return prev; // success sequence handled by handleEngineStop
-                if (prev >= 3) return prev;            // hold at "Stabilizing Universe"
+                if (engineIsDone.current) return prev;
+                if (prev >= 3) return prev;
                 return prev + 1;
             });
         }, 1200);
-    
-        // Hard fallback: if onEngineStop never fires, force the success sequence
         const hardTimeout = setTimeout(() => {
             if (!engineIsDone.current) {
                 engineIsDone.current = true;
@@ -380,13 +364,8 @@ export default function GraphNetwork({
                 setTimeout(() => setIsInitialFitting(false), 650);
             }
         }, 1500);
-    
-        return () => {
-            clearInterval(interval);
-            clearTimeout(hardTimeout);
-        };
+        return () => { clearInterval(interval); clearTimeout(hardTimeout); };
     }, [isInitialFitting]);
-    
 
     const handleEngineStop = useCallback(() => {
         setEngineReadyCount((c) => Math.max(c, 1));
@@ -394,7 +373,6 @@ export default function GraphNetwork({
 
     useEffect(() => {
         const handleVisibilityChange = () => {
-            // Якщо користувач повернувся і двигун вже "вистрілив"
             if (document.visibilityState === 'visible' && engineIsDone.current && isInitialFitting) {
                 setIsInitialFitting(false);
             }
@@ -403,9 +381,8 @@ export default function GraphNetwork({
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [isInitialFitting]);
 
-    // Fallback: if onEngineStop doesn't fire (e.g. library timing), re-run physics after ref is likely set.
     useEffect(() => {
-        if (viewMode !== '2D') return;  // ← must be present
+        if (viewMode !== '2D') return;
         const t = setTimeout(() => setEngineReadyCount((c) => Math.max(c, 1)), 50);
         return () => clearTimeout(t);
     }, [viewMode]);
@@ -469,9 +446,9 @@ export default function GraphNetwork({
     const highlightedSet = useMemo(() => new Set(highlightedNodes), [highlightedNodes]);
     const contextNodeSet = useMemo(() => new Set(contextNodeIds), [contextNodeIds]);
     const searchActive = highlightedSet.size > 0;
-
     const pathfinderActive = pathNodes.length > 0;
     const pathNodeSet = useMemo(() => new Set(pathNodes), [pathNodes]);
+
     const pathLinkSet = useMemo(() => {
         const set = new Set<string>();
         const linkKey = (a: string, b: string) => (a < b ? `${a}\0${b}` : `${b}\0${a}`);
@@ -482,6 +459,7 @@ export default function GraphNetwork({
         });
         return set;
     }, [pathLinks]);
+
     const isPathLink = useCallback((link: any) => {
         const sId = typeof link.source === "string" ? link.source : link.source?.id;
         const tId = typeof link.target === "string" ? link.target : link.target?.id;
@@ -493,7 +471,6 @@ export default function GraphNetwork({
     const processedData = useMemo(() => {
         const { nodes, links } = graphData;
         const getNodeId = (n: any) => (typeof n === 'string' ? n : n?.id);
-
         const useTimeline = typeof timelineDate === 'number' && Number.isFinite(timelineDate);
         let workingNodes = nodes;
         let workingLinks = links;
@@ -511,7 +488,6 @@ export default function GraphNetwork({
                 return sId != null && tId != null && filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
             });
         }
-
         const degreeMap: Record<string, number> = {};
         workingLinks.forEach((link: any) => {
             const sId = getNodeId(link.source);
@@ -519,7 +495,6 @@ export default function GraphNetwork({
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
-
         const minDim = Math.min(dimensions.width, dimensions.height);
         const layoutRadius = minDim * 0.48;
         const getClusterKey = (n: any): string | number =>
@@ -527,7 +502,6 @@ export default function GraphNetwork({
                 ? getNodeGroupKey(n)
                 : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
         const clusterCenters = buildClusterCenters2D(workingNodes, clusterMode, layoutRadius);
-
         const jitter = 28;
         const nodesWithVal = workingNodes.map((node: any, index: number) => {
             const id = getNodeId(node);
@@ -545,22 +519,18 @@ export default function GraphNetwork({
         const linksCopy = workingLinks.map((link: any) => ({ ...link }));
         if (pathfinderActive) {
             const pathSet = new Set(pathNodes);
-            const dim: any[] = [];
-            const bright: any[] = [];
+            const dim: any[] = [], bright: any[] = [];
             nodesWithVal.forEach((n: any) => {
                 const id = getNodeId(n);
-                if (pathSet.has(id)) bright.push(n);
-                else dim.push(n);
+                if (pathSet.has(id)) bright.push(n); else dim.push(n);
             });
             return { nodes: [...dim, ...bright], links: linksCopy };
         }
         if (searchActive) {
-            const dim: any[] = [];
-            const bright: any[] = [];
+            const dim: any[] = [], bright: any[] = [];
             nodesWithVal.forEach((n: any) => {
                 const id = getNodeId(n);
-                if (highlightedSet.has(id)) bright.push(n);
-                else dim.push(n);
+                if (highlightedSet.has(id)) bright.push(n); else dim.push(n);
             });
             return { nodes: [...dim, ...bright], links: linksCopy };
         }
@@ -572,154 +542,200 @@ export default function GraphNetwork({
             try {
                 const domain = new URL(node.url).hostname;
                 return `/api/favicon?domain=${domain}`;
-            } catch {
-                return null;
-            }
+            } catch { return null; }
         }
         return null;
     }, []);
 
+    // ── CHANGE 2: Orbital animation — uses refs, skips dragged node, ring layout
     useEffect(() => {
         if (viewMode !== '2D') return;
-    
-        const orbitMap = new Map<any, {
-            radius: number;
-            angle: number;
-            speed: number;
-        }>();
-    
-        // Cluster centers also orbit the global center
-        const clusterOrbitMap = new Map<string | number, {
-            radius: number;
-            angle: number;
-            speed: number;
-        }>();
-    
+
+        // Reset refs on re-init (clusterMode or nodes changed)
+        orbitMapRef.current.clear();
+        clusterOrbitMapRef.current.clear();
+
         let initialized = false;
         const GOLDEN = 2.399;
-        const BASE_SPEED = 0.00008;          // node orbit speed around cluster center
-        const CLUSTER_SPEED = 0.000022;      // cluster orbit speed around global center (slower)
-    
+        const BASE_SPEED    = 0.00008;   // node speed around cluster center
+        const CLUSTER_SPEED = 0.000022;  // cluster speed around global center
+
         const getClusterKey = (node: any): string | number =>
             clusterMode === 'group'
                 ? getNodeGroupKey(node)
                 : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
-    
+
         const init = (): boolean => {
             const centers = clusterCentersRef.current;
-            const nodes = processedData.nodes;
+            const nodes   = processedData.nodes;
             if (!nodes.length || !Object.keys(centers).length) return false;
-    
+
             const settled = nodes.filter((n: any) =>
                 isFinite(n.x) && isFinite(n.y) && (Math.abs(n.x) > 1 || Math.abs(n.y) > 1)
             );
             if (settled.length < nodes.length * 0.8) return false;
-    
-            // Initialize cluster orbits around global center (0,0)
+
+            // ── Cluster orbits around (0,0) — unchanged from original ──────
             Object.entries(centers).forEach(([keyStr, center], i) => {
                 const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
                 const radius = Math.hypot(center.x, center.y);
-                const angle = Math.atan2(center.y, center.x);
-                // Each cluster orbits at slightly different speed
-                const speed = CLUSTER_SPEED * (0.8 + ((i * GOLDEN) % 1) * 0.4);
-                clusterOrbitMap.set(key, { radius: Math.max(10, radius), angle, speed });
+                const angle  = Math.atan2(center.y, center.x);
+                const speed  = CLUSTER_SPEED * (0.8 + ((i * GOLDEN) % 1) * 0.4);
+                clusterOrbitMapRef.current.set(key, { radius: Math.max(10, radius), angle, speed });
             });
-    
-            // Initialize node orbits around their cluster center
-            nodes.forEach((node: any, i: number) => {
+
+            // ── CHANGE 2a: node orbits — evenly distributed on concentric rings ──
+            // Group nodes by cluster first so we can assign slots
+            const byCluster = new Map<string | number, any[]>();
+            nodes.forEach((node: any) => {
                 if (node.fx != null) return;
                 const key = getClusterKey(node);
-                const center = centers[key];
-                if (!center) return;
-                const dx = (node.x ?? 0) - center.x;
-                const dy = (node.y ?? 0) - center.y;
-                const radius = Math.max(10, Math.hypot(dx, dy));
-                const angle = Math.atan2(dy, dx);
-                const speed = BASE_SPEED * (0.7 + ((i * GOLDEN) % 1) * 0.6);
-                orbitMap.set(node, { radius, angle, speed });
+                if (!byCluster.has(key)) byCluster.set(key, []);
+                byCluster.get(key)!.push(node);
             });
-    
-            return orbitMap.size > 0;
+
+            byCluster.forEach((clusterNodes) => {
+                const total = clusterNodes.length;
+                clusterNodes.forEach((node: any, localIdx: number) => {
+                    const ring       = Math.floor(localIdx / ORBIT_NODES_PER_RING);
+                    const posInRing  = localIdx % ORBIT_NODES_PER_RING;
+                    // How many nodes actually sit on this ring
+                    const ringCount  = Math.min(
+                        ORBIT_NODES_PER_RING,
+                        total - ring * ORBIT_NODES_PER_RING
+                    );
+                    // Evenly spread + stagger rings so they don't stack radially
+                    const angle  = (posInRing / ringCount) * 2 * Math.PI
+                                 + ring * (Math.PI / ORBIT_NODES_PER_RING);
+                    const radius = ORBIT_RING_BASE_R + ring * ORBIT_RING_GAP;
+
+                    const globalIdx = nodes.indexOf(node);
+                    const speed     = BASE_SPEED * (0.7 + ((globalIdx * GOLDEN) % 1) * 0.6);
+                    orbitMapRef.current.set(node, { radius, angle, speed });
+                });
+            });
+
+            return orbitMapRef.current.size > 0;
         };
-    
+
         let lastTime = 0;
         const tick = (now: number) => {
             const fg = fgRef.current;
             const dt = Math.min(lastTime ? now - lastTime : 16, 64);
             lastTime = now;
-    
+
             if (fg) {
-                if (!initialized) {
-                    initialized = init();
-                }
-    
+                if (!initialized) initialized = init();
+
                 if (initialized) {
-                    // Step 1 — advance cluster center orbits around (0,0)
+                    // Step 1 — advance cluster centers around (0,0)
                     const liveCenters: Record<string | number, { x: number; y: number }> = {};
-                    clusterOrbitMap.forEach((orbit, key) => {
+                    clusterOrbitMapRef.current.forEach((orbit, key) => {
                         orbit.angle += orbit.speed * dt;
                         liveCenters[key] = {
                             x: Math.cos(orbit.angle) * orbit.radius,
                             y: Math.sin(orbit.angle) * orbit.radius,
                         };
                     });
-    
-                    // Step 2 — advance node orbits around their (now moving) cluster center
-                    orbitMap.forEach((orbit, node) => {
+                    // Expose live centers so drag handler can use them
+                    liveClusterCentersRef.current = liveCenters;
+
+                    // Step 2 — advance node orbits around their moving cluster center
+                    // CHANGE 2b: skip the node being dragged
+                    orbitMapRef.current.forEach((orbit, node) => {
+                        if (node === draggingNodeRef.current) return;
                         orbit.angle += orbit.speed * dt;
-                        const key = getClusterKey(node);
+                        const key    = getClusterKey(node);
                         const center = liveCenters[key] ?? clusterCentersRef.current[key] ?? { x: 0, y: 0 };
                         node.x = center.x + Math.cos(orbit.angle) * orbit.radius;
                         node.y = center.y + Math.sin(orbit.angle) * orbit.radius;
                     });
-    
+
                     fg.refresh?.();
                 }
             }
-    
+
             ambientRafRef.current = requestAnimationFrame(tick);
         };
-    
+
         const startTimer = setTimeout(() => {
             ambientRafRef.current = requestAnimationFrame(tick);
         }, 700);
-    
+
         return () => {
             clearTimeout(startTimer);
             cancelAnimationFrame(ambientRafRef.current);
-            orbitMap.clear();
-            clusterOrbitMap.clear();
+            orbitMapRef.current.clear();
+            clusterOrbitMapRef.current.clear();
         };
     }, [viewMode, processedData.nodes, clusterMode]);
+
+    // ── CHANGE 3: drag handlers ───────────────────────────────────────────────
+    const getClusterKeyForNode = useCallback((node: any): string | number =>
+        clusterMode === 'group'
+            ? getNodeGroupKey(node)
+            : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string,
+    [clusterMode]);
+
+    const handleNodeDrag = useCallback((node: any) => {
+        draggingNodeRef.current = node;
+
+        // Clamp position to ORBIT_MAX_DRAG_R from the live cluster center
+        const key        = getClusterKeyForNode(node);
+        const liveCenter = liveClusterCentersRef.current[key]
+                        ?? clusterCentersRef.current[key]
+                        ?? { x: 0, y: 0 };
+
+        const dx   = (node.x ?? 0) - liveCenter.x;
+        const dy   = (node.y ?? 0) - liveCenter.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > ORBIT_MAX_DRAG_R) {
+            const s = ORBIT_MAX_DRAG_R / dist;
+            node.x  = liveCenter.x + dx * s;
+            node.y  = liveCenter.y + dy * s;
+        }
+    }, [getClusterKeyForNode]);
+
+    const handleNodeDragEnd = useCallback((node: any) => {
+        draggingNodeRef.current = null;
+
+        // Re-capture orbit from the dropped position so animation resumes from here
+        const key          = getClusterKeyForNode(node);
+        const clusterOrbit = clusterOrbitMapRef.current.get(key);
+        const liveCenter   = clusterOrbit
+            ? {
+                x: Math.cos(clusterOrbit.angle) * clusterOrbit.radius,
+                y: Math.sin(clusterOrbit.angle) * clusterOrbit.radius,
+            }
+            : clusterCentersRef.current[key];
+
+        if (!liveCenter) return;
+        const existing = orbitMapRef.current.get(node);
+        if (!existing) return;
+
+        const dx = (node.x ?? 0) - liveCenter.x;
+        const dy = (node.y ?? 0) - liveCenter.y;
+        existing.radius = Math.max(10, Math.hypot(dx, dy));
+        existing.angle  = Math.atan2(dy, dx);
+        // speed intentionally preserved
+    }, [getClusterKeyForNode]);
 
     const isLinkHidden = useCallback((link: any) => {
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
         const tId = typeof link.target === 'string' ? link.target : link.target?.id;
-
         if (solarSystemNodeId) {
             if (!solarNeighbors.has(sId) && !solarNeighbors.has(tId)) return true;
             return false;
         }
-
-        if (pathfinderActive) {
-            return !isPathLink(link);
-        }
-
+        if (pathfinderActive) return !isPathLink(link);
         if (searchActive) {
             if (!highlightedSet.has(sId) && !highlightedSet.has(tId)) return true;
         }
-        
-        if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) {
-            return true; 
-        }
-
+        if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) return true;
         if (activeTag) {
             const sTags = typeof link.source === 'object' ? link.source.tags : graphData.nodes.find((n: any) => n.id === sId)?.tags;
             const tTags = typeof link.target === 'object' ? link.target.tags : graphData.nodes.find((n: any) => n.id === tId)?.tags;
-            
-            if (!sTags?.includes(activeTag) || !tTags?.includes(activeTag)) {
-                return true;
-            }
+            if (!sTags?.includes(activeTag) || !tTags?.includes(activeTag)) return true;
         }
         return false;
     }, [solarSystemNodeId, solarNeighbors, pathfinderActive, isPathLink, searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
@@ -757,19 +773,14 @@ export default function GraphNetwork({
             const pathEndId = pathNodes.length > 0 ? pathNodes[pathNodes.length - 1] : null;
             const isPathStart = idStr === pathStartId;
             const isPathEnd = pathEndId != null && idStr === pathEndId;
-
             const isSearchHighlighted = !pathfinderActive && searchActive && highlightedSet.has(idStr);
-            if (searchActive && !pathfinderActive) {
-                if (isSearchHighlighted) size = Math.min(24, size * 1.2);
-            }
+            if (searchActive && !pathfinderActive) { if (isSearchHighlighted) size = Math.min(24, size * 1.2); }
             if (pathfinderActive && isPathNode) size = Math.min(24, size * 1.2);
-
             const isZenHidden = !pathfinderActive && !searchActive && zenModeNodeId && !zenModeNeighbors.has(idStr);
             const isTagHidden = !pathfinderActive && !searchActive && activeTag && (!node.tags || !node.tags.includes(activeTag));
             const isDimmedBySearch = !pathfinderActive && searchActive && !isSearchHighlighted;
             const isDimmedByPath = pathfinderActive && !isPathNode;
             isHidden = isZenHidden || isTagHidden || isDimmedBySearch || isDimmedByPath;
-
             if (pathfinderActive) {
                 if (isPathStart) baseColor = "#06b6d4";
                 else if (isPathEnd) baseColor = "#f97316";
@@ -829,11 +840,9 @@ export default function GraphNetwork({
 
         ctx.beginPath();
         ctx.arc(x, y, size, 0, 2 * Math.PI, false);
-        
         const innerFill = isHidden ? 'rgba(0, 0, 0, 0)' : (themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.18) : 'rgba(0, 0, 0, 0.2)');
         ctx.fillStyle = innerFill;
         ctx.fill();
-
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = strongGlow ? 2.5 / globalScale : 2 / globalScale;
         ctx.shadowColor = strokeColor;
@@ -843,7 +852,6 @@ export default function GraphNetwork({
         if (!isHidden) {
             const iconUrl = getNodeIconUrl(node);
             const iconSize = size * 1.2;
-    
             if (iconUrl) {
                 if (!imgCache[iconUrl]) {
                     const img = new Image();
@@ -851,7 +859,6 @@ export default function GraphNetwork({
                     img.onload = () => { imgCache[iconUrl] = img; };
                 } else {
                     const img = imgCache[iconUrl];
-                    const iconSize = size * 1.2;
                     ctx.save();
                     ctx.beginPath();
                     ctx.arc(x, y, size * 0.8, 0, Math.PI * 2, true);
@@ -861,24 +868,13 @@ export default function GraphNetwork({
                 }
             } else {
                 let iconImg = null;
-                if (node.type === 'idea') {
-                    iconImg = createIconImage(Lightbulb, baseColor);
-                } else if (node.type === 'note') {
-                    iconImg = createIconImage(FileText, baseColor);
-                }
-
+                if (node.type === 'idea') iconImg = createIconImage(Lightbulb, baseColor);
+                else if (node.type === 'note') iconImg = createIconImage(FileText, baseColor);
                 if (iconImg && iconImg.complete) {
                     ctx.save();
                     ctx.shadowColor = baseColor;
                     ctx.shadowBlur = 8 / globalScale;
-                    
-                    ctx.drawImage(
-                        iconImg,
-                        x - iconSize / 2,
-                        y - iconSize / 2,
-                        iconSize,
-                        iconSize
-                    );
+                    ctx.drawImage(iconImg, x - iconSize / 2, y - iconSize / 2, iconSize, iconSize);
                     ctx.restore();
                 }
             }
@@ -906,19 +902,12 @@ export default function GraphNetwork({
 
     useEffect(() => {
         if (containerRef.current) {
-            setDimensions({
-                width: containerRef.current.offsetWidth,
-                height: window.innerHeight,
-            })
+            setDimensions({ width: containerRef.current.offsetWidth, height: window.innerHeight });
         }
     }, []);
 
-    // ── 2D Physics setup ─────────────────────────────────────────────────────
-    // NOTE: `engineReadyCount` is intentionally included so this effect re-runs
-    // once the dynamic import resolves and ForceGraph2D fires its first onEngineStop.
-    // Without it, fgRef.current is null on the very first run and forces are never applied.
     useEffect(() => {
-        if (viewMode !== '2D') return;   // ← add this
+        if (viewMode !== '2D') return;
         if (!fgRef.current) return;
         const fg = fgRef.current;
         const minDim = Math.min(dimensions.width, dimensions.height);
@@ -935,7 +924,6 @@ export default function GraphNetwork({
         fg.d3Force('x', forceX((node: any) => clusterCentersRef.current[getClusterKey(node)]?.x ?? 0).strength(0.4));
         fg.d3Force('y', forceY((node: any) => clusterCentersRef.current[getClusterKey(node)]?.y ?? 0).strength(0.4));
 
-        // Seed positions deterministically so nodes start near their cluster center
         const jitter = 28;
         processedData.nodes.forEach((node: any) => {
             const key = getClusterKey(node);
@@ -951,13 +939,8 @@ export default function GraphNetwork({
         const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
 
         if (solarSystemNodeId && solarNeighbors.size > 0) {
-            const centerNode = processedData.nodes.find(
-                (n: any) => getNodeIdStr(n) === solarSystemNodeId
-            );
-            if (centerNode) {
-                (centerNode as any).fx = 0;
-                (centerNode as any).fy = 0;
-            }
+            const centerNode = processedData.nodes.find((n: any) => getNodeIdStr(n) === solarSystemNodeId);
+            if (centerNode) { (centerNode as any).fx = 0; (centerNode as any).fy = 0; }
             fg.d3Force('x', null);
             fg.d3Force('y', null);
             fg.d3Force('radial', forceRadial(250, 0, 0).strength((node: any) =>
@@ -965,10 +948,7 @@ export default function GraphNetwork({
             ));
             fg.d3Force('collide', forceCollide(24).strength(1));
         } else {
-            processedData.nodes.forEach((node: any) => {
-                delete (node as any).fx;
-                delete (node as any).fy;
-            });
+            processedData.nodes.forEach((node: any) => { delete (node as any).fx; delete (node as any).fy; });
             fg.d3Force('radial', null);
             fg.d3Force('collide', null);
             fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? 0).strength(0.4));
@@ -1003,10 +983,7 @@ export default function GraphNetwork({
                 setTimeout(() => setLoadingStep(6), 440);
                 setTimeout(() => setIsInitialFitting(false), 650);
             }, 350);
-            // Note: cleanup is handled by existing effect cleanup or hard timeout guard
         }
-        
-
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, engineReadyCount, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
 
@@ -1026,20 +1003,15 @@ export default function GraphNetwork({
         const padding = 100;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         nodes.forEach((n: any) => {
-            const nx = Number(n.x);
-            const ny = Number(n.y);
+            const nx = Number(n.x), ny = Number(n.y);
             if (isFinite(nx) && isFinite(ny)) {
-                minX = Math.min(minX, nx);
-                minY = Math.min(minY, ny);
-                maxX = Math.max(maxX, nx);
-                maxY = Math.max(maxY, ny);
+                minX = Math.min(minX, nx); minY = Math.min(minY, ny);
+                maxX = Math.max(maxX, nx); maxY = Math.max(maxY, ny);
             }
         });
         if (!isFinite(minX) || !isFinite(maxX)) return;
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        const boxW = maxX - minX + 2 * padding;
-        const boxH = maxY - minY + 2 * padding;
+        const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
+        const boxW = maxX - minX + 2 * padding, boxH = maxY - minY + 2 * padding;
         const k = Math.min(dimensions.width / boxW, dimensions.height / boxH, 4);
         fgRef.current.centerAt(centerX, centerY, 400);
         fgRef.current.zoom(k, 400);
@@ -1063,6 +1035,7 @@ export default function GraphNetwork({
 
     const ZOOM_FACTOR = 1.25;
     const NAV_DURATION_MS = 250;
+
     const handleZoomIn = useCallback(() => {
         if (viewMode === '3D') {
             const fg3d = fg3dRef.current;
@@ -1070,21 +1043,16 @@ export default function GraphNetwork({
                 const pos = fg3d.cameraPosition();
                 if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' && typeof pos.z === 'number') {
                     const scale = 1 / ZOOM_FACTOR;
-                    fg3d.cameraPosition(
-                        { x: pos.x * scale, y: pos.y * scale, z: pos.z * scale },
-                        { x: 0, y: 0, z: 0 },
-                        NAV_DURATION_MS
-                    );
+                    fg3d.cameraPosition({ x: pos.x * scale, y: pos.y * scale, z: pos.z * scale }, { x: 0, y: 0, z: 0 }, NAV_DURATION_MS);
                 }
             }
             return;
         }
         if (!fgRef.current) return;
         const k = fgRef.current.zoom();
-        if (typeof k === 'number' && Number.isFinite(k)) {
-            fgRef.current.zoom(Math.min(8, k * ZOOM_FACTOR), NAV_DURATION_MS);
-        }
+        if (typeof k === 'number' && Number.isFinite(k)) fgRef.current.zoom(Math.min(8, k * ZOOM_FACTOR), NAV_DURATION_MS);
     }, [viewMode]);
+
     const handleZoomOut = useCallback(() => {
         if (viewMode === '3D') {
             const fg3d = fg3dRef.current;
@@ -1092,36 +1060,25 @@ export default function GraphNetwork({
                 const pos = fg3d.cameraPosition();
                 if (pos && typeof pos.x === 'number' && typeof pos.y === 'number' && typeof pos.z === 'number') {
                     const scale = ZOOM_FACTOR;
-                    fg3d.cameraPosition(
-                        { x: pos.x * scale, y: pos.y * scale, z: pos.z * scale },
-                        { x: 0, y: 0, z: 0 },
-                        NAV_DURATION_MS
-                    );
+                    fg3d.cameraPosition({ x: pos.x * scale, y: pos.y * scale, z: pos.z * scale }, { x: 0, y: 0, z: 0 }, NAV_DURATION_MS);
                 }
             }
             return;
         }
         if (!fgRef.current) return;
         const k = fgRef.current.zoom();
-        if (typeof k === 'number' && Number.isFinite(k)) {
-            fgRef.current.zoom(Math.max(0.2, k / ZOOM_FACTOR), NAV_DURATION_MS);
-        }
+        if (typeof k === 'number' && Number.isFinite(k)) fgRef.current.zoom(Math.max(0.2, k / ZOOM_FACTOR), NAV_DURATION_MS);
     }, [viewMode]);
 
     const handleRecenter = useCallback(() => {
-        if (viewMode === '3D') {
-            fg3dRef.current?.zoomToFit(1000, 150);
-            return;
-        }
-        if (fgRef.current) {
-            // zoomToFit(час_анімації, відступ_у_пікселях)
-            fgRef.current.zoomToFit(1000, 150);
-        }
+        if (viewMode === '3D') { fg3dRef.current?.zoomToFit(1000, 150); return; }
+        if (fgRef.current) fgRef.current.zoomToFit(1000, 150);
     }, [viewMode]);
 
     const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-200 cursor-pointer";
 
     const graphTheme = getGraphThemeColors(containerRef.current);
+
     const dataFor3D = useMemo(() => {
         if (viewMode !== '3D') return processedData;
         const getClusterKey = (n: any): string | number =>
@@ -1161,40 +1118,35 @@ export default function GraphNetwork({
         >
             <AnimatePresence>
                 {isInitialFitting && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 1 }}
                         exit={{ opacity: 0, scale: 1.2, filter: "blur(10px)", transition: { duration: 0.3, ease: "easeIn" } }}
                         className="absolute inset-0 z-[100] flex items-center justify-center bg-white dark:bg-[#050505]"
                     >
                         <div className="flex flex-col items-center gap-10">
-                            {/* Іконка Орбіти */}
                             <div className="relative">
                                 <motion.div
                                     animate={loadingStep < 4 ? { rotate: 360 } : { rotate: 0, scale: [1, 1.2, 1] }}
-                                    transition={loadingStep < 4 
-                                        ? { duration: 2, repeat: Infinity, ease: "linear" } 
+                                    transition={loadingStep < 4
+                                        ? { duration: 2, repeat: Infinity, ease: "linear" }
                                         : { duration: 0.4, ease: "easeOut" }
                                     }
                                     className={loadingStep >= 4 ? "text-emerald-500" : "text-indigo-600 dark:text-purple-500"}
                                 >
                                     <Orbit size={48} strokeWidth={1.5} />
                                 </motion.div>
-                                
-                                {/* Маленьке мерехтіння навколо іконки */}
                                 {loadingStep < 4 && (
-                                    <motion.div 
+                                    <motion.div
                                         animate={{ opacity: [0, 1, 0] }}
                                         transition={{ duration: 1, repeat: Infinity }}
-                                        className="absolute -inset-4 border border-indigo-500/20 rounded-full" 
+                                        className="absolute -inset-4 border border-indigo-500/20 rounded-full"
                                     />
                                 )}
                             </div>
-
                             <div className="flex flex-col items-center gap-3">
-                                {/* Основний текст станів */}
                                 <div className="h-6 overflow-hidden flex items-center justify-center">
                                     <AnimatePresence mode="wait">
-                                        <motion.p 
+                                        <motion.p
                                             key={loadingStep}
                                             initial={{ opacity: 0, y: 15, filter: "blur(4px)" }}
                                             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -1208,11 +1160,9 @@ export default function GraphNetwork({
                                         </motion.p>
                                     </AnimatePresence>
                                 </div>
-
-                                {/* Допоміжний "технічний" рядок */}
                                 <div className="h-4 flex items-center justify-center">
                                     {loadingStep < 4 ? (
-                                        <motion.span 
+                                        <motion.span
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             className="text-[12px] font-mono text-neutral-400/50 uppercase tracking-[0.2em]"
@@ -1220,7 +1170,7 @@ export default function GraphNetwork({
                                             {`0x${(loadingStep * 25).toString(16)}FF...${Math.floor(Math.random() * 100)}%`}
                                         </motion.span>
                                     ) : (
-                                        <motion.span 
+                                        <motion.span
                                             initial={{ scale: 0 }}
                                             animate={{ scale: 1 }}
                                             className="text-[8px] font-mono text-emerald-500/60 uppercase tracking-[0.2em]"
@@ -1240,10 +1190,8 @@ export default function GraphNetwork({
                         key="graph-2d"
                         className="absolute inset-0 w-full h-full"
                         initial={{ opacity: 0, filter: "blur(10px)", scale: 0.97 }}
-                        animate={{ opacity: 1, filter: "blur(0px)", scale: 1,
-                            transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
-                        exit={{ opacity: 0, filter: "blur(10px)", scale: 0.97,
-                            transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
+                        animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
+                        exit={{ opacity: 0, filter: "blur(10px)", scale: 0.97, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
                     >
                         <GraphNetwork2D
                             ref={fgRef}
@@ -1269,13 +1217,13 @@ export default function GraphNetwork({
                             onNodeRightClick={(node, event) => {
                                 if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
                             }}
-                            onBackgroundClick={() => {
-                                if (onBackgroundClick) onBackgroundClick();
-                            }}
+                            // ── CHANGE 4: wire drag handlers ─────────────────
+                            onNodeDrag={handleNodeDrag}
+                            onNodeDragEnd={handleNodeDragEnd}
+                            onBackgroundClick={() => { if (onBackgroundClick) onBackgroundClick(); }}
                             onLinkHover={(link) => setHoveredLink(link)}
                             nodePointerAreaPaint={(node: any, color, ctx) => {
-                                const x = node.x ?? 0;
-                                const y = node.y ?? 0;
+                                const x = node.x ?? 0, y = node.y ?? 0;
                                 if (!isFinite(x) || !isFinite(y)) return;
                                 const rawSize = (node.val ?? 4) * 1;
                                 let radius = Math.min(20, Math.max(6, rawSize));
@@ -1331,7 +1279,7 @@ export default function GraphNetwork({
                             linkDirectionalParticleWidth={4}
                             linkDirectionalParticleColor={() => {
                                 const theme = getGraphThemeColors(containerRef.current);
-                                return pathfinderActive ? theme.nodeColor : theme.nodeColor;
+                                return theme.nodeColor;
                             }}
                             linkColor={(link: any) => {
                                 const theme = getGraphThemeColors(containerRef.current);
@@ -1354,10 +1302,8 @@ export default function GraphNetwork({
                         key="graph-3d"
                         className="absolute inset-0 w-full h-full"
                         initial={{ opacity: 0, filter: "blur(10px)", scale: 1.03 }}
-                        animate={{ opacity: 1, filter: "blur(0px)", scale: 1,
-                            transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
-                        exit={{ opacity: 0, filter: "blur(10px)", scale: 1.03,
-                            transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
+                        animate={{ opacity: 1, filter: "blur(0px)", scale: 1, transition: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
+                        exit={{ opacity: 0, filter: "blur(10px)", scale: 1.03, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
                     >
                         <GraphNetwork3D
                             key={`3d-${threeDKeyRef.current}`}
@@ -1390,27 +1336,13 @@ export default function GraphNetwork({
                                 <motion.div
                                     key="nav-zoom-recenter"
                                     initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{
-                                        opacity: 1,
-                                        scale: 1,
-                                        transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] },
-                                    }}
-                                    exit={{
-                                        opacity: 0,
-                                        scale: 0.9,
-                                        transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
-                                    }}
+                                    animate={{ opacity: 1, scale: 1, transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] } }}
+                                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
                                     className="flex flex-col gap-1 origin-top"
                                 >
-                                    <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in">
-                                        <ZoomIn size={18} />
-                                    </button>
-                                    <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out">
-                                        <ZoomOut size={18} />
-                                    </button>
-                                    <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter">
-                                        <Locate size={18} />
-                                    </button>
+                                    <button type="button" onClick={handleZoomIn} className={navBtnClass} title="Zoom in" aria-label="Zoom in"><ZoomIn size={18} /></button>
+                                    <button type="button" onClick={handleZoomOut} className={navBtnClass} title="Zoom out" aria-label="Zoom out"><ZoomOut size={18} /></button>
+                                    <button type="button" onClick={handleRecenter} className={navBtnClass} title="Recenter / Fit to screen" aria-label="Recenter"><Locate size={18} /></button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -1420,8 +1352,7 @@ export default function GraphNetwork({
                                 onClick={() => onViewModeChange?.(viewMode === '3D' ? '2D' : '3D')}
                                 className={viewMode === '3D'
                                     ? "flex items-center justify-center w-10 h-10 rounded-xl text-white bg-indigo-600/80 dark:bg-purple-500/80 hover:bg-indigo-600 dark:hover:bg-purple-500 shadow-[0_0_20px_rgba(99,102,241,0.45)] dark:shadow-[0_0_24px_rgba(168,85,247,0.5)] transition-all duration-200 cursor-pointer"
-                                    : navBtnClass
-                                }
+                                    : navBtnClass}
                                 title="Toggle 3D Universe"
                                 aria-label={viewMode === '3D' ? 'Switch to 2D' : 'Switch to 3D'}
                             >
@@ -1454,9 +1385,9 @@ export default function GraphNetwork({
                     >
                         <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider mb-1">
                             {hoveredLink.relationType === 'ai' ? (
-                                <><Sparkles size={12} className="text-indigo-600 dark:text-purple-400" /> <span className="text-indigo-600 dark:text-purple-400">AI Connection</span></>
+                                <><Sparkles size={12} className="text-indigo-600 dark:text-purple-400" /><span className="text-indigo-600 dark:text-purple-400">AI Connection</span></>
                             ) : (
-                                <><LinkIcon size={12} className="text-neutral-500 dark:text-neutral-400" /> <span className="text-neutral-600 dark:text-neutral-400">Logical connection</span></>
+                                <><LinkIcon size={12} className="text-neutral-500 dark:text-neutral-400" /><span className="text-neutral-600 dark:text-neutral-400">Logical connection</span></>
                             )}
                         </div>
                         <p className="text-sm font-medium text-neutral-900 dark:text-white">{hoveredLink.label || "Communication"}</p>
