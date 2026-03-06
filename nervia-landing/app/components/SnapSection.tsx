@@ -1,7 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
-
 type SnapSectionProps = {
   id?: string;
   children: React.ReactNode;
@@ -23,15 +21,9 @@ export function SnapSection({
     ? "flex flex-col w-full min-h-min flex-shrink-0 max-w-6xl mx-auto overflow-visible"
     : "flex flex-col w-full min-h-0 max-w-6xl mx-auto overflow-visible";
   const content = (
-    <motion.div
-      initial={{ opacity: 0, filter: "blur(10px)" }}
-      whileInView={{ opacity: 1, filter: "blur(0px)" }}
-      viewport={{ once: false, amount: 0.6 }}
-      transition={{ duration: 0.7, ease: "easeOut" }}
-      className={contentClass}
-    >
+    <div className={`relative ${contentClass}`}>
       {children}
-    </motion.div>
+    </div>
   );
 
   const justifyClass = alignBottom ? "justify-end" : "justify-center";

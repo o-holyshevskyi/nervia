@@ -11,6 +11,7 @@ import {
   History,
   Globe,
 } from "lucide-react";
+import { HolographicCard } from "./HolographicCard";
 
 const cards = [
   {
@@ -91,16 +92,18 @@ export function FeaturesBento() {
                 delay={0.05 * (i + 1)}
                 className={spanClass}
               >
-                <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-black/30 p-6 backdrop-blur-sm transition hover:border-indigo-500/30 hover:bg-black/40 md:p-8">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
-                    <Icon className="h-5 w-5 text-indigo-300" />
-                  </div>
-                  <h3 className="mt-5 text-lg font-semibold tracking-tight text-white md:text-xl">
-                    {card.title}
-                  </h3>
-                  <p className="mt-2 flex-1 text-sm text-neutral-400 md:text-base">
-                    {card.description}
-                  </p>
+                <div className="flex h-full flex-col transition hover:border-indigo-500/30">
+                  <HolographicCard className="flex h-full flex-col">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+                      <Icon className="h-5 w-5 text-indigo-300" />
+                    </div>
+                    <h3 className="mt-5 text-lg font-semibold tracking-tight text-white md:text-xl">
+                      {card.title}
+                    </h3>
+                    <p className="mt-2 flex-1 text-sm text-neutral-400 md:text-base">
+                      {card.description}
+                    </p>
+                  </HolographicCard>
                 </div>
               </FadeIn>
             );

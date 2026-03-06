@@ -12,6 +12,7 @@ import { Testimonials } from "./components/Testimonials";
 import { FAQ } from "./components/FAQ";
 import { Footer } from "./components/Footer";
 import { DemoModal } from "./components/DemoModal";
+import { SectionNav } from "./components/SectionNav";
 
 export default function Home() {
   const [isDemoOpen, setIsDemoOpen] = useState(false);
@@ -21,6 +22,8 @@ export default function Home() {
       <div className="fixed top-0 left-0 right-0 z-50">
         <Header />
       </div>
+
+      <SectionNav />
 
       <div
         className="relative z-10 h-screen w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide bg-transparent"

@@ -1,13 +1,14 @@
 "use client";
 
 import { FadeIn } from "./FadeIn";
+import { HolographicCard } from "./HolographicCard";
 
 export function Testimonials() {
   return (
     <div className="relative w-full" aria-labelledby="founder-note-heading">
       <div className="mx-auto max-w-4xl">
         <FadeIn>
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-8 backdrop-blur-sm shadow-[0_0_60px_rgba(99,102,241,0.10)] md:p-12">
+          <HolographicCard className="p-8 md:p-12">
             <h2
               id="founder-note-heading"
               className="font-mono text-[10px] md:text-xs uppercase tracking-[0.22em] text-neutral-400"
@@ -26,7 +27,7 @@ export function Testimonials() {
             <p className="mt-8 font-mono text-xs uppercase tracking-widest text-neutral-500">
               - Founder of Nervia
             </p>
-          </div>
+          </HolographicCard>
         </FadeIn>
       </div>
     </div>

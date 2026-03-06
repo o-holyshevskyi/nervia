@@ -29,9 +29,8 @@ export default function SupportPage() {
               <h2>FAQ</h2>
               <p>
                 Many common questions about features, pricing, and how Nervia works are answered on
-                our main site. Scroll to the <Link href="/#faq">FAQ section</Link> on the homepage
-                for quick answers on neurons, the 3D graph, Neural Core (AI), tiers, and data
-                privacy.
+                our main site. Visit our <Link href="/faq">FAQ page</Link> for quick answers on
+                neurons, the 3D graph, Neural Core (AI), tiers, and data privacy.
               </p>
             </section>
 

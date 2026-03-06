@@ -5,6 +5,7 @@ import { FadeIn } from "./FadeIn";
 import { SectionHeader } from "./SectionHeader";
 import { Bookmark, Box, Brain, Clock, Download, Filter, InfinityIcon, LayoutGrid, MessageCircle, Route, Search, Share2, Sparkles } from "lucide-react";
 import { APP_URL } from "../lib/app-url";
+import { HolographicCard } from "./HolographicCard";
 
 const tiers = [
   {
@@ -74,11 +75,12 @@ export function Pricing() {
         <div className="mt-16 grid gap-6 md:grid-cols-3">
           {tiers.map((tier, i) => (
             <FadeIn key={tier.name} delay={0.1 * (i + 1)} className="min-w-0">
-              <div
-                className={`relative flex h-full flex-col rounded-2xl border p-8 backdrop-blur-sm ${
+              <HolographicCard
+                variant={tier.highlighted ? "highlighted" : "default"}
+                className={`relative flex h-full flex-col p-8 ${
                   tier.highlighted
-                    ? "border-indigo-400/40 bg-indigo-500/10 shadow-[0_0_56px_rgba(99,102,241,0.18),0_0_32px_rgba(168,85,247,0.12)]"
-                    : "border-white/10 bg-black/30"
+                    ? "border-indigo-400/40 shadow-[0_0_56px_rgba(99,102,241,0.18),0_0_32px_rgba(168,85,247,0.12)]"
+                    : ""
                 }`}
               >
                 {tier.badge && (
@@ -116,7 +118,7 @@ export function Pricing() {
                 >
                   {tier.cta}
                 </Link>
-              </div>
+              </HolographicCard>
             </FadeIn>
           ))}
         </div>
