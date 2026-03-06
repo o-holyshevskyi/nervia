@@ -1165,7 +1165,7 @@ export default function GraphNetwork({
                                         <motion.span
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
-                                            className="text-[12px] font-mono text-neutral-400/50 uppercase tracking-[0.2em]"
+                                            className="text-[12px] font-mono text-neutral-400/50 dark:text-neutral-500/50 uppercase tracking-[0.2em] text-shimmer-muted"
                                         >
                                             {`0x${(loadingStep * 25).toString(16)}FF...${Math.floor(Math.random() * 100)}%`}
                                         </motion.span>

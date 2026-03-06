@@ -548,7 +548,7 @@ export default function Home() {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-neutral-950 flex-col gap-4">
                 <Loader2 size={40} className="text-indigo-600 dark:text-purple-500 animate-spin" />
-                <p className="font-mono text-[10px] md:text-xs tracking-[0.5em] uppercase font-bold text-neutral-500 dark:text-neutral-400">Initializing Universe...</p>
+                <p className="font-mono text-[10px] md:text-xs tracking-[0.5em] uppercase font-bold text-neutral-500 dark:text-neutral-400 text-shimmer">Initializing Universe...</p>
             </div>
         );
     }
