@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { GalaxyBackdrop } from "./components/GalaxyBackdrop";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -53,10 +54,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${inter.variable} font-sans antialiased min-h-screen bg-slate-950 text-white`}
+        className={`${inter.variable} font-sans antialiased min-h-screen bg-neutral-50 text-neutral-900 dark:bg-[#050505] dark:text-white transition-colors duration-500 relative`}
         suppressHydrationWarning
       >
-        {children}
+        <GalaxyBackdrop />
+        <div className="relative z-10 min-h-screen">{children}</div>
       </body>
     </html>
   );

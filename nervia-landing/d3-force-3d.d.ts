@@ -1,8 +1,8 @@
-declare module 'd3-force-3d' {
-    export function forceManyBody(): any;
-    export function forceX(x?: number | ((d: any) => number)): any;
-    export function forceY(y?: number | ((d: any) => number)): any;
-    export function forceZ(z?: number | ((d: any) => number)): any;
-    export function forceCollide(radius?: number | ((d: any) => number)): any;
-    export function forceLink(links?: any[]): any;
+declare module "d3-force-3d" {
+  export function forceManyBody(): unknown;
+  export function forceX<TNode = unknown>(x?: number | ((d: TNode) => number)): unknown;
+  export function forceY<TNode = unknown>(y?: number | ((d: TNode) => number)): unknown;
+  export function forceZ<TNode = unknown>(z?: number | ((d: TNode) => number)): unknown;
+  export function forceCollide<TNode = unknown>(radius?: number | ((d: TNode) => number)): unknown;
+  export function forceLink<TLink = unknown>(links?: TLink[]): unknown;
 }

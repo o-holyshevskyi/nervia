@@ -79,6 +79,7 @@ function buildGraphData(): { nodes: Node[]; links: Link[] } {
 const graphData = buildGraphData();
 
 export function InteractiveHeroGraph() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-force-graph-2d ref type
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 640, height: 360 });
@@ -114,9 +115,10 @@ export function InteractiveHeroGraph() {
   }, [dimensions.width, dimensions.height]);
 
   const drawNode = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- library node type is generic
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const x = Number(node.x);
-      const y = Number(node.y);
+      const x = Number(node.x ?? 0);
+      const y = Number(node.y ?? 0);
       if (!isFinite(x) || !isFinite(y)) return;
       const label = node.name ?? "";
       const val = node.val ?? 5;
@@ -154,6 +156,7 @@ export function InteractiveHeroGraph() {
   );
 
   const drawLink = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- library link type is generic
     (link: any, ctx: CanvasRenderingContext2D) => {
       const source = link.source;
       const target = link.target;

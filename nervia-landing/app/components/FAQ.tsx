@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { FadeIn } from "./FadeIn";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { SectionHeader } from "./SectionHeader";
 
 const INITIAL_VISIBLE = 4;
 
@@ -67,21 +69,23 @@ export function FAQ() {
   const hasMore = faqs.length > INITIAL_VISIBLE;
 
   return (
-    <section className="relative px-6 py-24 md:py-32" id="faq">
+    <div className="relative w-full">
       <div className="mx-auto max-w-3xl">
         <FadeIn className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Frequently asked questions
-          </h2>
+          <SectionHeader kicker="Sys.Req // faq" title="Frequently asked questions" />
         </FadeIn>
         <ul className="mt-16 space-y-6">
           {visibleFaqs.map((faq, i) => (
-            <FadeIn key={faq.q} delay={0.1 * (i + 1)}>
-              <li className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl">
-                <h3 className="font-semibold text-white">{faq.q}</h3>
-                <p className="mt-2 text-slate-400">{faq.a}</p>
-              </li>
-            </FadeIn>
+            <motion.li
+              key={faq.q}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.05 * i, ease: "easeOut" }}
+              className="rounded-2xl border border-white/10 bg-black/30 p-6 backdrop-blur-sm transition hover:border-indigo-500/25 hover:bg-black/40"
+            >
+              <h3 className="font-semibold text-white">{faq.q}</h3>
+              <p className="mt-2 text-neutral-400">{faq.a}</p>
+            </motion.li>
           ))}
         </ul>
         {hasMore && (
@@ -89,7 +93,7 @@ export function FAQ() {
             <button
               type="button"
               onClick={() => setExpanded((e) => !e)}
-              className="cursor-pointer inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-5 py-2.5 text-sm font-medium text-slate-300 backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-white/20 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:ring-offset-2 focus:ring-offset-slate-950"
+              className="cursor-pointer inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-5 py-2.5 text-sm font-medium text-neutral-200 backdrop-blur-sm transition hover:bg-white/[0.06] hover:border-indigo-500/25 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400/50 focus:ring-offset-2 focus:ring-offset-black"
               aria-expanded={expanded}
             >
               {expanded ? (
@@ -107,6 +111,6 @@ export function FAQ() {
           </FadeIn>
         )}
       </div>
-    </section>
+    </div>
   );
 }

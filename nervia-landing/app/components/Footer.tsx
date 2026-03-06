@@ -39,7 +39,7 @@ export function Footer() {
             </p>
           </div>
           <div>
-            <h4 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <h4 className="text-sm font-medium uppercase tracking-wider text-neutral-400">
               Product
             </h4>
             <ul className="mt-4 space-y-3">
@@ -47,7 +47,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 transition hover:text-white"
+                    className="text-sm text-neutral-400 transition hover:text-white"
                   >
                     {link.label}
                   </Link>
@@ -56,7 +56,7 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <h4 className="text-sm font-medium uppercase tracking-wider text-neutral-400">
               Company
             </h4>
             <ul className="mt-4 space-y-3">
@@ -64,7 +64,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 transition hover:text-white"
+                    className="text-sm text-neutral-400 transition hover:text-white"
                   >
                     {link.label}
                   </Link>
@@ -73,7 +73,7 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-medium uppercase tracking-wider text-slate-400">
+            <h4 className="text-sm font-medium uppercase tracking-wider text-neutral-400">
               Legal
             </h4>
             <ul className="mt-4 space-y-3">
@@ -81,7 +81,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 transition hover:text-white"
+                    className="text-sm text-neutral-400 transition hover:text-white"
                   >
                     {link.label}
                   </Link>
@@ -90,7 +90,7 @@ export function Footer() {
             </ul>
           </div>
         </div>
-        <div className="mt-12 border-t border-white/10 pt-8 text-center text-sm text-slate-500">
+        <div className="mt-12 border-t border-white/10 pt-8 text-center text-sm text-neutral-500">
           © 2026 Nervia. All rights reserved.
         </div>
       </div>

@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
+  --background: #050505;
+  --foreground: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.1);
-  --accent-cyan: rgba(6, 182, 212, 0.2);
-  --accent-purple: rgba(99, 102, 241, 0.2);
+  --accent-indigo: rgba(99, 102, 241, 0.22);
+  --accent-purple: rgba(168, 85, 247, 0.18);
 }
 
 @theme inline {
@@ -20,41 +20,15 @@ body {
   color: var(--foreground);
 }
 
-/* Animated orbs - slow drift */
-@keyframes orb-float-1 {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(15%, -10%) scale(1.05);
-  }
-  66% {
-    transform: translate(-10%, 15%) scale(0.95);
-  }
+/* Hide scrollbar while keeping scroll behavior */
+.scrollbar-hide,
+[data-scrollbar-hide] {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
-
-@keyframes orb-float-2 {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(-15%, 10%) scale(0.95);
-  }
-  66% {
-    transform: translate(10%, -15%) scale(1.05);
-  }
-}
-
-.orb-cyan {
-  background: rgba(6, 182, 212, 0.2);
-  filter: blur(80px);
-  animation: orb-float-1 20s ease-in-out infinite;
-}
-
-.orb-purple {
-  background: rgba(99, 102, 241, 0.2);
-  filter: blur(80px);
-  animation: orb-float-2 25s ease-in-out infinite;
+.scrollbar-hide::-webkit-scrollbar,
+[data-scrollbar-hide]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }

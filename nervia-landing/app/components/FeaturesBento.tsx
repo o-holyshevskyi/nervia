@@ -1,6 +1,7 @@
 "use client";
 
 import { FadeIn } from "./FadeIn";
+import { SectionHeader } from "./SectionHeader";
 import {
   Box,
   MessageCircle,
@@ -66,15 +67,14 @@ const cards = [
 
 export function FeaturesBento() {
   return (
-    <section className="relative px-6 py-24 md:py-32" id="features">
+    <div className="relative w-full">
       <div className="mx-auto max-w-6xl">
         <FadeIn className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
-            Built for how you think
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-            One visual intelligence layer for your notes, research, and ideas.
-          </p>
+          <SectionHeader
+            kicker="Sys.Req // modules"
+            title="Built for how you think"
+            subtitle="One visual intelligence layer for your notes, research, and ideas."
+          />
         </FadeIn>
         <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card, i) => {
@@ -91,14 +91,14 @@ export function FeaturesBento() {
                 delay={0.05 * (i + 1)}
                 className={spanClass}
               >
-                <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.05] md:p-8">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
-                    <Icon className="h-5 w-5 text-cyan-400" />
+                <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-black/30 p-6 backdrop-blur-sm transition hover:border-indigo-500/30 hover:bg-black/40 md:p-8">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+                    <Icon className="h-5 w-5 text-indigo-300" />
                   </div>
                   <h3 className="mt-5 text-lg font-semibold tracking-tight text-white md:text-xl">
                     {card.title}
                   </h3>
-                  <p className="mt-2 flex-1 text-sm text-slate-400 md:text-base">
+                  <p className="mt-2 flex-1 text-sm text-neutral-400 md:text-base">
                     {card.description}
                   </p>
                 </div>
@@ -107,6 +107,6 @@ export function FeaturesBento() {
           })}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

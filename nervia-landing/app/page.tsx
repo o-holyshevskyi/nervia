@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Header } from "./components/Header";
+import { SnapSection } from "./components/SnapSection";
 import { Hero } from "./components/Hero";
 import { WhySection } from "./components/WhySection";
 import { FeaturesBento } from "./components/FeaturesBento";
@@ -17,30 +18,41 @@ export default function Home() {
 
   return (
     <>
-      {/* Animated orbs background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-        <div
-          className="absolute -top-1/2 -left-1/4 h-[80vh] w-[80vh] rounded-full orb-cyan"
-          style={{ width: "80vmax", height: "80vmax" }}
-        />
-        <div
-          className="absolute -bottom-1/2 -right-1/4 h-[80vh] w-[80vh] rounded-full orb-purple"
-          style={{ width: "80vmax", height: "80vmax" }}
-        />
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <Header />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen">
-        <Header />
-        <main>
+      <div
+        className="relative z-10 h-screen w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide bg-transparent"
+        data-scrollbar-hide
+      >
+        <SnapSection id="hero" className="pt-20">
           <Hero onWatchDemo={() => setIsDemoOpen(true)} />
+        </SnapSection>
+
+        <SnapSection id="reason">
           <WhySection />
+        </SnapSection>
+
+        <SnapSection id="features" scrollable>
           <FeaturesBento />
+        </SnapSection>
+
+        <SnapSection id="pricing">
           <Pricing />
+        </SnapSection>
+
+        <SnapSection id="why-build">
           <Testimonials />
+        </SnapSection>
+
+        <SnapSection id="faq" scrollable>
           <FAQ />
+        </SnapSection>
+
+        <SnapSection id="footer" alignBottom>
           <Footer />
-        </main>
+        </SnapSection>
       </div>
 
       <AnimatePresence mode="wait">
