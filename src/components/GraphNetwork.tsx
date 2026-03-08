@@ -238,8 +238,8 @@ interface GraphNetworkProps {
     focusedNodeId: string | null;
     zenModeNodeId: string | null;
     physicsConfig: {
-        clusterSpeed: number;
-        nodeSpeed: number; repulsion: number; linkDistance: number 
+        nodeSpeed: number;
+        clusterSpeed: number; repulsion: number; linkDistance: number 
 };
     highlightedNodes?: string[];
     contextNodeIds?: string[];
@@ -985,7 +985,7 @@ export default function GraphNetwork({
         if (!fgRef.current) return;
         const fg = fgRef.current;
         const minDim = Math.min(dimensions.width, dimensions.height);
-        const radius = minDim * 0.25;
+        const radius = minDim * 0.28;
 
         const getClusterKey = (node: any): string | number => {
             if (clusterMode === 'group') return getNodeGroupKey(node);
@@ -1415,6 +1415,7 @@ export default function GraphNetwork({
                             getNodeGroupKey={getNodeGroupKey}
                             getNodeLabel={getNodeLabel}
                             getNodeIconUrl={getNodeIconUrl}
+                            physicsConfig={physicsConfig}
                             linkDistance={physicsConfig.linkDistance}
                             readOnly={readOnly}
                             onNodeSelect={onNodeSelect}
