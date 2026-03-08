@@ -20,7 +20,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode, onAddLink, onDeleteLink, groups, onAddGroup }: SidebarProps) {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
 
     const [editTitle, setEditTitle] = useState("");
     const [editContent, setEditContent] = useState("");
