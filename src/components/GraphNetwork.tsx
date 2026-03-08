@@ -265,6 +265,23 @@ function getLinkEnd(linkEnd: any): string | undefined {
     return typeof linkEnd === "string" ? linkEnd : linkEnd?.id;
 }
 
+/** Returns the set of all nodes in the same connected component as `node` (via links). */
+function getConnectedNodes(node: any, links: any[]): Set<any> {
+    const set = new Set<any>([node]);
+    const queue = [node];
+    while (queue.length > 0) {
+        const n = queue.shift()!;
+        for (const link of links) {
+            const other = link.source === n ? link.target : link.target === n ? link.source : null;
+            if (other && !set.has(other)) {
+                set.add(other);
+                queue.push(other);
+            }
+        }
+    }
+    return set;
+}
+
 function buildClusterCenters2D(
     nodes: any[],
     clusterMode: 'group' | 'tag',
@@ -288,11 +305,12 @@ function buildClusterCenters2D(
 }
 
 // ─── Orbit layout constants ──────────────────────────────────────────────────
-// Nodes are spread across concentric rings inside each cluster.
-const ORBIT_NODES_PER_RING = 6;   // max nodes on the innermost ring
-const ORBIT_RING_BASE_R    = 60;  // px from cluster center to ring-0
-const ORBIT_RING_GAP       = 52;  // extra px per ring
-const ORBIT_MAX_DRAG_R     = 160; // max px a node may be dragged from its live cluster center
+const ORBIT_MAX_DRAG_R = 160; // max px a node may be dragged from its live cluster center
+const DRAG_CLAMP_LERP = 0.9;  // soft clamp: lerp toward boundary (smooth, no snap)
+const DRAG_FLY_IMPULSE = 0.11; // lighter push; linked nodes drift in drag direction
+const DRAG_FLY_DAMPING = 0.1; // higher = longer glide, floatier fly
+const REPULSION_THRESHOLD = 90;  // px; inter-group repulsion below this distance
+const REPULSION_STRENGTH = 0.12; // smooth push when groups overlap
 
 export default function GraphNetwork({
     onNodeSelect,
@@ -341,6 +359,13 @@ export default function GraphNetwork({
 
     // Node currently being dragged — RAF tick skips it
     const draggingNodeRef = useRef<any>(null);
+    /** Set of nodes moving with the dragged node (connected component); cleared on drag end */
+    const draggedGroupRef = useRef<Set<any> | null>(null);
+    /** Previous position of dragged node (fallback when translate is not passed) */
+    const prevDragPosRef = useRef<{ x: number; y: number } | null>(null);
+    /** Velocity per linked node during drag (fly physics) */
+    const linkedNodeVelocityRef = useRef<Map<any, { vx: number; vy: number }>>(new Map());
+    const dragFlyRafRef = useRef<number | null>(null);
 
     // Always mirrors the latest physicsConfig so the orbital tick can read
     // nodeSpeed / clusterSpeed live without restarting the effect.
@@ -361,6 +386,12 @@ export default function GraphNetwork({
 
     const initialFitDone = useRef(false);
     const threeDKeyRef = useRef(0);
+    /** Persisted 2D node positions so remount (e.g. after 3D→2D) restores same layout */
+    const layout2DRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+    /** Nodes currently passed to 2D graph (used to save layout in handleEngineStop) */
+    const data2DNodesRef = useRef<any[]>([]);
+    /** When true, next 2D engine stop will run zoomToFit (mount and remount) */
+    const zoomOnNextEngineStopRef = useRef(false);
     const [engineReadyCount, setEngineReadyCount] = useState(0);
 
     useEffect(() => {
@@ -377,7 +408,7 @@ export default function GraphNetwork({
                 engineIsDone.current = true;
                 initialFitDone.current = true;
                 physicsAppliedRef.current = true;
-                fgRef.current?.zoomToFit(450, 100);
+                fgRef.current?.zoomToFit(450, 50);
                 setLoadingStep(4);
                 setTimeout(() => setLoadingStep(5), 220);
                 setTimeout(() => setLoadingStep(6), 440);
@@ -388,8 +419,29 @@ export default function GraphNetwork({
     }, [isInitialFitting]);
 
     const handleEngineStop = useCallback(() => {
+        if (viewMode === '2D') {
+            if (zoomOnNextEngineStopRef.current) {
+                zoomOnNextEngineStopRef.current = false;
+                // Defer zoom to next frame so layout has painted; avoids race with effect re-runs
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        fgRef.current?.zoomToFit(450, 50);
+                    });
+                });
+            }
+            const nodes = data2DNodesRef.current;
+            if (nodes?.length) {
+                const cache = layout2DRef.current;
+                nodes.forEach((n: any) => {
+                    const id = typeof n?.id === 'string' ? n.id : n?.id != null ? String(n.id) : null;
+                    if (id != null && typeof n.x === 'number' && typeof n.y === 'number' && isFinite(n.x) && isFinite(n.y)) {
+                        cache.set(id, { x: n.x, y: n.y });
+                    }
+                });
+            }
+        }
         setEngineReadyCount((c) => Math.max(c, 1));
-    }, []);
+    }, [viewMode]);
 
     useEffect(() => {
         const handleVisibilityChange = () => {
@@ -406,6 +458,14 @@ export default function GraphNetwork({
         const t = setTimeout(() => setEngineReadyCount((c) => Math.max(c, 1)), 50);
         return () => clearTimeout(t);
     }, [viewMode]);
+
+    useEffect(() => {
+        if (viewMode === '2D') zoomOnNextEngineStopRef.current = true;
+    }, [viewMode]);
+
+    useEffect(() => {
+        layout2DRef.current.clear();
+    }, [graphData.nodes.length, graphData.links.length, clusterMode, timelineDate, dimensions.width, dimensions.height]);
 
     const groupColorsById = useMemo(() => {
         const out: Record<string, string> = {};
@@ -522,7 +582,8 @@ export default function GraphNetwork({
                 ? getNodeGroupKey(n)
                 : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
         const clusterCenters = buildClusterCenters2D(workingNodes, clusterMode, layoutRadius);
-        const jitter = 28;
+        const spreadMin = 20;
+        const spreadMax = 75;
         const nodesWithVal = workingNodes.map((node: any, index: number) => {
             const id = getNodeId(node);
             const degree = degreeMap[id] ?? 0;
@@ -530,10 +591,13 @@ export default function GraphNetwork({
             const idStr = id != null ? String(id) : `i${index}`;
             const key = getClusterKey(node);
             const center = clusterCenters[key];
-            const dx = center ? jitter * (hashStr(idStr + 'x') - 0.5) : 0;
-            const dy = center ? jitter * (hashStr(idStr + 'y') - 0.5) : 0;
-            const x = center ? center.x + dx : 0;
-            const y = center ? center.y + dy : 0;
+            let x = 0, y = 0;
+            if (center) {
+                const angle = hashStr(idStr + 'a') * 2 * Math.PI;
+                const radius = spreadMin + hashStr(idStr + 'r') * (spreadMax - spreadMin);
+                x = center.x + radius * Math.cos(angle);
+                y = center.y + radius * Math.sin(angle);
+            }
             return { ...node, val, x, y };
         });
         const linksCopy = workingLinks.map((link: any) => ({ ...link }));
@@ -556,6 +620,41 @@ export default function GraphNetwork({
         }
         return { nodes: nodesWithVal, links: linksCopy };
     }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate, dimensions.width, dimensions.height, clusterMode]);
+
+    const getNodeIdForLayout = useCallback((n: any): string | null => {
+        const id = typeof n?.id === 'string' ? n.id : n?.id;
+        return id != null ? String(id) : null;
+    }, []);
+
+    const graphData2D = useMemo(() => {
+        if (viewMode !== '2D') return processedData;
+        const cache = layout2DRef.current;
+        if (cache.size === 0) return processedData;
+        const nodes = processedData.nodes.map((n: any) => {
+            const id = getNodeIdForLayout(n);
+            const c = id ? cache.get(id) : undefined;
+            return c ? { ...n, x: c.x, y: c.y } : { ...n };
+        });
+        const nodeById = new Map<string, any>();
+        nodes.forEach((n: any) => {
+            const id = getNodeIdForLayout(n);
+            if (id) nodeById.set(id, n);
+        });
+        const links = processedData.links.map((l: any) => {
+            const sId = getLinkEnd(l.source);
+            const tId = getLinkEnd(l.target);
+            return {
+                ...l,
+                source: (sId && nodeById.get(sId)) ?? l.source,
+                target: (tId && nodeById.get(tId)) ?? l.target,
+            };
+        });
+        return { nodes, links };
+    }, [viewMode, processedData, getNodeIdForLayout]);
+
+    useEffect(() => {
+        if (viewMode === '2D') data2DNodesRef.current = graphData2D.nodes;
+    }, [viewMode, graphData2D]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
@@ -589,7 +688,7 @@ export default function GraphNetwork({
                 : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
 
         const init = (): boolean => {
-            const nodes = processedData.nodes;
+            const nodes = graphData2D.nodes;
             if (!nodes.length) return false;
 
             const settled = nodes.filter((n: any) =>
@@ -613,26 +712,16 @@ export default function GraphNetwork({
                     clusterOrbitMapRef.current.set(key, { radius: Math.max(10, radius), angle, speedFactor });
                 });
 
-                const byCluster = new Map<string | number, any[]>();
+                const spreadMin = 40;
+                const spreadMax = 120;
                 nodes.forEach((node: any) => {
                     if (node.fx != null) return;
-                    const key = getClusterKey(node);
-                    if (!byCluster.has(key)) byCluster.set(key, []);
-                    byCluster.get(key)!.push(node);
-                });
-                byCluster.forEach((clusterNodes) => {
-                    const total = clusterNodes.length;
-                    clusterNodes.forEach((node: any, localIdx: number) => {
-                        const ring        = Math.floor(localIdx / ORBIT_NODES_PER_RING);
-                        const posInRing   = localIdx % ORBIT_NODES_PER_RING;
-                        const ringCount   = Math.min(ORBIT_NODES_PER_RING, total - ring * ORBIT_NODES_PER_RING);
-                        const angle       = (posInRing / ringCount) * 2 * Math.PI + ring * (Math.PI / ORBIT_NODES_PER_RING);
-                        const radius      = ORBIT_RING_BASE_R + ring * ORBIT_RING_GAP;
-                        const globalIdx   = nodes.indexOf(node);
-                        // speedFactor: node variation (0.7–1.3)
-                        const speedFactor = 0.7 + ((globalIdx * GOLDEN) % 1) * 0.6;
-                        orbitMapRef.current.set(node, { radius, angle, speedFactor });
-                    });
+                    const idStr = (typeof node.id === 'string' ? node.id : node?.id) ?? '';
+                    const angle = hashStr(idStr + 'oa') * 2 * Math.PI;
+                    const radius = spreadMin + hashStr(idStr + 'or') * (spreadMax - spreadMin);
+                    const globalIdx = nodes.indexOf(node);
+                    const speedFactor = 0.7 + ((globalIdx * GOLDEN) % 1) * 0.6;
+                    orbitMapRef.current.set(node, { radius, angle, speedFactor });
                 });
 
             } else {
@@ -709,14 +798,38 @@ export default function GraphNetwork({
                     });
                     liveClusterCentersRef.current = liveCenters;
 
-                    // Step 2 — advance node orbits around their moving cluster center
+                    // Step 2 — advance node orbits; skip entire dragged group
+                    const draggedGroup = draggedGroupRef.current;
+                    const orbitPos = new Map<any, { x: number; y: number }>();
                     orbitMapRef.current.forEach((orbit, node) => {
-                        if (node === draggingNodeRef.current) return;
+                        if (draggedGroup?.has(node)) return;
                         orbit.angle += orbit.speedFactor * nodeSpeedBase * dt;
                         const key    = getClusterKey(node);
                         const center = liveCenters[key] ?? clusterCentersRef.current[key] ?? { x: 0, y: 0 };
-                        node.x = center.x + Math.cos(orbit.angle) * orbit.radius;
-                        node.y = center.y + Math.sin(orbit.angle) * orbit.radius;
+                        const ox = center.x + Math.cos(orbit.angle) * orbit.radius;
+                        const oy = center.y + Math.sin(orbit.angle) * orbit.radius;
+                        orbitPos.set(node, { x: ox, y: oy });
+                    });
+                    orbitMapRef.current.forEach((orbit, node) => {
+                        if (draggedGroup?.has(node)) return;
+                        const pos = orbitPos.get(node);
+                        if (!pos) return;
+                        const keyA = getClusterKey(node);
+                        let rx = 0, ry = 0;
+                        orbitPos.forEach((otherPos, other) => {
+                            if (other === node) return;
+                            if (getClusterKey(other) === keyA) return;
+                            const dx = pos.x - otherPos.x;
+                            const dy = pos.y - otherPos.y;
+                            const d = Math.hypot(dx, dy) || 1e-6;
+                            if (d >= REPULSION_THRESHOLD) return;
+                            const t = 1 - d / REPULSION_THRESHOLD;
+                            const f = (REPULSION_STRENGTH * t) / d;
+                            rx += dx * f;
+                            ry += dy * f;
+                        });
+                        node.x = pos.x + rx;
+                        node.y = pos.y + ry;
                     });
 
                     fg.refresh?.();
@@ -742,7 +855,7 @@ export default function GraphNetwork({
             clusterOrbitMapRef.current.clear();
             orbitFirstInitRef.current = true; // next run starts fresh with ring layout
         };
-    }, [viewMode, processedData.nodes, clusterMode]);
+    }, [viewMode, graphData2D, clusterMode]);
 
     // ── CHANGE 3: drag handlers ───────────────────────────────────────────────
     const getClusterKeyForNode = useCallback((node: any): string | number =>
@@ -751,47 +864,108 @@ export default function GraphNetwork({
             : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string,
     [clusterMode]);
 
-    const handleNodeDrag = useCallback((node: any) => {
+    const handleNodeDrag = useCallback((node: any, translate?: { x: number; y: number }) => {
         draggingNodeRef.current = node;
 
-        // Clamp position to ORBIT_MAX_DRAG_R from the live cluster center
+        const links = graphData2D.links;
+        if (!draggedGroupRef.current) {
+            draggedGroupRef.current = getConnectedNodes(node, links);
+            prevDragPosRef.current = { x: node.x ?? 0, y: node.y ?? 0 };
+        }
+
         const key        = getClusterKeyForNode(node);
         const liveCenter = liveClusterCentersRef.current[key]
                         ?? clusterCentersRef.current[key]
                         ?? { x: 0, y: 0 };
 
-        const dx   = (node.x ?? 0) - liveCenter.x;
-        const dy   = (node.y ?? 0) - liveCenter.y;
+        const prevX = translate != null ? (node.x ?? 0) - translate.x : (prevDragPosRef.current?.x ?? node.x ?? 0);
+        const prevY = translate != null ? (node.y ?? 0) - translate.y : (prevDragPosRef.current?.y ?? node.y ?? 0);
+
+        // Soft clamp: lerp toward ORBIT_MAX_DRAG_R so drag stays smooth (no hard snap)
+        let nx = node.x ?? 0;
+        let ny = node.y ?? 0;
+        const dx = nx - liveCenter.x;
+        const dy = ny - liveCenter.y;
         const dist = Math.hypot(dx, dy);
         if (dist > ORBIT_MAX_DRAG_R) {
-            const s = ORBIT_MAX_DRAG_R / dist;
-            node.x  = liveCenter.x + dx * s;
-            node.y  = liveCenter.y + dy * s;
+            const targetX = liveCenter.x + (dx / dist) * ORBIT_MAX_DRAG_R;
+            const targetY = liveCenter.y + (dy / dist) * ORBIT_MAX_DRAG_R;
+            nx += (targetX - nx) * DRAG_CLAMP_LERP;
+            ny += (targetY - ny) * DRAG_CLAMP_LERP;
+            node.x = nx;
+            node.y = ny;
         }
-    }, [getClusterKeyForNode]);
+        const actualDx = (node.x ?? 0) - prevX;
+        const actualDy = (node.y ?? 0) - prevY;
+
+        if ((actualDx !== 0 || actualDy !== 0) && draggedGroupRef.current) {
+            const velMap = linkedNodeVelocityRef.current;
+            const k = DRAG_FLY_IMPULSE;
+            draggedGroupRef.current.forEach((n: any) => {
+                if (n === node) return;
+                let v = velMap.get(n);
+                if (!v) {
+                    v = { vx: 0, vy: 0 };
+                    velMap.set(n, v);
+                }
+                v.vx += actualDx * k;
+                v.vy += actualDy * k;
+            });
+            if (dragFlyRafRef.current == null) {
+                const flyLoop = () => {
+                    if (!draggingNodeRef.current || !draggedGroupRef.current) {
+                        dragFlyRafRef.current = null;
+                        return;
+                    }
+                    const d = DRAG_FLY_DAMPING;
+                    draggedGroupRef.current.forEach((n: any) => {
+                        if (n === draggingNodeRef.current) return;
+                        const v = linkedNodeVelocityRef.current.get(n);
+                        if (!v) return;
+                        (n as any).x = (n.x ?? 0) + v.vx;
+                        (n as any).y = (n.y ?? 0) + v.vy;
+                        v.vx *= d;
+                        v.vy *= d;
+                    });
+                    fgRef.current?.refresh?.();
+                    dragFlyRafRef.current = requestAnimationFrame(flyLoop);
+                };
+                dragFlyRafRef.current = requestAnimationFrame(flyLoop);
+            }
+        }
+        prevDragPosRef.current = { x: node.x ?? 0, y: node.y ?? 0 };
+    }, [getClusterKeyForNode, graphData2D]);
 
     const handleNodeDragEnd = useCallback((node: any) => {
+        const group = draggedGroupRef.current;
+        if (dragFlyRafRef.current != null) {
+            cancelAnimationFrame(dragFlyRafRef.current);
+            dragFlyRafRef.current = null;
+        }
+        linkedNodeVelocityRef.current.clear();
+        draggedGroupRef.current = null;
+        prevDragPosRef.current = null;
         draggingNodeRef.current = null;
 
-        // Re-capture orbit from the dropped position so animation resumes from here
-        const key          = getClusterKeyForNode(node);
-        const clusterOrbit = clusterOrbitMapRef.current.get(key);
-        const liveCenter   = clusterOrbit
-            ? {
-                x: Math.cos(clusterOrbit.angle) * clusterOrbit.radius,
-                y: Math.sin(clusterOrbit.angle) * clusterOrbit.radius,
-            }
-            : clusterCentersRef.current[key];
+        const getLiveCenter = (n: any) => {
+            const k = getClusterKeyForNode(n);
+            const clusterOrbit = clusterOrbitMapRef.current.get(k);
+            return clusterOrbit
+                ? { x: Math.cos(clusterOrbit.angle) * clusterOrbit.radius, y: Math.sin(clusterOrbit.angle) * clusterOrbit.radius }
+                : clusterCentersRef.current[k];
+        };
 
-        if (!liveCenter) return;
-        const existing = orbitMapRef.current.get(node);
-        if (!existing) return;
-
-        const dx = (node.x ?? 0) - liveCenter.x;
-        const dy = (node.y ?? 0) - liveCenter.y;
-        existing.radius = Math.max(10, Math.hypot(dx, dy));
-        existing.angle  = Math.atan2(dy, dx);
-        // speed intentionally preserved
+        const toUpdate = group ?? new Set([node]);
+        toUpdate.forEach((n: any) => {
+            const liveCenter = getLiveCenter(n);
+            if (!liveCenter) return;
+            const existing = orbitMapRef.current.get(n);
+            if (!existing) return;
+            const dx = (n.x ?? 0) - liveCenter.x;
+            const dy = (n.y ?? 0) - liveCenter.y;
+            existing.radius = Math.max(10, Math.hypot(dx, dy));
+            existing.angle  = Math.atan2(dy, dx);
+        });
     }, [getClusterKeyForNode]);
 
     const isLinkHidden = useCallback((link: any) => {
@@ -969,9 +1143,10 @@ export default function GraphNetwork({
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
             if (solarSystemNodeId) return;
-            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, containerRef.current, groupColorsById, groupNamesById);
+            const nodesForDraw = viewMode === '2D' ? graphData2D.nodes : processedData.nodes;
+            drawGroupAreas(ctx, nodesForDraw, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, containerRef.current, groupColorsById, groupNamesById);
         },
-        [processedData.nodes, dimensions, nodeIdToGroupKeyMap, clusterMode, solarSystemNodeId, groupColorsById, groupNamesById]
+        [viewMode, graphData2D.nodes, processedData.nodes, dimensions, nodeIdToGroupKeyMap, clusterMode, solarSystemNodeId, groupColorsById, groupNamesById]
     );
 
     useEffect(() => {
@@ -984,6 +1159,7 @@ export default function GraphNetwork({
         if (viewMode !== '2D') return;
         if (!fgRef.current) return;
         const fg = fgRef.current;
+        const nodes = graphData2D.nodes;
         const minDim = Math.min(dimensions.width, dimensions.height);
         const radius = minDim * 0.28;
 
@@ -992,14 +1168,15 @@ export default function GraphNetwork({
             return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
         };
 
-        const clusterCenters = buildClusterCenters2D(processedData.nodes, clusterMode, radius);
+        const clusterCenters = buildClusterCenters2D(nodes, clusterMode, radius);
         clusterCentersRef.current = clusterCenters;
 
         fg.d3Force('x', forceX((node: any) => clusterCentersRef.current[getClusterKey(node)]?.x ?? 0).strength(0.4));
         fg.d3Force('y', forceY((node: any) => clusterCentersRef.current[getClusterKey(node)]?.y ?? 0).strength(0.4));
 
-        const jitter = 28;
-        processedData.nodes.forEach((node: any) => {
+        const spreadMin = 20;
+        const spreadMax = 75;
+        nodes.forEach((node: any) => {
             // Only seed if the node has no valid position yet (first load / new node).
             // On physicsConfig changes nodes are already placed — resetting them here
             // is what caused the "jumps back to original position" bug.
@@ -1010,16 +1187,16 @@ export default function GraphNetwork({
             const center = clusterCenters[key];
             if (!center) return;
             const idStr = (typeof node.id === 'string' ? node.id : node?.id) ?? '';
-            const dx = jitter * (hashStr(String(idStr) + 'x') - 0.5);
-            const dy = jitter * (hashStr(String(idStr) + 'y') - 0.5);
-            (node as any).x = center.x + dx;
-            (node as any).y = center.y + dy;
+            const angle = hashStr(String(idStr) + 'a') * 2 * Math.PI;
+            const radius = spreadMin + hashStr(String(idStr) + 'r') * (spreadMax - spreadMin);
+            (node as any).x = center.x + radius * Math.cos(angle);
+            (node as any).y = center.y + radius * Math.sin(angle);
         });
 
         const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
 
         if (solarSystemNodeId && solarNeighbors.size > 0) {
-            const centerNode = processedData.nodes.find((n: any) => getNodeIdStr(n) === solarSystemNodeId);
+            const centerNode = nodes.find((n: any) => getNodeIdStr(n) === solarSystemNodeId);
             if (centerNode) { (centerNode as any).fx = 0; (centerNode as any).fy = 0; }
             fg.d3Force('x', null);
             fg.d3Force('y', null);
@@ -1028,7 +1205,7 @@ export default function GraphNetwork({
             ));
             fg.d3Force('collide', forceCollide(24).strength(1));
         } else {
-            processedData.nodes.forEach((node: any) => { delete (node as any).fx; delete (node as any).fy; });
+            nodes.forEach((node: any) => { delete (node as any).fx; delete (node as any).fy; });
             fg.d3Force('radial', null);
             fg.d3Force('collide', null);
             fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? 0).strength(0.4));
@@ -1042,8 +1219,8 @@ export default function GraphNetwork({
         if (linkForce) {
             linkForce.distance(physicsConfig.linkDistance);
             linkForce.strength((link: any) => {
-                const sNode = typeof link.source === 'object' ? link.source : processedData.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.source);
-                const tNode = typeof link.target === 'object' ? link.target : processedData.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.target);
+                const sNode = typeof link.source === 'object' ? link.source : nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.source);
+                const tNode = typeof link.target === 'object' ? link.target : nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.target);
                 const s = sNode != null ? getClusterKey(sNode) : undefined;
                 const t = tNode != null ? getClusterKey(tNode) : undefined;
                 return s !== undefined && t !== undefined && s === t ? 0.7 : 0.1;
@@ -1052,7 +1229,7 @@ export default function GraphNetwork({
 
         fg.d3ReheatSimulation();
 
-        // If the graph is already up (physicsConfig slider change), pause orbital
+        // If the graph is already up (physicsConfig slider change or remount from 3D), pause orbital
         // writes so d3 can move nodes freely, then re-capture orbits once settled.
         if (initialFitDone.current) {
             physicsSettlingRef.current = true;
@@ -1073,7 +1250,6 @@ export default function GraphNetwork({
                 if (initialFitDone.current) return;
                 initialFitDone.current = true;
                 engineIsDone.current = true;
-                fgRef.current?.zoomToFit(450, 100);
                 setLoadingStep(4);
                 setTimeout(() => setLoadingStep(5), 220);
                 setTimeout(() => setLoadingStep(6), 440);
@@ -1081,7 +1257,7 @@ export default function GraphNetwork({
             }, 350);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, engineReadyCount, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, processedData.nodes, clusterMode]);
+    }, [viewMode, physicsConfig, dimensions.width, dimensions.height, graphData.nodes, solarSystemNodeId, solarNeighbors, graphData2D, clusterMode]);
 
     useEffect(() => {
         if (!solarSystemNodeId || !fgRef.current) return;
@@ -1091,7 +1267,8 @@ export default function GraphNetwork({
 
     useEffect(() => {
         if (!fgRef.current || contextNodeIds.length === 0) return;
-        const nodes = processedData.nodes.filter((n: any) => {
+        const nodesToUse = viewMode === '2D' ? graphData2D.nodes : processedData.nodes;
+        const nodes = nodesToUse.filter((n: any) => {
             const id = typeof n.id === "string" ? n.id : n?.id;
             return id != null && contextNodeSet.has(id);
         });
@@ -1111,13 +1288,14 @@ export default function GraphNetwork({
         const k = Math.min(dimensions.width / boxW, dimensions.height / boxH, 4);
         fgRef.current.centerAt(centerX, centerY, 400);
         fgRef.current.zoom(k, 400);
-    }, [contextNodeIds.length, contextNodeSet, processedData.nodes, dimensions.width, dimensions.height]);
+    }, [viewMode, contextNodeIds.length, contextNodeSet, graphData2D.nodes, processedData.nodes, dimensions.width, dimensions.height]);
 
     const handleZoom = useCallback((_transform: { k: number; x: number; y: number }) => {}, []);
 
     useEffect(() => {
         if (!flyToNodeId || !fgRef.current) return;
-        const node = processedData.nodes.find(
+        const nodesToUse = viewMode === '2D' ? graphData2D.nodes : processedData.nodes;
+        const node = nodesToUse.find(
             (n: any) => (typeof n.id === "string" ? n.id : n?.id) === flyToNodeId
         );
         if (node && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
@@ -1127,7 +1305,7 @@ export default function GraphNetwork({
             return () => clearTimeout(t);
         }
         onFlyToComplete?.();
-    }, [flyToNodeId, processedData.nodes, onFlyToComplete]);
+    }, [viewMode, flyToNodeId, graphData2D.nodes, processedData.nodes, onFlyToComplete]);
 
     const ZOOM_FACTOR = 1.25;
     const NAV_DURATION_MS = 250;
@@ -1293,7 +1471,7 @@ export default function GraphNetwork({
                             ref={fgRef}
                             width={dimensions.width}
                             height={dimensions.height}
-                            graphData={processedData}
+                            graphData={graphData2D}
                             nodeVal={(node: any) => node.val ?? 4}
                             nodeLabel={getNodeLabel}
                             nodeCanvasObject={drawNode}

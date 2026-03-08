@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { forwardRef, type MutableRefObject, useState, useCallback, useRef, useMemo } from 'react';
+import { forwardRef, type MutableRefObject, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
@@ -44,15 +44,17 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
     props,
     ref
 ) {
-    const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
+    const mousePosRef = useRef({ x: -1000, y: -1000 });
     const glowState = useRef<Map<string, number>>(new Map());
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    };
+        mousePosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }, []);
 
-    const handleMouseLeave = () => setMousePos({ x: -1000, y: -1000 });
+    const handleMouseLeave = useCallback(() => {
+        mousePosRef.current = { x: -1000, y: -1000 };
+    }, []);
 
     const isLightTheme = useMemo(() => {
         const bg = props.graphTheme.graphBg?.trim() || '#000000';
@@ -74,6 +76,7 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
 
     const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
         const fg = (ref as MutableRefObject<any>)?.current;
+        const mousePos = mousePosRef.current;
         let mouseWorld = { x: -999999, y: -999999 };
 
         if (fg && mousePos.x !== -1000) {
@@ -155,7 +158,7 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
         ctx.restore();
 
         if (props.onRenderFramePre) props.onRenderFramePre(ctx, globalScale);
-    }, [mousePos, props, ref, isLightTheme]);
+    }, [props, ref, isLightTheme]);
 
     return (
         <div
