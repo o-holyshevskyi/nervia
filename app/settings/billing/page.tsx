@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Zap, Loader2, ExternalLink, Check, Brain, LayoutGrid, Bookmark, Search, Infinity as InfinityIcon, Route, Filter, Download, Share2, Box, MessageCircle, Sparkles, Clock, Import } from 'lucide-react';
 import { createClient } from '@/src/lib/supabase/client';
-import { usePlan, getNeuronLimit, getSharedUniversesLimit, type PlanId } from '@/src/hooks/usePlan';
+import { usePlan, getNeuronLimit, getSharedUniversesLimit, type PlanId } from '../../../src/hooks/usePlan';
 
 const PLAN_LABELS: Record<PlanId, string> = {
   genesis: 'Genesis',
