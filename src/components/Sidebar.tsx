@@ -31,6 +31,9 @@ interface SidebarProps {
 export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode, onAddLink, onDeleteLink, groups, onAddGroup, canUseNeuralCore = false, onRequestUpgrade, onLocateNode, onDeepFocus, onDelete, onZenMode }: SidebarProps) {
     // false = 30% екрану, true = 75% екрану
     const [isFocusMode, setIsFocusMode] = useState(false);
+    
+    // 🔥 NEW: Стан для контролю плавного переходу
+    const [isTransitioning, setIsTransitioning] = useState(false);
 
     const [editTitle, setEditTitle] = useState("");
     const [editContent, setEditContent] = useState("");
@@ -39,7 +42,6 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
     const [newTag, setNewTag] = useState("");
     const [isDirty, setIsDirty] = useState(false);
     
-    // 🔥 NEW: Статуси збереження
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
     
@@ -83,10 +85,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         const urlChanged = editUrl !== (selectedNode?.url || "");
         const groupChanged = editGroupId !== (selectedNode?.group_id ?? null);
 
-        // Якщо щось змінилось, ставимо dirty
         if (titleChanged || contentChanged || tagsChanged || urlChanged || groupChanged) {
             setIsDirty(true);
-            setSaveStatus("idle"); // Скидаємо статус, бо з'явились нові зміни
+            setSaveStatus("idle");
         }
     }, [editContent, editTitle, editTags, selectedNode, editUrl, editGroupId]);
 
@@ -102,25 +103,33 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             setError(null);
             setConnectionSearch("");
             setIsConnListOpen(false);
-            setIsDirty(false); // При виборі нової ноди все чисто
+            setIsDirty(false);
             setSaveStatus("idle");
+            setAiResponse(null);
         }
     }, [selectedNode]);
 
-    // Авто-розмір висоти заголовка
     useEffect(() => {
-        if (titleTextareaRef.current) {
-            titleTextareaRef.current.style.height = '0px';
-            titleTextareaRef.current.style.height = titleTextareaRef.current.scrollHeight + 'px';
-        }
+        const textarea = titleTextareaRef.current;
+        if (!textarea) return;
+
+        const adjustHeight = () => {
+            textarea.style.height = '0px';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        };
+
+        adjustHeight();
+
+        const resizeObserver = new ResizeObserver(() => adjustHeight());
+        resizeObserver.observe(textarea);
+
+        return () => resizeObserver.disconnect();
     }, [editTitle, isFocusMode]);
 
-    // 🔥 NEW: Логіка Збереження (щоб можна було викликати зсередини debounce)
     const handleSave = useCallback(async () => {
         if (!selectedNode || !isDirty) return;
         
         const trimmedTitle = editTitle.trim();
-        // Якщо заголовок пустий, не зберігаємо (або можна дозволити пустий, якщо це ок для бекенду)
         if (!trimmedTitle && !editContent) return; 
 
         const nodeId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
@@ -141,7 +150,6 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             setSaveStatus("saved");
             setError(null);
             
-            // Забираємо напис "Saved" через 2 секунди
             setTimeout(() => {
                 setSaveStatus("idle");
             }, 2000);
@@ -163,8 +171,13 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         const title = editTitle || "Untitled";
         const summary = editContent || "No content provided.";
         const contextNodes = [{ title, summary, tags: editTags }];
-        const userQuestion =
-            "Based on this neuron, what insights can you offer? Suggest connections or related topics to explore.";
+        const userQuestion = `
+            Please analyze this specific neuron. Structure your response as follows:
+            1. **Core Insight:** A one-sentence summary of what this neuron is fundamentally about.
+            2. **Hidden Patterns:** What broader concepts or ideas does this connect to?
+            3. **Suggested Action/Exploration:** What should I research or write about next to expand this thought?
+            4. **Suggested Tags:** Provide 3-5 relevant tags (comma-separated) that I could add to this neuron.
+                    `.trim();
 
         try {
             const res = await fetch("/api/ai/chat", {
@@ -193,22 +206,35 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         }
     };
 
-    // 🔥 NEW: Debounce Auto-Save
     useEffect(() => {
-        // Якщо є зміни і ми зараз не зберігаємо
         if (isDirty && !isSaving) {
             const timeoutId = setTimeout(() => {
                 handleSave();
-            }, 1000); // Чекаємо 1 секунду після останнього вводу
+            }, 1000);
 
-            // Якщо користувач продовжує вводити, очищаємо попередній таймер
             return () => clearTimeout(timeoutId);
         }
     }, [isDirty, isSaving, handleSave]);
 
+    // 🔥 NEW: Функція перемикання режимів з плавним Fade (розчиненням)
+    const handleToggleFocus = () => {
+        if (isTransitioning) return; // Запобігає спаму кліками
+        
+        // 1. Починаємо розчинення контенту
+        setIsTransitioning(true);
+        
+        setTimeout(() => {
+            // 2. Змінюємо ширину сітки, коли контент вже невидимий
+            setIsFocusMode(prev => !prev);
+            
+            setTimeout(() => {
+                // 3. Повертаємо контент на місце з новою структурою
+                setIsTransitioning(false);
+            }, 200); // Час на "перебудову" макету перед появою
+        }, 150); // Час на розчинення
+    };
 
     const handleClose = () => {
-        // Якщо є незбережені зміни під час закриття, можна спробувати їх зберегти (опціонально)
         if (isDirty) handleSave(); 
         
         setIsDirty(false);
@@ -247,7 +273,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                     <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-black/5 dark:border-white/5">
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => setIsFocusMode(!isFocusMode)}
+                                onClick={handleToggleFocus} // 🔥 Оновлено
                                 className="cursor-pointer p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-neutral-500 transition-colors tooltip-trigger"
                                 title={isFocusMode ? "Collapse to 30%" : "Expand to 75%"}
                             >
@@ -256,7 +282,6 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                         </div>
                         
                         <div className="flex items-center gap-3">
-                            {/* 🔥 NEW: Індикатор статусу збереження */}
                             <AnimatePresence mode="wait">
                                 {saveStatus === "saving" && (
                                     <motion.div
@@ -282,11 +307,16 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                     </div>
 
                     <div className="flex-1 overflow-y-auto no-scrollbar relative" ref={scrollRef}>
+                        {/* 🔥 Обгортка, що розчиняється/з'являється під час транзишену */}
                         <motion.div 
                             layout
-                            className={`py-8 transition-all duration-300 w-full ${
+                            animate={{ 
+                                opacity: isTransitioning ? 0 : 1,
+                                filter: isTransitioning ? "blur(4px)" : "blur(0px)" 
+                            }}
+                            transition={{ duration: 0.15 }}
+                            className={`py-8 w-full ${
                                 isFocusMode 
-                                // justify-end (через flex-row-reverse) притискає все до лівого краю
                                 ? 'flex flex-row-reverse justify-between gap-12 md:gap-20 pl-8 md:pl-16 pr-8 max-w-[1400px]' 
                                 : 'flex flex-col gap-6 px-8'
                             }`}
@@ -304,14 +334,12 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 )}
                             </AnimatePresence>
 
-                            <div className={`${isFocusMode ? 'w-88 shrink-0 sticky top-8 self-start flex flex-col gap-6' : 'w-full flex flex-col gap-3'}`}>
+                            <div className={`${isFocusMode ? 'w-[500px] shrink-0 sticky top-8 self-start flex flex-col gap-6' : 'w-full flex flex-col gap-3'}`}>
         
-                                {/* Сюди переносиш блоки: Cluster, Tags, URL */}
                                 <motion.div layout className="flex flex-col gap-3 py-4 border-y border-black/5 dark:border-white/5">
                                 
                                     {/* Link Property */}
                                     {selectedNode.type === 'link' && (
-                                        // 🔥 Тут магія: якщо Focus Mode (вузька колонка) - ставимо flex-col. Інакше - в рядок.
                                         <div className={`flex ${isFocusMode ? 'flex-col gap-1.5' : 'items-center gap-4'}`}>
                                             <div className={`${isFocusMode ? 'w-full' : 'w-24 shrink-0'} flex items-center gap-2 text-neutral-400 text-xs font-medium`}>
                                                 <Globe size={14} /> URL
@@ -448,10 +476,8 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
                             </div>
 
-
-
                             <div className={`flex flex-col gap-4 flex-1 ${isFocusMode ? 'max-w-3xl min-w-0' : 'w-full'}`}>
-                                                            {/* TITLE */}
+                                {/* TITLE */}
                                 <textarea
                                     ref={titleTextareaRef}
                                     value={editTitle}
@@ -477,7 +503,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                             e.target.style.height = e.target.scrollHeight + 'px';
                                         }}
                                         onBlur={() => setIsEditingContent(false)} // Ховаємо редактор, коли клікнули повз
-                                        className={`w-full h-full min-h-[40vh] bg-transparent text-neutral-800 dark:text-neutral-300 leading-relaxed outline-none border-none p-0 resize-none placeholder-neutral-300 dark:placeholder-neutral-700 font-mono transition-all duration-300 ${
+                                        className={`w-full h-full min-h-[80vh] bg-transparent text-neutral-800 dark:text-neutral-300 leading-relaxed outline-none border-none p-0 resize-none placeholder-neutral-300 dark:placeholder-neutral-700 font-mono transition-all duration-300 ${
                                             isFocusMode ? "text-lg" : "text-sm"
                                         }`}
                                         placeholder="Start typing in markdown..."
@@ -487,7 +513,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                         onClick={() => setIsEditingContent(true)}
                                         className={`w-full min-h-[40vh] cursor-text prose prose-neutral dark:prose-invert max-w-none ${
                                             isFocusMode ? "prose-lg" : "prose-sm"
-                                        } prose-headings:font-bold prose-a:text-indigo-500 hover:prose-a:text-indigo-400`}
+                                        } prose-headings:font-bold prose-a:text-indigo-500 hover:prose-a:text-indigo-400 [&>*:first-child]:mt-0`}
                                     >
                                         {editContent ? (
                                             <ReactMarkdown>{editContent}</ReactMarkdown>
@@ -502,8 +528,15 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                         </motion.div>
                     </div>
 
-                    {/* AI ASSISTANT FOOTER — Singularity only (same as Neural Chat) */}
-                    <div className="p-4 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] flex flex-col gap-3">
+                    {/* AI ASSISTANT FOOTER — Також розчиняється для єдиного стилю */}
+                    <motion.div 
+                        animate={{ 
+                            opacity: isTransitioning ? 0 : 1,
+                            filter: isTransitioning ? "blur(4px)" : "blur(0px)" 
+                        }}
+                        transition={{ duration: 0.15 }}
+                        className="p-4 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] flex flex-col gap-3"
+                    >
                         <div className="flex items-center gap-2">
                             {/* Головна кнопка AI (займає залишковий простір - flex-1) */}
                             {canUseNeuralCore ? (
@@ -606,7 +639,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                    </div>
+                    </motion.div>
 
                 </motion.div>
             )}

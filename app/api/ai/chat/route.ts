@@ -3,7 +3,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-const SYSTEM_PROMPT = `You are the Nervia Neural Core. Use the provided context from the user's personal knowledge base (called "universe") to answer the question. Groups are used to categorize neurons and called clusters. If the answer is not in the context, say so, but try to find connections. Be concise and insightful.`;
+const SYSTEM_PROMPT = `You are the Nervia Exocortex, an advanced AI neural network designed to help the user think better, find hidden connections, and expand their personal knowledge base (called "universe").
+- You are analyzing a specific "neuron" (a note, link, or idea).
+- Do not use generic pleasantries (e.g., "Sure, I can help with that"). Dive straight into the analysis.
+- Use clean Markdown formatting (bolding, bullet points) to make your response easy to scan.
+- If the content is too brief, deduce potential meanings based on the title and tags.
+- Be concise, insightful, and highly analytical.`;
 
 export interface ChatContextNode {
   title: string;
@@ -89,22 +94,15 @@ export async function POST(req: Request) {
 
     const contextBlock =
       validNodes.length === 0
-        ? "(No relevant context from the knowledge base.)"
+        ? "(No relevant content provided.)"
         : validNodes
             .map(
               (n) =>
-                `- Title: ${(n.title || "").slice(0, 200)}\n  Summary: ${(n.summary || "").slice(0, 400)}\n  Tags: ${(n.tags || []).join(", ")}`
+                `--- NEURON START ---\nTitle: ${(n.title || "").slice(0, 300)}\nContent: ${(n.summary || "").slice(0, 5000)}\nTags: ${(n.tags || []).join(", ")}\n--- NEURON END ---`
             )
             .join("\n\n");
 
-    const prompt = `${SYSTEM_PROMPT}
-
-CONTEXT FROM KNOWLEDGE BASE:
-${contextBlock}
-
-QUESTION: ${userQuestion.trim()}
-
-Answer based on the context above. If the answer is not in the context, say so and suggest connections if you can.`;
+    const prompt = `${SYSTEM_PROMPT}\n\nTARGET DATA FOR ANALYSIS:\n${contextBlock}\n\nUSER DIRECTIVE:\n${userQuestion.trim()}`;
 
     const model = genAI.getGenerativeModel({ model: "gemma-3-27b-it" });
     const result = await model.generateContent(prompt);

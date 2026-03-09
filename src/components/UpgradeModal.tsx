@@ -2,28 +2,9 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { Sparkles, Infinity, Route, Filter, Download, Share2, Box, MessageCircle, Clock, InfinityIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
-
-/** Constellation: same list as billing page with icons. */
-const CONSTELLATION_FEATURES = [
-  { icon: InfinityIcon, text: 'Unlimited Neurons' },
-  { icon: Route, text: 'Pathfinder & Zen Mode' },
-  { icon: Filter, text: 'Tags & Advanced Filters' },
-  { icon: Download, text: 'Data Import/Export' },
-  { icon: Share2, text: 'Up to 5 shares' },
-  { icon: InfinityIcon, text: 'All Gnesis features' },
-];
-
-/** Singularity: same list as billing page with icons. */
-const SINGULARITY_FEATURES = [
-  { icon: MessageCircle, text: 'Full AI Neural Core (Chat & Search)' },
-  { icon: Sparkles, text: 'AI Semantic Search' },
-  { icon: Box, text: '3D Graph Visualization' },
-  { icon: Clock, text: 'Time Machine & Evolution Journal' },
-  { icon: Share2, text: 'Unlimited shares' },
-  { icon: InfinityIcon, text: 'All Constellation features' },
-];
+import { CONSTELLATION_FEATURES, SINGULARITY_FEATURES } from "../../app/settings/billing/page";
 
 export type UpgradeTargetPlan = "constellation" | "singularity";
 

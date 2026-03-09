@@ -87,6 +87,55 @@ function ChangelogItem({ version, title, description, sections = [], badges = []
 
 const CHANGELOG_ENTRIES: Omit<ChangelogItemProps, "isLast">[] = [
   {
+    version: "v1.3.0 - 9 Mar 2026",
+    title: "Obsidian & Notion import, Exocortex AI, and 3D polish",
+    badges: ["New", "Improved", "Fixed"],
+    sections: [
+      {
+        tag: "Import & data",
+        items: [
+          "Notion Workspace import (Singularity): upload a .ZIP export; notes are parsed, titles cleaned of Notion hashes, and [text](url) links become neural links. Notes skip AI processing; links are mapped in the data layer.",
+          "Obsidian Vault import (Singularity): select one or more .md files; frontmatter (title, tags), wikilinks [[ ]], and inline #tags are extracted. Wikilinks are converted to neural connections; notes appear in the Obsidian cluster.",
+          "Duplicate detection on import: bookmarks by URL, notes by title. Toasts when all items are duplicates or when some are skipped. AI processing runs only for HTML bookmarks; Obsidian/Notion imports finish without Neural Core.",
+          "Data Management UI: HTML Bookmarks (all plans), Notion Workspace and Obsidian Vault (Singularity); locked state with upgrade CTA for non-Singularity. Confirm modal copy varies by source.",
+        ],
+      },
+      {
+        tag: "AI (Exocortex)",
+        items: [
+          "Neural Core rebranded to Exocortex in the AI chat system prompt: neuron-focused analysis, no generic pleasantries, clean Markdown, up to 5000 chars of content per neuron in context.",
+          "Sidebar “Analyze” prompt restructured: Core Insight, Hidden Patterns, Suggested Action/Exploration, Suggested Tags (3–5). AI response cleared when switching neurons.",
+        ],
+      },
+      {
+        tag: "3D graph (Exocortex)",
+        items: [
+          "Group description labels: card-style texture with rounded background, cluster-colored accent bar, and theme-aware fill (dark/light). Descriptions no longer plain flat color.",
+          "Cluster names: merged groupNames (Obsidian/Notion defaults) with groupNamesById so 3D cluster labels show correct names.",
+          "Performance: shared sphere/torus geometry cache (one mesh per size), cluster group Map for O(1) orbital lookup, label texture caching to avoid GPU re-upload on every engine stop, nodeById Map in link strength callback.",
+          "OrbitControls fix: re-enabled after node drag so camera controls are not left disabled by the per-frame refresh cycle.",
+          "Link tooltip and mouse position use refs to avoid re-renders on every mousemove.",
+        ],
+      },
+      {
+        tag: "2D graph",
+        items: [
+          "Theme cache (getCachedTheme + MutationObserver on document class) so node/link drawing and group areas avoid getComputedStyle on every frame. Accent colors (purple/indigo) respect light/dark theme.",
+          "Orbit animation: cluster-level repulsion O(clusters²) instead of per-node O(nodes²). nodeById map for O(1) link visibility and drawing.",
+          "New group colors and names for Obsidian (6) and Notion (7); groupNames exported for 3D. drawGroupAreas now receives theme colors directly.",
+        ],
+      },
+      {
+        tag: "Sidebar & billing",
+        items: [
+          "Focus mode toggle: smooth fade/blur transition (150ms out, 200ms layout, fade in) so content and AI footer animate together; focus column width 500px, content min-height 80vh.",
+          "Title textarea auto-height with ResizeObserver. Export label: “Export Universe (JSON)”.",
+          "Billing: Singularity feature list includes “Obsidian/Notion Import”; feature arrays exported for reuse in UpgradeModal (single source of truth).",
+        ],
+      },
+    ],
+  },
+  {
     version: "v1.2.2 - 6 Mar 2026",
     title: "Physics panel: node & cluster speed",
     badges: ["Improved", "Fixed"],

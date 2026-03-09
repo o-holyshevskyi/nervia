@@ -142,13 +142,13 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
         ctx.fill();
 
         if (newGlows.size > 0) {
+            const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
             ctx.beginPath();
             for (const [key, glow] of newGlows.entries()) {
                 const [xStr, yStr] = key.split(',');
                 const x        = parseFloat(xStr);
                 const y        = parseFloat(yStr);
                 const glowSize = (1.5 + glow * 2.5) / transform.k;
-                const isDark   = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
                 ctx.fillStyle  = isDark ? `rgba(168, 85, 247, ${glow * 0.8})` : `rgba(99, 102, 241, ${glow * 0.8})`;
                 ctx.rect(x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
             }

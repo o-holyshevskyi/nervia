@@ -17,12 +17,34 @@ import * as THREE from 'three';
 import { FileText, Lightbulb, LinkIcon, Sparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { groupNames } from './GraphNetwork';
 
 const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), { ssr: false });
 
 // ─── Caches ────────────────────────────────────────────────────────────────
 const textureCache: Record<string, THREE.Texture> = {};
 let circularAlphaMaskTexture: THREE.CanvasTexture | null = null;
+
+// ─── Shared geometry cache: one geometry per unique size, never per-node ────
+const geoCache: Record<string, THREE.BufferGeometry> = {};
+function getSharedSphereGeo(r: number): THREE.SphereGeometry {
+    const key = `s${r.toFixed(2)}`;
+    if (!geoCache[key]) {
+        const geo = new THREE.SphereGeometry(r, 16, 16);
+        geo.dispose = () => {}; // shared — must not be freed by external callers
+        geoCache[key] = geo;
+    }
+    return geoCache[key] as THREE.SphereGeometry;
+}
+function getSharedTorusGeo(r: number, tube: number): THREE.TorusGeometry {
+    const key = `t${r.toFixed(2)}-${tube.toFixed(3)}`;
+    if (!geoCache[key]) {
+        const geo = new THREE.TorusGeometry(r, tube, 8, 48);
+        geo.dispose = () => {}; // shared — must not be freed by external callers
+        geoCache[key] = geo;
+    }
+    return geoCache[key] as THREE.TorusGeometry;
+}
 
 function getCircularAlphaMaskTexture(): THREE.CanvasTexture {
     if (circularAlphaMaskTexture) return circularAlphaMaskTexture;
@@ -60,6 +82,56 @@ function createSimpleLabelTexture(text: string, textColor: string): THREE.Canvas
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = textColor;
     ctx.fillText(text, w / 2, h / 2);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function createDescriptionLabelTexture(text: string, textColor: string, accentColor: string, isLightTheme = false): THREE.CanvasTexture {
+    const padH = 14, padV = 10, fontSize = 12, radius = 8, accentWidth = 4;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    ctx.font = `400 ${fontSize}px Inter, Arial, sans-serif`;
+    const m = ctx.measureText(text);
+    const textW = Math.ceil(m.width);
+    const w = Math.min(320, textW + padH * 2 + accentWidth);
+    const h = fontSize * 1.5 + padV * 2;
+    canvas.width = w; canvas.height = h;
+
+    const [r, g, b] = hexRgb(accentColor);
+    const bg = isLightTheme ? 'rgba(248, 250, 252, 0.94)' : 'rgba(28, 32, 42, 0.92)';
+    const border = `rgba(${r}, ${g}, ${b}, ${isLightTheme ? 0.5 : 0.45})`;
+
+    roundRect(ctx, 0, 0, w, h, radius);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.85)`;
+    ctx.fillRect(0, 0, accentWidth, h);
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    roundRect(ctx, 0, 0, w, h, radius);
+    ctx.stroke();
+
+    ctx.font = `400 ${fontSize}px Inter, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = textColor;
+    ctx.fillText(text, w / 2, h / 2);
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     return texture;
@@ -199,11 +271,15 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
 
     // ── Drag state ───────────────────────────────────────────────────────────
     const draggingNodeRef = useRef<any>(null);
+    // ── Cluster group cache: O(1) lookup in RAF tick instead of getObjectByName ─
+    const clusterGroupsRef = useRef<Map<string, THREE.Object3D>>(new Map());
 
     useImperativeHandle(ref, () => fgRef.current ?? null, []);
 
     const [hoveredLink, setHoveredLink] = useState<any | null>(null);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    // Mouse position stored in ref — avoids full re-render on every mousemove
+    const mousePosRef = useRef({ x: 0, y: 0 });
+    const tooltipRef = useRef<HTMLDivElement>(null);
     const [graphDataReady, setGraphDataReady] = useState(false);
 
     useEffect(() => {
@@ -241,7 +317,13 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
         const keys = [...new Set(cleanData.nodes.map((n: any) =>
             String(nodeIdToGroupKeyMap.get(n.id) ?? getNodeGroupKey(n))
         ))];
-        const CLUSTER_COLOR_OPACITY = 0.05;
+
+        const mergedGroupNames: Record<string, string> = {
+            ...Object.fromEntries(Object.entries(groupNames).map(([k, v]) => [String(k), v])),
+            ...groupNamesById,
+        };
+
+        const CLUSTER_COLOR_OPACITY = 0.1;
         const out: Record<string, { x: number; y: number; z: number; color: string; opacity: number; name: string; description?: string }> = {};
         keys.forEach((key, i) => {
             const phi   = Math.acos(-1 + (2 * i) / Math.max(keys.length, 1));
@@ -252,7 +334,7 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
                 z: RADIUS * Math.cos(phi),
                 color: resolveColor(key),
                 opacity: CLUSTER_COLOR_OPACITY,
-                name: groupNamesById[key] ?? 'No Group',
+                name: mergedGroupNames[key] ?? 'No Group',
                 description: groupDescriptionsById?.[key],
             };
         });
@@ -266,13 +348,16 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
         let zoomTimer: ReturnType<typeof setTimeout> | undefined;
         try {
             const centerMap = groupCentroids;
+            // Build O(1) lookup map once — used in the per-link strength callback
+            const nodeById = new Map<string, any>();
+            cleanData.nodes.forEach((n: any) => nodeById.set(String(n.id), n));
             fg.d3Force('link', (forceLink() as any).id((d: unknown) => (d as any).id).distance(physicsConfig.linkDistance).strength((link: any) => {
                 const src = link.source as { id: string } | string;
                 const tgt = link.target as { id: string } | string;
                 const sId = typeof src === 'object' ? src.id : src;
                 const tId = typeof tgt === 'object' ? tgt.id : tgt;
-                const sNode = cleanData.nodes.find((n: any) => n.id === sId);
-                const tNode = cleanData.nodes.find((n: any) => n.id === tId);
+                const sNode = nodeById.get(String(sId));
+                const tNode = nodeById.get(String(tId));
                 if (!sNode || !tNode) return 0.3;
                 const sk = String(nodeIdToGroupKeyMap.get(sNode.id) ?? getNodeGroupKey(sNode));
                 const tk = String(nodeIdToGroupKeyMap.get(tNode.id) ?? getNodeGroupKey(tNode));
@@ -355,12 +440,15 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             scene.remove(nebulaRef.current);
             nebulaRef.current.traverse((obj: any) => { obj.geometry?.dispose(); obj.material?.dispose(); });
         }
-
         const group = new THREE.Group();
         group.name = 'nebula';
 
         const labelColor = graphTheme.nodeColor?.trim() && graphTheme.nodeColor !== 'transparent'
             ? graphTheme.nodeColor : '#e2e8f0';
+
+        // Build new cluster group map before assigning — atomic swap avoids a race
+        // where the orbital RAF tick sees an empty map between clear() and repopulation.
+        const newClusterGroups = new Map<string, THREE.Object3D>();
 
         // Each cluster gets a named sub-group so the orbital tick can reposition it
         Object.entries(groupCentroids).forEach(([key, c]) => {
@@ -368,9 +456,8 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             clusterGroup.name = `cluster-${key}`;
             clusterGroup.position.set(c.x, c.y, c.z);
 
-            // Invalidate cached nebula texture when color changes
-            const nebulaKey = `nebula-${c.color}`;
-            delete textureCache[nebulaKey];
+            // Fix #6: removed unconditional `delete textureCache[nebulaKey]` —
+            // the key already includes the color so the cache is valid until it changes.
             const tex = createNebulaTexture(c.color);
             const mat = new THREE.SpriteMaterial({
                 map: tex, transparent: true,
@@ -382,7 +469,10 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             sprite.position.set(0, 0, 0);
             clusterGroup.add(sprite);
 
-            const nameTex = createSimpleLabelTexture(c.name, labelColor);
+            // Fix #5: cache label textures so GPU doesn't re-upload on every engine stop
+            const nameCacheKey = `label-name-${c.name}-${labelColor}`;
+            const nameTex = (textureCache[nameCacheKey] as THREE.CanvasTexture | undefined)
+                ?? (textureCache[nameCacheKey] = createSimpleLabelTexture(c.name, labelColor));
             const nameMat = new THREE.SpriteMaterial({ map: nameTex, transparent: true, depthWrite: false });
             const nameSprite = new THREE.Sprite(nameMat);
             nameSprite.scale.set(Math.max(120, c.name.length * 8), 24, 1);
@@ -390,16 +480,22 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             clusterGroup.add(nameSprite);
 
             if (c.description) {
-                const descTex = createSimpleLabelTexture(c.description, labelColor);
-                const descMat = new THREE.SpriteMaterial({ map: descTex, transparent: true, depthWrite: false, opacity: 0.85 });
+                const descCacheKey = `label-desc-${c.description}-${labelColor}-${c.color}-${isLightTheme}`;
+                const descTex = (textureCache[descCacheKey] as THREE.CanvasTexture | undefined)
+                    ?? (textureCache[descCacheKey] = createDescriptionLabelTexture(c.description, labelColor, c.color, isLightTheme));
+                const descMat = new THREE.SpriteMaterial({ map: descTex, transparent: true, depthWrite: false, opacity: 0.95 });
                 const descSprite = new THREE.Sprite(descMat);
-                descSprite.scale.set(Math.min(280, c.description.length * 6), 18, 1);
+                descSprite.scale.set(Math.min(320, c.description.length * 6.5), 22, 1);
                 descSprite.position.set(0, -28, 0);
                 clusterGroup.add(descSprite);
             }
 
             group.add(clusterGroup);
+            newClusterGroups.set(key, clusterGroup);
         });
+
+        // Atomic swap — the orbital RAF tick always sees a fully-populated map
+        clusterGroupsRef.current = newClusterGroups;
 
         scene.add(group);
         nebulaRef.current = group;
@@ -520,11 +616,9 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
                         const cz = orbit.radius * Math.cos(orbit.phi);
                         liveCenters[key] = { x: cx, y: cy, z: cz };
 
-                        // Move the nebula clusterGroup to follow the orbiting centroid
-                        if (nebulaRef.current) {
-                            const clusterGroup = nebulaRef.current.getObjectByName(`cluster-${key}`);
-                            if (clusterGroup) clusterGroup.position.set(cx, cy, cz);
-                        }
+                        // Move the nebula clusterGroup — O(1) Map lookup, no tree walk
+                        const clusterGroup = clusterGroupsRef.current.get(key);
+                        if (clusterGroup) clusterGroup.position.set(cx, cy, cz);
                     });
 
                     // Step 2 — advance nodes around their (now moving) cluster center
@@ -608,16 +702,16 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             const isLinkNode = node.type === 'link';
 
             group.add(new THREE.Mesh(
-                new THREE.SphereGeometry(baseSize * 0.82, 24, 24),
+                getSharedSphereGeo(baseSize * 0.82),
                 new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0, depthWrite: false })
             ));
             group.add(new THREE.Mesh(
-                new THREE.TorusGeometry(baseSize, baseSize * 0.11, 8, 64),
+                getSharedTorusGeo(baseSize, baseSize * 0.11),
                 new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.55, depthWrite: false })
             ));
             if (!isLinkNode) {
                 group.add(new THREE.Mesh(
-                    new THREE.TorusGeometry(baseSize * 1.28, baseSize * 0.055, 8, 64),
+                    getSharedTorusGeo(baseSize * 1.28, baseSize * 0.055),
                     new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.22, depthWrite: false })
                 ));
             }
@@ -653,6 +747,15 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             if (readOnly) return;
             const fg = fgRef.current;
             if (fg) {
+                // The per-frame fg.refresh() cycle can cause DragControls to leave
+                // OrbitControls disabled (emptyObject() clears child mesh parents between
+                // pointerdown and pointerup, making getGraphObj return null in dragend,
+                // which skips the controls.enabled = true restore).
+                // This handler runs in the rAF after pointerup, so re-enabling here
+                // is safe and guarantees controls are restored after every node click.
+                const navControls = fg.controls?.();
+                if (navControls) navControls.enabled = true;
+
                 const dist  = 180;
                 const ratio = 1 + dist / Math.hypot(node.x ?? 1, node.y ?? 1, node.z ?? 1);
                 fg.cameraPosition(
@@ -696,7 +799,13 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
     return (
         <div
             style={{ width, height, position: 'relative', overflow: 'hidden' }}
-            onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+            onMouseMove={(e) => {
+                mousePosRef.current = { x: e.clientX, y: e.clientY };
+                if (tooltipRef.current) {
+                    tooltipRef.current.style.left = `${e.clientX + 15}px`;
+                    tooltipRef.current.style.top  = `${e.clientY + 15}px`;
+                }
+            }}
         >
             <ForceGraph3D
                 ref={fgRef}
@@ -732,12 +841,13 @@ const GraphNetwork3D = forwardRef<any, GraphNetwork3DProps>(function GraphNetwor
             <AnimatePresence>
                 {hoveredLink && (
                     <motion.div
+                        ref={tooltipRef}
                         key="link-tooltip-3d"
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
                         className="absolute z-50 pointer-events-none bg-white/95 dark:bg-neutral-900/90 backdrop-blur-md border border-black/10 dark:border-white/10 px-4 py-3 rounded-xl shadow-xl dark:shadow-2xl flex flex-col gap-1 min-w-[200px]"
-                        style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
+                        style={{ left: mousePosRef.current.x + 15, top: mousePosRef.current.y + 15 }}
                     >
                         <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider mb-1">
                             {hoveredLink.relationType === 'ai' ? (

@@ -3,22 +3,16 @@
 import Link from "next/link";
 import { FadeIn } from "./FadeIn";
 import { SectionHeader } from "./SectionHeader";
-import { Bookmark, Box, Brain, Clock, Download, Filter, InfinityIcon, LayoutGrid, MessageCircle, Route, Search, Share2, Sparkles } from "lucide-react";
 import { APP_URL } from "../lib/app-url";
 import { HolographicCard } from "./HolographicCard";
+import { GENESIS_FEATURES, CONSTELLATION_FEATURES, SINGULARITY_FEATURES } from "../../../app/settings/billing/page";
 
 const tiers = [
   {
     name: "Genesis",
     price: "$0",
     period: "Forever",
-    features: [
-      { icon: Brain, text: 'Up to 60 Neurons' },
-      { icon: LayoutGrid, text: '2D Knowledge Graph' },
-      { icon: Bookmark, text: 'Browser Web Clipper' },
-      { icon: Search, text: 'Standard Search' },
-      { icon: Share2, text: 'Share 1 Cluster' },
-    ],
+    features: GENESIS_FEATURES,
     cta: "Start your Universe",
     ctaHref: `${APP_URL}/`,
     primary: false,
@@ -28,14 +22,7 @@ const tiers = [
     name: "Constellation",
     price: "$3,99",
     period: "month",
-    features: [
-      { icon: InfinityIcon, text: 'Unlimited Neurons' },
-      { icon: Route, text: 'Pathfinder & Zen Mode' },
-      { icon: Filter, text: 'Tags & Advanced Filters' },
-      { icon: Download, text: 'Data Import/Export' },
-      { icon: Share2, text: 'Up to 5 shares' },
-      { icon: InfinityIcon, text: 'All Gnesis features' },
-    ],
+    features: CONSTELLATION_FEATURES,
     cta: "Join Constellation",
     ctaHref: `${APP_URL}/settings/billing`,
     primary: false,
@@ -46,14 +33,7 @@ const tiers = [
     badge: "Ultimate AI Fusion",
     price: "$7,99",
     period: "month",
-    features: [
-      { icon: MessageCircle, text: 'Full AI Neural Core (Chat & Search)' },
-      { icon: Sparkles, text: 'AI Semantic Search' },
-      { icon: Box, text: '3D Graph Visualization' },
-      { icon: Clock, text: 'Time Machine & Evolution Journal' },
-      { icon: Share2, text: 'Unlimited shares' },
-      { icon: InfinityIcon, text: 'All Constellation features' },
-    ],
+    features: SINGULARITY_FEATURES,
     cta: "Reach Singularity",
     ctaHref: `${APP_URL}/settings/billing`,
     primary: true,

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Zap, Loader2, ExternalLink, Check, Brain, LayoutGrid, Bookmark, Search, Infinity as InfinityIcon, Route, Filter, Download, Share2, Box, MessageCircle, Sparkles, Clock } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2, ExternalLink, Check, Brain, LayoutGrid, Bookmark, Search, Infinity as InfinityIcon, Route, Filter, Download, Share2, Box, MessageCircle, Sparkles, Clock, Import } from 'lucide-react';
 import { createClient } from '@/src/lib/supabase/client';
 import { usePlan, getNeuronLimit, getSharedUniversesLimit, type PlanId } from '@/src/hooks/usePlan';
 
@@ -35,7 +35,7 @@ const TIER_TEXT_SHADOW = {
   singularity: '0 0 28px rgba(245,158,11,0.25), 0 1px 2px rgba(0,0,0,0.05)',
 } as const;
 
-const GENESIS_FEATURES = [
+export const GENESIS_FEATURES = [
   { icon: Brain, text: 'Up to 60 Neurons' },
   { icon: LayoutGrid, text: '2D Knowledge Graph' },
   { icon: Bookmark, text: 'Browser Web Clipper' },
@@ -43,7 +43,7 @@ const GENESIS_FEATURES = [
   { icon: Share2, text: 'Share 1 Cluster' },
 ];
 
-const CONSTELLATION_FEATURES = [
+export const CONSTELLATION_FEATURES = [
   { icon: InfinityIcon, text: 'Unlimited Neurons' },
   { icon: Route, text: 'Pathfinder & Zen Mode' },
   { icon: Filter, text: 'Tags & Advanced Filters' },
@@ -52,9 +52,10 @@ const CONSTELLATION_FEATURES = [
   { icon: InfinityIcon, text: 'All Gnesis features' },
 ];
 
-const SINGULARITY_FEATURES = [
+export const SINGULARITY_FEATURES = [
   { icon: MessageCircle, text: 'Full AI Neural Core (Chat & Search)' },
   { icon: Sparkles, text: 'AI Semantic Search' },
+  { icon: Import, text: 'Obsidian/Notion Import' },
   { icon: Box, text: '3D Graph Visualization' },
   { icon: Clock, text: 'Time Machine & Evolution Journal' },
   { icon: Share2, text: 'Unlimited shares' },

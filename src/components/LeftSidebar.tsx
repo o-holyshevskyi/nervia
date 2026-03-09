@@ -35,7 +35,7 @@ interface LeftSidebarProps {
   onClose: () => void;
   onSelect: (node: any) => void;
   onTagSelect: (tag: string | null) => void;
-  onImport: (bookmarks: any[]) => Promise<void>;
+  onImport: (items: any[], source?: 'html' | 'notion' | 'obsidian') => Promise<void>;
   onExport: () => void;
   onOpenSearch?: () => void;
   onOpenPathfinder?: () => void;
@@ -600,7 +600,14 @@ export default function LeftSidebar({
                       <AnimatePresence initial={false}>
                         {openAccordion === 'import-export' && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: "easeInOut" }}>
-                            <div className="px-0 pt-1.5 pb-2"><ImportExport onImport={onImport} onExport={onExport} /></div>
+                            <div className="px-0 pt-1.5 pb-2">
+                            <ImportExport 
+                              onImport={onImport} 
+                              onExport={onExport} 
+                              plan={plan} 
+                              onRequestUpgrade={() => onRequestUpgrade?.('singularity')} 
+                            />
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>

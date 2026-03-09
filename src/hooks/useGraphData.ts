@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef } from 'react';
 import { ParsedBookmark } from '../lib/bookmarkParser';
+import { ParsedObsidianNote } from '../lib/obsidianParser';
 import { NodeData } from '../components/AddModal';
 
 const NEW_NODE_PING_DURATION_MS = 4000;
@@ -424,11 +425,80 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
             .eq('user_id', user.id);
     };
 
-    const importData = async (bookmarks: ParsedBookmark[]) => {
-        console.log('Call -> importData()');
-        if (!user) return;
+    /** Normalize title for wikilink/title matching: trim, lowercase. */
+    function normalizeTitle(t: string): string {
+        return (t ?? '').toString().trim().toLowerCase();
+    }
 
-        const nodesToInsert = bookmarks.map(b => ({
+    const importData = async (
+        items: ParsedBookmark[] | ParsedObsidianNote[],
+        source?: 'html' | 'notion' | 'obsidian'
+    ) => {
+        console.log('Call -> importData()');
+        if (!user) return [];
+
+        const isObsidian = source === 'obsidian' || (items.length > 0 && 'wikilinks' in items[0]);
+        const isNotion = source === 'notion';
+
+        if (isObsidian || isNotion) {
+            const notes = items as any[]; // Тут будуть ParsedObsidianNote або ParsedNotionNote
+            const nodesToInsert = notes.map((n) => ({
+                id: crypto.randomUUID(),
+                title: n.title.replace(/[\n\r]/g, ' ').trim(),
+                url: '',
+                content: n.content ?? '',
+                type: 'note', 
+                group: isObsidian ? 6 : 7,     
+                tags: n.tags || [],
+                user_id: user.id,
+                is_ai_processed: true,
+            }));
+
+            const { data: insertedNodes, error } = await supabase
+                .from('nodes')
+                .insert(nodesToInsert)
+                .select();
+
+            if (error) {
+                console.error("🔴 Detailed Import Error:", error.message, error.details);
+                throw error;
+            }
+
+            if (insertedNodes && insertedNodes.length > 0) {
+                setData((prev) => ({
+                    ...prev,
+                    nodes: [...prev.nodes, ...insertedNodes]
+                }));
+
+                // Мапимо лінки (wikilinks для Obsidian, links для Notion)
+                const allNodes = [...data.nodes, ...insertedNodes];
+                const titleToId = new Map<string, string>();
+                for (const node of allNodes) {
+                    const id = typeof node.id === 'string' ? node.id : (node as any).id?.id;
+                    const title = (node.title ?? '').toString().trim();
+                    if (id && title) titleToId.set(normalizeTitle(title), id);
+                }
+
+                for (let i = 0; i < insertedNodes.length; i++) {
+                    const sourceId = (insertedNodes[i] as any).id;
+                    // Для Obsidian беремо wikilinks, для Notion - links
+                    const connectionsToMap = isObsidian ? (notes[i].wikilinks ?? []) : (notes[i].links ?? []);
+                    
+                    for (const targetTitle of connectionsToMap) {
+                        const targetId = titleToId.get(normalizeTitle(targetTitle));
+                        if (targetId && targetId !== sourceId) {
+                            // Додаємо лінк. Для Notion можемо зробити окремий label
+                            await addLink(sourceId, targetId, 'ai', isNotion ? 'Notion Link' : 'Obsidian link');
+                        }
+                    }
+                }
+            }
+
+            return insertedNodes || [];
+        }
+
+        const bookmarks = items as ParsedBookmark[];
+        const nodesToInsert = bookmarks.map((b) => ({
             id: crypto.randomUUID(),
             title: b.title.replace(/[\n\r]/g, ' ').trim(),
             url: b.url,
@@ -446,14 +516,12 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
             .select();
 
         if (error) {
-            // Якщо все ще є помилка — ми побачимо її детально
             console.error("🔴 Detailed Import Error:", error.message, error.details);
             throw error;
         }
 
-        // Оновлюємо UI тільки тими нодами, які реально додалися
         if (insertedNodes && insertedNodes.length > 0) {
-            setData(prev => ({
+            setData((prev) => ({
                 ...prev,
                 nodes: [...prev.nodes, ...insertedNodes]
             }));

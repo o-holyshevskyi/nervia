@@ -18,13 +18,17 @@ const groupColors: Record<number, string> = {
     3: "#6366f1",
     4: "#f97316",
     5: "#06b6d4",
+    6: "#bc16f9",
+    7: "#d44406",
 };
-const groupNames: Record<number, string> = {
+export const groupNames: Record<number, string> = {
     1: "No Group",
     2: "No Group",
     3: "Finance",
     4: "Design",
     5: "Research",
+    6: "Obsidian",
+    7: "Notion",
 };
 
 const loadingLabels = [
@@ -146,7 +150,7 @@ function drawGroupAreas(
     _globalScale: number,
     nodeIdToGroupKey: Map<string | number, string | number>,
     clusterMode: 'group' | 'tag',
-    container: HTMLElement | null,
+    themeColors: { nodeColor: string; linkColor: string; graphBg: string },
     groupColorsById: Record<string, string>,
     groupNamesById: Record<string, string>
 ) {
@@ -199,7 +203,6 @@ function drawGroupAreas(
         if (!isFinite(centerX) || !isFinite(centerY)) continue;
         const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
         const label = clusterMode === 'group' ? getGroupLabel(key, groupNamesById) : `#${keyStr}`;
-        const themeColors = getGraphThemeColors(container);
         const labelColor = themeColors.nodeColor.startsWith('#')
             ? themeColors.nodeColor
             : themeColors.nodeColor.replace(/,\s*[\d.]+\)$/, ', 0.9)');
@@ -394,6 +397,20 @@ export default function GraphNetwork({
     const zoomOnNextEngineStopRef = useRef(false);
     const [engineReadyCount, setEngineReadyCount] = useState(0);
 
+    // ── Theme cache: avoids getComputedStyle on every node/link per frame ─────
+    const themeCache = useRef<{ nodeColor: string; linkColor: string; graphBg: string; isDark: boolean } | null>(null);
+    const getCachedTheme = useCallback(() => {
+        if (!themeCache.current) {
+            themeCache.current = { ...getGraphThemeColors(containerRef.current), isDark: isDarkTheme() };
+        }
+        return themeCache.current;
+    }, []);
+    useEffect(() => {
+        const observer = new MutationObserver(() => { themeCache.current = null; });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
     useEffect(() => {
         if (!isInitialFitting) return;
         const interval = setInterval(() => {
@@ -484,7 +501,8 @@ export default function GraphNetwork({
     }, [groups]);
 
     const [hoveredLink, setHoveredLink] = useState<any | null>(null);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const mousePosRef = useRef({ x: 0, y: 0 });
+    const tooltipRef = useRef<HTMLDivElement>(null);
 
     const zenModeNeighbors = useMemo(() => {
         const neighbors = new Set<string>();
@@ -519,6 +537,15 @@ export default function GraphNetwork({
         graphData.nodes.forEach((n: any) => {
             const id = typeof n.id === 'string' ? n.id : n?.id;
             if (id != null) m.set(id, getNodeGroupKey(n));
+        });
+        return m;
+    }, [graphData.nodes]);
+
+    const nodeById = useMemo(() => {
+        const m = new Map<string, any>();
+        graphData.nodes.forEach((n: any) => {
+            const id = typeof n.id === 'string' ? n.id : n?.id != null ? String(n.id) : null;
+            if (id != null) m.set(id, n);
         });
         return m;
     }, [graphData.nodes]);
@@ -810,26 +837,36 @@ export default function GraphNetwork({
                         const oy = center.y + Math.sin(orbit.angle) * orbit.radius;
                         orbitPos.set(node, { x: ox, y: oy });
                     });
-                    orbitMapRef.current.forEach((orbit, node) => {
+                    // Cluster-level repulsion: O(clusters²) instead of O(nodes²)
+                    const clusterKeys = Object.keys(liveCenters);
+                    const clusterRep: Record<string, { rx: number; ry: number }> = {};
+                    for (let i = 0; i < clusterKeys.length; i++) {
+                        const ka = clusterKeys[i];
+                        const pa = liveCenters[ka];
+                        if (!clusterRep[ka]) clusterRep[ka] = { rx: 0, ry: 0 };
+                        for (let j = i + 1; j < clusterKeys.length; j++) {
+                            const kb = clusterKeys[j];
+                            const pb = liveCenters[kb];
+                            if (!clusterRep[kb]) clusterRep[kb] = { rx: 0, ry: 0 };
+                            const dx = pa.x - pb.x;
+                            const dy = pa.y - pb.y;
+                            const d  = Math.hypot(dx, dy) || 1e-6;
+                            if (d >= REPULSION_THRESHOLD) continue;
+                            const t  = 1 - d / REPULSION_THRESHOLD;
+                            const f  = (REPULSION_STRENGTH * t) / d;
+                            const fx = dx * f, fy = dy * f;
+                            clusterRep[ka].rx += fx; clusterRep[ka].ry += fy;
+                            clusterRep[kb].rx -= fx; clusterRep[kb].ry -= fy;
+                        }
+                    }
+                    orbitMapRef.current.forEach((_orbit, node) => {
                         if (draggedGroup?.has(node)) return;
                         const pos = orbitPos.get(node);
                         if (!pos) return;
-                        const keyA = getClusterKey(node);
-                        let rx = 0, ry = 0;
-                        orbitPos.forEach((otherPos, other) => {
-                            if (other === node) return;
-                            if (getClusterKey(other) === keyA) return;
-                            const dx = pos.x - otherPos.x;
-                            const dy = pos.y - otherPos.y;
-                            const d = Math.hypot(dx, dy) || 1e-6;
-                            if (d >= REPULSION_THRESHOLD) return;
-                            const t = 1 - d / REPULSION_THRESHOLD;
-                            const f = (REPULSION_STRENGTH * t) / d;
-                            rx += dx * f;
-                            ry += dy * f;
-                        });
-                        node.x = pos.x + rx;
-                        node.y = pos.y + ry;
+                        const key = String(getClusterKey(node));
+                        const rep = clusterRep[key] ?? { rx: 0, ry: 0 };
+                        node.x = pos.x + rep.rx;
+                        node.y = pos.y + rep.ry;
                     });
 
                     fg.refresh?.();
@@ -981,19 +1018,22 @@ export default function GraphNetwork({
         }
         if (zenModeNodeId && sId !== zenModeNodeId && tId !== zenModeNodeId) return true;
         if (activeTag) {
-            const sTags = typeof link.source === 'object' ? link.source.tags : graphData.nodes.find((n: any) => n.id === sId)?.tags;
-            const tTags = typeof link.target === 'object' ? link.target.tags : graphData.nodes.find((n: any) => n.id === tId)?.tags;
+            const sTags = typeof link.source === 'object' ? link.source.tags : nodeById.get(sId)?.tags;
+            const tTags = typeof link.target === 'object' ? link.target.tags : nodeById.get(tId)?.tags;
             if (!sTags?.includes(activeTag) || !tTags?.includes(activeTag)) return true;
         }
         return false;
-    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, isPathLink, searchActive, highlightedSet, zenModeNodeId, activeTag, graphData.nodes]);
+    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, isPathLink, searchActive, highlightedSet, zenModeNodeId, activeTag, nodeById]);
 
     const drawNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const x = Number(node.x);
         const y = Number(node.y);
         if (!isFinite(x) || !isFinite(y)) return;
 
-        const themeColors = getGraphThemeColors(containerRef.current);
+        const themeColors = getCachedTheme();
+        const isDark = themeColors.isDark;
+        const accentColor = isDark ? ACCENT_PURPLE : ACCENT_INDIGO;
+        const accent = (a: number) => isDark ? `rgba(168, 85, 247, ${a})` : `rgba(99, 102, 241, ${a})`;
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
         const label = getNodeLabel(node);
         const rawSize = (node.val ?? 4) * 1;
@@ -1036,7 +1076,7 @@ export default function GraphNetwork({
                 else baseColor = themeColors.nodeColor.startsWith('#') ? hexToRgba(themeColors.nodeColor, 0.12) : themeColors.nodeColor;
             } else {
                 const groupKey = nodeIdToGroupKeyMap.get(idStr) ?? getNodeGroupKey(node);
-                baseColor = isSearchHighlighted ? accentHex() : (getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899");
+                baseColor = isSearchHighlighted ? accentColor : (getGroupColor(groupKey, groupColorsById) ?? groupColors[typeof groupKey === 'number' ? groupKey : 1] ?? "#ec4899");
             }
             strongGlow = (searchActive && highlightedSet.has(idStr)) || (pathfinderActive && pathNodeSet.has(idStr));
         }
@@ -1055,13 +1095,13 @@ export default function GraphNetwork({
             ctx.arc(x, y, haloRadius, 0, 2 * Math.PI);
             ctx.strokeStyle = `rgba(6, 182, 212, ${pulse * 0.9})`;
             ctx.lineWidth = 3 / globalScale;
-            ctx.shadowColor = accentRgba(0.8);
+            ctx.shadowColor = accent(0.8);
             ctx.shadowBlur = 20 / globalScale;
             ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.beginPath();
             ctx.arc(x, y, haloRadius + 2 / globalScale, 0, 2 * Math.PI);
-            ctx.strokeStyle = accentRgba(pulse * 0.5);
+            ctx.strokeStyle = accent(pulse * 0.5);
             ctx.lineWidth = 2 / globalScale;
             ctx.stroke();
             ctx.restore();
@@ -1077,9 +1117,9 @@ export default function GraphNetwork({
                 ctx.beginPath();
                 ctx.arc(x, y, pingRadius, 0, 2 * Math.PI);
                 const gradient = ctx.createRadialGradient(x, y, size, x, y, pingRadius);
-                gradient.addColorStop(0, accentRgba(alpha * 0.5));
-                gradient.addColorStop(0.6, accentRgba(alpha * 0.2));
-                gradient.addColorStop(1, accentRgba(0));
+                gradient.addColorStop(0, accent(alpha * 0.5));
+                gradient.addColorStop(0.6, accent(alpha * 0.2));
+                gradient.addColorStop(1, accent(0));
                 ctx.fillStyle = gradient;
                 ctx.fill();
                 ctx.restore();
@@ -1138,15 +1178,15 @@ export default function GraphNetwork({
                 : themeColors.nodeColor;
             ctx.fillText(label, x, y + size + 4);
         }
-    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, contextNodeSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupKeyMap, groupColorsById]);
+    }, [solarSystemNodeId, solarNeighbors, pathfinderActive, pathNodeSet, pathNodes, searchActive, highlightedSet, contextNodeSet, zenModeNodeId, activeTag, zenModeNeighbors, getNodeIconUrl, nodeIdToGroupKeyMap, groupColorsById, getCachedTheme]);
 
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
             if (solarSystemNodeId) return;
             const nodesForDraw = viewMode === '2D' ? graphData2D.nodes : processedData.nodes;
-            drawGroupAreas(ctx, nodesForDraw, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, containerRef.current, groupColorsById, groupNamesById);
+            drawGroupAreas(ctx, nodesForDraw, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, getCachedTheme(), groupColorsById, groupNamesById);
         },
-        [viewMode, graphData2D.nodes, processedData.nodes, dimensions, nodeIdToGroupKeyMap, clusterMode, solarSystemNodeId, groupColorsById, groupNamesById]
+        [viewMode, graphData2D.nodes, processedData.nodes, dimensions, nodeIdToGroupKeyMap, clusterMode, solarSystemNodeId, groupColorsById, groupNamesById, getCachedTheme]
     );
 
     useEffect(() => {
@@ -1351,7 +1391,7 @@ export default function GraphNetwork({
 
     const navBtnClass = "flex items-center justify-center w-10 h-10 rounded-xl text-neutral-500 hover:bg-black/10 hover:text-black dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-white transition-all duration-200 cursor-pointer";
 
-    const graphTheme = getGraphThemeColors(containerRef.current);
+    const graphTheme = getCachedTheme();
 
     const dataFor3D = useMemo(() => {
         if (viewMode !== '3D') return processedData;
@@ -1388,7 +1428,13 @@ export default function GraphNetwork({
             ref={containerRef}
             className="w-full h-screen relative overflow-hidden"
             style={{ backgroundColor: 'var(--graph-bg)' }}
-            onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+            onMouseMove={(e) => {
+                mousePosRef.current = { x: e.clientX, y: e.clientY };
+                if (tooltipRef.current) {
+                    tooltipRef.current.style.left = `${e.clientX + 15}px`;
+                    tooltipRef.current.style.top = `${e.clientY + 15}px`;
+                }
+            }}
         >
             <AnimatePresence>
                 {isInitialFitting && (
@@ -1510,7 +1556,7 @@ export default function GraphNetwork({
                                 ctx.fill();
                             }}
                             nodeColor={(node: any) => {
-                                const theme = getGraphThemeColors(containerRef.current);
+                                const theme = getCachedTheme();
                                 const nodeId = typeof node.id === 'string' ? node.id : node.id?.id;
                                 const dimColor = theme.nodeColor.startsWith('#') ? hexToRgba(theme.nodeColor, 0.12) : theme.nodeColor;
                                 if (solarSystemNodeId) {
@@ -1530,7 +1576,7 @@ export default function GraphNetwork({
                                     return dimColor;
                                 }
                                 if (searchActive) {
-                                    if (highlightedSet.has(nodeId)) return accentHex();
+                                    if (highlightedSet.has(nodeId)) return theme.isDark ? ACCENT_PURPLE : ACCENT_INDIGO;
                                     return dimColor;
                                 }
                                 if (zenModeNodeId && !zenModeNeighbors.has(nodeId)) return dimColor;
@@ -1551,18 +1597,15 @@ export default function GraphNetwork({
                             }}
                             linkDirectionalParticleSpeed={pathfinderActive ? 0.01 : 0.005}
                             linkDirectionalParticleWidth={4}
-                            linkDirectionalParticleColor={() => {
-                                const theme = getGraphThemeColors(containerRef.current);
-                                return theme.nodeColor;
-                            }}
+                            linkDirectionalParticleColor={() => getCachedTheme().nodeColor}
                             linkColor={(link: any) => {
-                                const theme = getGraphThemeColors(containerRef.current);
+                                const theme = getCachedTheme();
                                 if (isLinkHidden(link)) return "rgba(0,0,0,0)";
                                 if (solarSystemNodeId) return "rgba(251, 191, 36, 0.9)";
                                 if (pathfinderActive && isPathLink(link)) return "rgba(6, 182, 212, 0.8)";
                                 if (pathfinderActive) return "rgba(0,0,0,0)";
-                                if (link === hoveredLink) return link.relationType === 'ai' ? accentHex() : theme.nodeColor;
-                                return link.relationType === 'ai' ? accentRgba(0.4) : theme.linkColor;
+                                if (link === hoveredLink) return link.relationType === 'ai' ? (theme.isDark ? ACCENT_PURPLE : ACCENT_INDIGO) : theme.nodeColor;
+                                return link.relationType === 'ai' ? (theme.isDark ? 'rgba(168,85,247,0.4)' : 'rgba(99,102,241,0.4)') : theme.linkColor;
                             }}
                             backgroundColor="rgba(0,0,0,0)"
                             enablePointerInteraction={true}
@@ -1652,11 +1695,12 @@ export default function GraphNetwork({
             <AnimatePresence>
                 {hoveredLink && (
                     <motion.div
+                        ref={tooltipRef}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
                         className="absolute z-50 pointer-events-none bg-white/95 dark:bg-neutral-900/90 backdrop-blur-md border border-black/10 dark:border-white/10 px-4 py-3 rounded-xl shadow-xl dark:shadow-2xl flex flex-col gap-1 min-w-[200px]"
-                        style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
+                        style={{ left: mousePosRef.current.x + 15, top: mousePosRef.current.y + 15 }}
                     >
                         <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider mb-1">
                             {hoveredLink.relationType === 'ai' ? (
