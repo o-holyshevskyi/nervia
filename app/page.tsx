@@ -841,6 +841,12 @@ export default function Home() {
                 onDeleteLink={deleteLink}
                 groups={groups}
                 onAddGroup={onAddGroup}
+                canUseNeuralCore={access.canUseNeuralCore}
+                onRequestUpgrade={openUpgradeModal}
+                onLocateNode={setFlyToNodeId}
+                onDeepFocus={(nodeId) => { if (access.canUse3DGraph) setSolarSystemNodeId(nodeId); else openUpgradeModal("singularity"); }}
+                onDelete={deleteNode}
+                onZenMode={toggleZenMode}
             />
 
 <AddModal
