@@ -35,7 +35,7 @@ interface LeftSidebarProps {
   onClose: () => void;
   onSelect: (node: any) => void;
   onTagSelect: (tag: string | null) => void;
-  onImport: (items: any[], source?: 'html' | 'notion' | 'obsidian') => Promise<void>;
+  onImport: (items: any[], source?: 'html' | 'notion' | 'obsidian' | 'json') => Promise<void>;
   onExport: () => void;
   onOpenSearch?: () => void;
   onOpenPathfinder?: () => void;
@@ -605,7 +605,8 @@ export default function LeftSidebar({
                               onImport={onImport} 
                               onExport={onExport} 
                               plan={plan} 
-                              onRequestUpgrade={() => onRequestUpgrade?.('singularity')} 
+                              onRequestUpgrade={(plan: UpgradeTargetPlan) => onRequestUpgrade?.(plan)}
+                              nodes={nodes}
                             />
                             </div>
                           </motion.div>

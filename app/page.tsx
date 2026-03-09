@@ -471,74 +471,41 @@ export default function Home() {
         }
     };
 
-    const getNodeId = (n: any) => typeof n.id === 'string' ? n.id : (n.id?.id || String(n.id));
-    const getNodeTitle = (n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? String(n.id);
-
-    const handleImportWithQueue = async (items: any[], source?: 'html' | 'notion' | 'obsidian') => {
+    const handleImportWithQueue = async (items: any[], source?: 'html' | 'notion' | 'obsidian' | 'json') => {
         console.log(`Call -> handleImportWithQueue() | Source: ${source}`);
         
-        // 🕵️ 1. ПЕРЕВІРКА НА ДУБЛІКАТИ
-        // Збираємо всі існуючі URL та заголовки з нашого графа для швидкого пошуку
-        const existingUrls = new Set(
-            data.nodes
-                .map((n: any) => n.url?.toLowerCase().trim())
-                .filter(Boolean)
-        );
-        const existingTitles = new Set(
-            data.nodes
-                .map((n: any) => getNodeTitle(n).toLowerCase().trim())
-                .filter(Boolean)
-        );
-
-        // Відфільтровуємо те, що вже є
-        const newItems = items.filter(item => {
-            if (source === 'obsidian' || source === 'notion') {
-                // Для нотаток перевіряємо за назвою
-                const itemTitle = (item.title || '').toLowerCase().trim();
-                return !existingTitles.has(itemTitle);
-            } else {
-                // Для закладок перевіряємо за URL
-                const itemUrl = (item.url || '').toLowerCase().trim();
-                return !existingUrls.has(itemUrl);
-            }
-        });
-
-        // Якщо всі файли/закладки вже існують - повідомляємо юзера і виходимо
-        if (newItems.length === 0) {
-            console.log('No new items to import. All are duplicates.');
-            toast.info("All these items already exist in your Universe.");
+        // 1. Дані вже відфільтровані в ImportExport, тому просто перевіряємо чи є що імпортувати
+        if (!items || items.length === 0) {
+            console.log('No new items to import.');
             return;
         }
 
-        if (newItems.length < items.length) {
-            toast.success(`Skipped ${items.length - newItems.length} duplicates.`);
-        }
-
-        // 2. Створюємо ТІЛЬКИ НОВІ ноди
-        const insertedNodes = await importData(newItems, source);
+        // 2. Створюємо ТІЛЬКИ НОВІ ноди в базі
+        const insertedNodes = await importData(items, source);
         console.log('Nodes imported:', insertedNodes);
     
         if (!insertedNodes || !Array.isArray(insertedNodes) || insertedNodes.length === 0) {
-            console.log('No nodes to process (either duplicates or error)');
+            console.log('No nodes to process (error during DB insert)');
             return;
         }
     
-        // 🛑 3. ЯКЩО ЦЕ OBSIDIAN - ЗУПИНЯЄМОСЬ ТУТ
-        if (source === 'obsidian' || source === 'notion') {
-            console.log(`${source} import detected. Skipping AI processing. Links were mapped in data layer.`);
-            toast.success(`Imported ${insertedNodes.length} new notes!`);
-            return; // ШІ не чіпає ці файли, бо ми самі зв'язали їх по тайтлах!
+        // 🛑 3. ЯКЩО ЦЕ БЕКАП, OBSIDIAN АБО NOTION - ЗУПИНЯЄМОСЬ ТУТ
+        if (source === 'obsidian' || source === 'notion' || source === 'json') {
+            console.log(`${source} import detected. Skipping AI processing.`);
+            toast.success(`Imported ${insertedNodes.length} items!`);
+            return; // ШІ не чіпає ці файли, бо вони вже мають свій контент і зв'язки!
         }
     
         // 🤖 4. ПРОЦЕС ШІ ТІЛЬКИ ДЛЯ ЗАКЛАДОК (HTML Bookmarks)
         const allNodesForContext = [...data.nodes, ...insertedNodes];
         console.log('Starting AI processing queue...');
+        
         const MAX_NODES_PER_RUN = 25;
         for (let i = 0; i < insertedNodes.length; i += MAX_NODES_PER_RUN) {
             const batch = insertedNodes.slice(i, i + MAX_NODES_PER_RUN);
             // eslint-disable-next-line no-await-in-loop
             await processQueue(batch, allNodesForContext);
-            // Small pause between batches to avoid bursts
+            // Невелика пауза між батчами, щоб не перевантажити нейронку (Rate Limits)
             // eslint-disable-next-line no-await-in-loop
             await new Promise((r) => setTimeout(r, 1000));
         }

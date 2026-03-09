@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ParsedBookmark } from '../lib/bookmarkParser';
 import { ParsedObsidianNote } from '../lib/obsidianParser';
 import { NodeData } from '../components/AddModal';
+import { toast } from 'sonner';
 
 const NEW_NODE_PING_DURATION_MS = 4000;
 
@@ -431,11 +432,47 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
     }
 
     const importData = async (
-        items: ParsedBookmark[] | ParsedObsidianNote[],
-        source?: 'html' | 'notion' | 'obsidian'
+        items: ParsedBookmark[] | ParsedObsidianNote[] | any[],
+        source?: 'html' | 'notion' | 'obsidian' | 'json'
     ) => {
         console.log('Call -> importData()');
         if (!user) return [];
+
+        if (source === 'json') {
+            const nodesToInsert = items.map((n) => ({
+                id: n._originalId || crypto.randomUUID(), // Зберігаємо старий ID, якщо є
+                title: n.title,
+                content: n.content,
+                url: n.url,
+                type: n.type,
+                group: n.group,
+                group_id: n.group_id,
+                tags: n.tags || [],
+                user_id: user.id,
+                is_ai_processed: true, // Вже оброблено, це ж бекап
+                val: 5
+            }));
+
+            const { data: insertedNodes, error } = await supabase
+                .from('nodes')
+                .insert(nodesToInsert)
+                .select();
+
+            if (error) {
+                console.error("🔴 Detailed Import Error:", error.message, error.details);
+                throw error;
+            }
+
+            if (insertedNodes && insertedNodes.length > 0) {
+                setData((prev) => ({
+                    ...prev,
+                    nodes: [...prev.nodes, ...insertedNodes]
+                }));
+                // (Опціонально) Тут колись можна буде додати відновлення лінків (links) з бекапу
+            }
+
+            return insertedNodes || [];
+        }
 
         const isObsidian = source === 'obsidian' || (items.length > 0 && 'wikilinks' in items[0]);
         const isNotion = source === 'notion';
@@ -531,45 +568,44 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
     };
 
     const exportData = () => {
-        if (data.nodes.length === 0) {
-            alert("Nothing to export yet!");
-            return;
-        }
-
-        // Створюємо об'єкт для експорту
-        const exportObject = {
-            version: "1.0",
-            timestamp: new Date().toISOString(),
-            payload: {
+        try {
+            // 1. Формуємо об'єкт з нашими даними
+            // data.nodes і data.links - це твій поточний стейт графа
+            const exportData = {
+                version: "1.0",
+                exportDate: new Date().toISOString(),
                 nodes: data.nodes,
-                links: data.links
-            }
-        };
+                links: data.links,
+                // groups: groups // якщо хочеш ще й групи/кластери бекапити (опціонально)
+            };
 
-        // Перетворюємо в JSON рядок
-        const jsonString = JSON.stringify(exportObject, null, 2);
-        
-        // Створюємо Blob (великий бінарний об'єкт)
-        const blob = new Blob([jsonString], { type: "application/json" });
-        
-        // Створюємо тимчасовий URL для цього Blob
-        const url = URL.createObjectURL(blob);
-        
-        // Створюємо невидиму кнопку для завантаження
-        const link = document.createElement("a");
-        link.href = url;
-        
-        // Формуємо красиву назву файлу: synapse_backup_2024-05-20.json
-        const date = new Date().toISOString().split('T')[0];
-        link.download = `synapse_backup_${date}.json`;
-        
-        // Симулюємо клік
-        document.body.appendChild(link);
-        link.click();
-        
-        // Прибираємо за собою
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+            // 2. Перетворюємо в красивий JSON (з відступами)
+            const jsonString = JSON.stringify(exportData, null, 2);
+            
+            // 3. Створюємо Blob (файл у пам'яті браузера)
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            // 4. Генеруємо назву файлу з поточною датою
+            const dateStr = new Date().toISOString().split('T')[0]; // "2026-03-09"
+            const filename = `nervia-universe-backup-${dateStr}.json`;
+
+            // 5. Створюємо тимчасовий лінк і клікаємо по ньому для завантаження
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            
+            // 6. Прибираємо за собою
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast.success("Universe exported successfully!");
+        } catch (error) {
+            console.error("Export failed:", error);
+            toast.error("Failed to export your data.");
+        }
     };
 
     return { 
