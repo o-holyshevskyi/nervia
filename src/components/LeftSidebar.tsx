@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { motion, AnimatePresence, useSpring, useTransform } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Filter, LogOut, Search, UserIcon, ImportIcon, Layers, Compass, Route, Clock, Globe, Tag, Puzzle, Plus, Sun, Trash2, MessageCircle, Share2, Bell, History, CreditCard, ChevronLeft, ChevronRight, Activity, Sliders, Settings, Settings2, Lock, Eye, Box, SmilePlus, HelpCircle, LifeBuoy, Rocket, BookOpen, Satellite, Telescope } from "lucide-react";
 import FilterPanel from "./FilterPanel";
 import CloseButton from "./ui/CloseButton";
@@ -26,6 +26,70 @@ import { useUniverseStats } from "../hooks/useUniverseStats";
 import packageJson from "../../package.json";
 import ThemeToggle from "./ThemeToggle";
 import type { UpgradeTargetPlan } from "./UpgradeModal";
+
+type SidebarView = 'main' | 'discovery' | 'collections' | 'viewOptions' | 'telemetry' | 'management';
+
+function relativeTime(createdAt: string): string {
+  const d = new Date(createdAt).getTime();
+  const now = Date.now();
+  const s = Math.floor((now - d) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hr${h === 1 ? "" : "s"} ago`;
+  const day = Math.floor(h / 24);
+  return `${day} day${day === 1 ? "" : "s"} ago`;
+}
+
+interface GroupRowProps {
+  group: Group;
+  onShare: (groupId: string) => void;
+  onDelete: (groupId: string) => void;
+}
+const GroupRow = memo(function GroupRow({ group: g, onShare, onDelete }: GroupRowProps) {
+  return (
+    <li className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 group/list">
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+      <span className="flex-1 min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">{g.name}</span>
+      <button type="button" onClick={() => onShare(g.id)} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all" title="Share"><Share2 size={12} /></button>
+      <button type="button" onClick={() => onDelete(g.id)} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all" title="Delete cluster"><Trash2 size={12} /></button>
+    </li>
+  );
+});
+
+interface NotificationItemProps {
+  notification: { id: string; title: string; message: string; type: string; metadata: Record<string, unknown>; read_at: string | null; created_at: string };
+  onNavigateToGroup?: (groupId: string) => void;
+  onClose: () => void;
+  onClosePanel: () => void;
+  markAsRead?: (id: string) => void;
+}
+const NotificationItem = memo(function NotificationItem({ notification: n, onNavigateToGroup, onClose, onClosePanel, markAsRead }: NotificationItemProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const groupId = n.metadata?.group_id as string | undefined;
+        if (groupId && onNavigateToGroup) {
+          onNavigateToGroup(groupId);
+          onClosePanel();
+          onClose();
+        }
+        markAsRead?.(n.id);
+      }}
+      className={`hover:cursor-pointer w-full text-left rounded-lg p-3 border transition-colors ${
+        n.read_at
+          ? "bg-transparent border-white/5 dark:border-white/5 hover:bg-white/5 dark:hover:bg-white/5"
+          : "bg-indigo-500/5 dark:bg-purple-500/5 border-indigo-500/20 dark:border-purple-500/20"
+      }`}
+    >
+      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">{n.title}</p>
+      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2">{n.message}</p>
+      <p className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 mt-1">{relativeTime(n.created_at)}</p>
+    </button>
+  );
+});
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -118,8 +182,7 @@ export default function LeftSidebar({
   onRequest3DUpgrade,
 }: LeftSidebarProps) {
   const access = useFeatureAccess(plan);
-  const [activeView, setActiveView] = useState<'main' | 'discovery' | 'collections' | 'viewOptions' | 'telemetry' | 'management'>('main');
-  const [lastOpenedView, setLastOpenedView] = useState<typeof activeView | null>(null);
+  const [nav, setNav] = useState<{ active: SidebarView; last: SidebarView | null }>({ active: 'main', last: null });
   const [openAccordion, setOpenAccordion] = useState<string | null>('');
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -153,7 +216,7 @@ export default function LeftSidebar({
     const ro = new ResizeObserver(updateScrollShadows);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [updateScrollShadows, openAccordion, activeView]);
+  }, [updateScrollShadows, openAccordion, nav.active]);
   const extensionDetected = useExtensionDetected();
   const router = useRouter();
   const { nodesCount, linksCount, topTag, isLoading: isStatsLoading } = useUniverseStats(nodes);
@@ -167,58 +230,51 @@ export default function LeftSidebar({
   }, [supabase]);
 
   useEffect(() => {
-    if (!isOpen) {
-      setActiveView('main');
-      setLastOpenedView(null);
-    }
+    if (!isOpen) setNav({ active: 'main', last: null });
   }, [isOpen]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
     router.refresh();
-  };
+  }, [supabase, router]);
 
   const kbdClass = "text-xs font-mono text-neutral-500 dark:text-neutral-400 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 px-1.5 py-0.5 rounded";
 
-  function relativeTime(createdAt: string): string {
-    const d = new Date(createdAt).getTime();
-    const now = Date.now();
-    const s = Math.floor((now - d) / 1000);
-    if (s < 60) return "just now";
-    const m = Math.floor(s / 60);
-    if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h} hr${h === 1 ? "" : "s"} ago`;
-    const day = Math.floor(h / 24);
-    return `${day} day${day === 1 ? "" : "s"} ago`;
-  }
+  const toggleAccordion = useCallback((itemId: string) => {
+    setOpenAccordion((prev) => (prev === itemId ? null : itemId));
+  }, []);
 
-  const toggleAccordion = (itemId: string) => {
-    setOpenAccordion(openAccordion === itemId ? null : itemId);
-  };
+  const navigateTo = useCallback((view: SidebarView) => setNav({ active: view, last: view }), []);
+  const goBack = useCallback(() => setNav((prev) => ({ active: 'main', last: prev.last })), []);
 
-  const AnimatedNumber = ({ value, active }: { value: number; active: boolean }) => {
-    const spring = useSpring(0, {
-      stiffness: 120,
-      damping: 20,
-      mass: 0.8,
-    });
+  const handleGroupShare = useCallback((groupId: string) => {
+    if (shares.length >= access.sharedUniversesLimit) {
+      onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation');
+      return;
+    }
+    setShareInitial({ scope: 'GROUPS', groupIds: [groupId] });
+    setIsShareModalOpen(true);
+  }, [shares.length, access.sharedUniversesLimit, onRequestUpgrade, plan]);
 
-    const display = useTransform(spring, (val) => Math.round(val).toLocaleString());
+  const handleUniverseShare = useCallback(() => {
+    if (shares.length >= access.sharedUniversesLimit) {
+      onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation');
+      return;
+    }
+    setShareInitial({ scope: 'ALL', groupIds: [] });
+    setIsShareModalOpen(true);
+  }, [shares.length, access.sharedUniversesLimit, onRequestUpgrade, plan]);
 
-    useEffect(() => {
-      if (active) {
-        spring.set(0);
-        spring.set(value);
-      }
-    }, [active, value, spring]);
+  const handleCloseNotificationPanel = useCallback(() => setIsNotificationPanelOpen(false), []);
 
-    return (
-      <motion.span className="font-mono text-neutral-700 dark:text-white/70">
-        {display}
-      </motion.span>
-    );
-  };
+  const handleSettingsSuccess = useCallback(() => {
+    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
+  }, [supabase]);
+
+  const handleCreateShare = useCallback(async (scope: ShareScope, groupIds?: string[]) => {
+    const result = await createShare(scope, groupIds);
+    return result ? { slug: result.slug, url: result.url } : null;
+  }, [createShare]);
 
   return (
     <AnimatePresence>
@@ -248,7 +304,7 @@ export default function LeftSidebar({
               className="flex-1 overflow-y-auto scroll-hint space-y-8 pr-2"
             >
             <AnimatePresence mode="wait">
-              {activeView === 'main' && (
+              {nav.active === 'main' && (
                 <motion.div
                   key="main"
                   initial={{ opacity: 0, x: 20 }}
@@ -270,8 +326,8 @@ export default function LeftSidebar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setLastOpenedView('discovery'); setActiveView('discovery'); }}
-                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'discovery' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    onClick={() => navigateTo('discovery')}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${nav.last === 'discovery' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Compass size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
@@ -280,15 +336,15 @@ export default function LeftSidebar({
                     <ChevronRight size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
                   </button>
                   <div
-                    className={`group/row w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors cursor-pointer ${lastOpenedView === 'collections' ? 'bg-white/5 dark:bg-purple-500/5' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`group/row w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors cursor-pointer ${nav.last === 'collections' ? 'bg-white/5 dark:bg-purple-500/5' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                     role="button"
                     tabIndex={0}
-                    onClick={() => { setLastOpenedView('collections'); setActiveView('collections'); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLastOpenedView('collections'); setActiveView('collections'); } }}
+                    onClick={() => navigateTo('collections')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigateTo('collections'); } }}
                   >
                     <div className="flex items-center gap-2.5 flex-1 min-w-0">
                       <Layers size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
-                      <span className={lastOpenedView === 'collections' ? 'text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 group-hover/row:text-neutral-900 dark:group-hover/row:text-white'}>Collections</span>
+                      <span className={nav.last === 'collections' ? 'text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 group-hover/row:text-neutral-900 dark:group-hover/row:text-white'}>Collections</span>
                       {onOpenAddModal && (
                         <button
                           type="button"
@@ -312,8 +368,8 @@ export default function LeftSidebar({
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setLastOpenedView('viewOptions'); setActiveView('viewOptions'); }}
-                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'viewOptions' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    onClick={() => navigateTo('viewOptions')}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${nav.last === 'viewOptions' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Sliders size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
@@ -323,8 +379,8 @@ export default function LeftSidebar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setLastOpenedView('telemetry'); setActiveView('telemetry'); }}
-                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'telemetry' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    onClick={() => navigateTo('telemetry')}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${nav.last === 'telemetry' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Activity size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
@@ -349,8 +405,8 @@ export default function LeftSidebar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setLastOpenedView('management'); setActiveView('management'); }}
-                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${lastOpenedView === 'management' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    onClick={() => navigateTo('management')}
+                    className={`hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm transition-colors ${nav.last === 'management' ? 'bg-white/5 dark:bg-purple-500/5 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'}`}
                   >
                     <div className="flex items-center gap-2.5">
                       <Settings2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" />
@@ -361,7 +417,7 @@ export default function LeftSidebar({
                 </motion.div>
               )}
 
-              {activeView === 'discovery' && (
+              {nav.active === 'discovery' && (
                 <motion.div
                   key="discovery"
                   initial={{ opacity: 0, x: 20 }}
@@ -370,7 +426,7 @@ export default function LeftSidebar({
                   transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="space-y-4"
                 >
-                  <SubViewHeader title="Discovery" onBack={() => setActiveView('main')} />
+                  <SubViewHeader title="Discovery" onBack={goBack} />
                   <div className="space-y-1 pt-2">
                     {access.canUsePathfinder ? (
                       <button
@@ -457,7 +513,7 @@ export default function LeftSidebar({
                 </motion.div>
               )}
 
-              {activeView === 'collections' && (
+              {nav.active === 'collections' && (
                 <motion.div
                   key="collections"
                   initial={{ opacity: 0, x: 20 }}
@@ -466,7 +522,7 @@ export default function LeftSidebar({
                   transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="space-y-6"
                 >
-                  <SubViewHeader title="Collections" onBack={() => setActiveView('main')} />
+                  <SubViewHeader title="Collections" onBack={goBack} />
                   <div className="space-y-4 pt-2">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
@@ -485,15 +541,7 @@ export default function LeftSidebar({
                       ) : (
                         <ul className="space-y-1">
                           {groups.map((g) => (
-                            <li
-                              key={g.id}
-                              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 group/list"
-                            >
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-                              <span className="flex-1 min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">{g.name}</span>
-                              <button type="button" onClick={() => { if (shares.length >= access.sharedUniversesLimit) { onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation'); return; } setShareInitial({ scope: 'GROUPS', groupIds: [g.id] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-indigo-600 dark:hover:text-purple-400 transition-all" title="Share"><Share2 size={12} /></button>
-                              <button type="button" onClick={() => onDeleteGroup(g.id)} className="hover:cursor-pointer p-1 opacity-0 group-hover/list:opacity-100 text-neutral-400 hover:text-red-500 transition-all" title="Delete cluster"><Trash2 size={12} /></button>
-                            </li>
+                            <GroupRow key={g.id} group={g} onShare={handleGroupShare} onDelete={onDeleteGroup} />
                           ))}
                         </ul>
                       )}
@@ -520,7 +568,7 @@ export default function LeftSidebar({
                 </motion.div>
               )}
 
-              {activeView === 'viewOptions' && (
+              {nav.active === 'viewOptions' && (
                 <motion.div
                   key="viewOptions"
                   initial={{ opacity: 0, x: 20 }}
@@ -529,7 +577,7 @@ export default function LeftSidebar({
                   transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="space-y-6"
                 >
-                  <SubViewHeader title="View Options" onBack={() => setActiveView('main')} />
+                  <SubViewHeader title="View Options" onBack={goBack} />
                   <div className="space-y-4 pt-2">
                     <div className="w-full h-10 flex items-center justify-between px-3 rounded-md">
                       <div className="flex items-center gap-2.5 text-sm text-neutral-600 dark:text-neutral-400">
@@ -569,7 +617,7 @@ export default function LeftSidebar({
                 </motion.div>
               )}
 
-              {activeView === 'management' && (
+              {nav.active === 'management' && (
                 <motion.div
                   key="management"
                   initial={{ opacity: 0, x: 20 }}
@@ -578,7 +626,7 @@ export default function LeftSidebar({
                   transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="space-y-4"
                 >
-                  <SubViewHeader title="Management" onBack={() => setActiveView('main')} />
+                  <SubViewHeader title="Management" onBack={goBack} />
                   <div className="space-y-1 pt-2">
                     <button type="button" onClick={() => setIsNotificationPanelOpen(true)} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                       <div className="flex items-center gap-2.5">
@@ -587,7 +635,7 @@ export default function LeftSidebar({
                       </div>
                       {unreadCount > 0 && <kbd className={kbdClass}>{unreadCount}</kbd>}
                     </button>
-                    <button type="button" onClick={() => { if (shares.length >= access.sharedUniversesLimit) { onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation'); return; } setShareInitial({ scope: 'ALL', groupIds: [] }); setIsShareModalOpen(true); }} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <button type="button" onClick={handleUniverseShare} className="hover:cursor-pointer w-full h-10 flex items-center justify-between px-3 rounded-md text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                       <div className="flex items-center gap-2.5"><Share2 size={16} className="text-neutral-500 dark:text-neutral-500 shrink-0" /><span>Share</span></div>
                       <kbd className={kbdClass}>Share</kbd>
                     </button>
@@ -627,7 +675,7 @@ export default function LeftSidebar({
                 </motion.div>
               )}
 
-              {activeView === 'telemetry' && (
+              {nav.active === 'telemetry' && (
                 <motion.div
                   key="telemetry"
                   initial={{ opacity: 0, x: 20 }}
@@ -636,7 +684,7 @@ export default function LeftSidebar({
                   transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="space-y-4"
                 >
-                  <SubViewHeader title="System Telemetry" onBack={() => setActiveView('main')} />
+                  <SubViewHeader title="System Telemetry" onBack={goBack} />
                   <div className="space-y-3 pt-2">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -878,9 +926,7 @@ export default function LeftSidebar({
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
         user={user}
-        onSuccess={() => {
-          supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
-        }}
+        onSuccess={handleSettingsSuccess}
       />
       {/* Notification center panel */}
       <AnimatePresence key="notification-panel">
@@ -893,7 +939,7 @@ export default function LeftSidebar({
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 backdrop-blur-sm"
               aria-hidden
-              onClick={() => setIsNotificationPanelOpen(false)}
+              onClick={handleCloseNotificationPanel}
             />
             <motion.div
               key="notification-drawer"
@@ -917,7 +963,7 @@ export default function LeftSidebar({
                       Mark all read
                     </button>
                   )}
-                  <CloseButton onClose={() => setIsNotificationPanelOpen(false)} size={18} />
+                  <CloseButton onClose={handleCloseNotificationPanel} size={18} />
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -927,34 +973,14 @@ export default function LeftSidebar({
                   </p>
                 ) : (
                   notifications.map((n) => (
-                    <button
+                    <NotificationItem
                       key={n.id}
-                      type="button"
-                      onClick={() => {
-                        const groupId = n.metadata?.group_id as string | undefined;
-                        if (groupId && onNavigateToGroup) {
-                          onNavigateToGroup(groupId);
-                          setIsNotificationPanelOpen(false);
-                          onClose();
-                        }
-                        markAsRead?.(n.id);
-                      }}
-                      className={`hover:cursor-pointer w-full text-left rounded-lg p-3 border transition-colors ${
-                        n.read_at
-                          ? "bg-transparent border-white/5 dark:border-white/5 hover:bg-white/5 dark:hover:bg-white/5"
-                          : "bg-indigo-500/5 dark:bg-purple-500/5 border-indigo-500/20 dark:border-purple-500/20"
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
-                        {n.title}
-                      </p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 line-clamp-2">
-                        {n.message}
-                      </p>
-                      <p className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 mt-1">
-                        {relativeTime(n.created_at)}
-                      </p>
-                    </button>
+                      notification={n}
+                      onNavigateToGroup={onNavigateToGroup}
+                      onClose={onClose}
+                      onClosePanel={handleCloseNotificationPanel}
+                      markAsRead={markAsRead}
+                    />
                   ))
                 )}
               </div>
@@ -975,10 +1001,7 @@ export default function LeftSidebar({
         groups={groups}
         initialScope={shareInitial.scope}
         initialGroupIds={shareInitial.groupIds}
-        onCreateShare={async (scope, groupIds) => {
-          const result = await createShare(scope, groupIds);
-          return result ? { slug: result.slug, url: result.url } : null;
-        }}
+        onCreateShare={handleCreateShare}
         allowShareClusters={access.canCreateShare(shares.length)}
         allowCreateShare={access.canCreateShare(shares.length)}
         onUpgradeRequest={() => onRequestUpgrade?.(plan === 'constellation' ? 'singularity' : 'constellation')}
