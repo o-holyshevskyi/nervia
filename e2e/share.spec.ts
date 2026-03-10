@@ -36,6 +36,11 @@ async function mockShareApi(page: Page, slug: string, overrides: Record<string, 
   await page.route('**/api/notifications/visit', (route) => route.fulfill({ status: 200, body: '{}' }));
 }
 
+/** Wait for the loading spinner to disappear — indicates data has loaded. */
+async function waitForShareLoad(page: Page) {
+  await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 15_000 });
+}
+
 // ──────────────────────────────────────────────
 // Tests
 // ──────────────────────────────────────────────
@@ -49,8 +54,7 @@ test.describe('Share view page', () => {
     test.beforeEach(async ({ page }) => {
       await mockShareApi(page, 'abc123');
       await page.goto('/share/abc123');
-      // Wait for the loading spinner to disappear
-      await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 15_000 });
+      await waitForShareLoad(page);
     });
 
     test('renders the graph canvas', async ({ page }) => {
@@ -65,24 +69,25 @@ test.describe('Share view page', () => {
       await expect(page.getByPlaceholder(/filter by title or tag/i)).toBeVisible();
     });
 
-    test('shows the "Intelligence Shared via Nervia" footer branding link', async ({ page }) => {
-      await expect(page.getByText(/shared via nervia/i)).toBeVisible();
+    test('shows the "Intelligence Shared via Nervia" footer branding', async ({ page }) => {
+      // The parent div has aria-hidden so we query by DOM text, not aria role
+      await expect(page.locator('a', { hasText: /intelligence shared via nervia/i })).toBeVisible();
     });
 
     test('footer branding links back to /', async ({ page }) => {
-      const link = page.getByRole('link', { name: /shared via nervia/i });
-      await expect(link).toHaveAttribute('href', '/');
+      // aria-hidden parent → locate anchor by href, not role
+      const link = page.locator('a[href="/"]', { hasText: /shared via nervia/i });
+      await expect(link).toBeVisible();
     });
 
     // ──────────────────────────────────────────────
     // Tag filter panel
     // ──────────────────────────────────────────────
 
-    test('renders a tag badge for each unique tag in the data', async ({ page }) => {
+    test('renders tag badges for each unique tag in the data', async ({ page }) => {
       // Unique tags across mock nodes: ai, roadmap, design, ui, api, dev
-      const uniqueTags = ['ai', 'roadmap', 'design', 'ui', 'api', 'dev'];
-      for (const tag of uniqueTags) {
-        await expect(page.getByText(tag, { exact: false })).toBeVisible();
+      for (const tag of ['ai', 'roadmap', 'design', 'ui', 'api', 'dev']) {
+        await expect(page.getByText(tag, { exact: true })).toBeVisible();
       }
     });
 
@@ -101,39 +106,28 @@ test.describe('Share view page', () => {
     // ──────────────────────────────────────────────
 
     test('closes the sidebar when the X button is clicked', async ({ page }) => {
-      // The sidebar is visible initially
-      await expect(page.getByText(/shared view/i)).toBeVisible();
-
-      // Click the close (X) button inside the sidebar
-      const closeBtn = page.getByRole('button', { name: /close/i })
-        .or(page.locator('[aria-label="close"]'))
-        .or(page.locator('[aria-label*="close" i]'))
-        .first();
+      // CloseButton renders a plain <button><X/></button> with no aria-label.
+      // Navigate up from the "Shared view" span to its flex-row parent div,
+      // then find the only button sibling — this avoids matching tag buttons.
+      await expect(page.getByText('Shared view')).toBeVisible();
+      const closeBtn = page.getByText('Shared view').locator('xpath=..').getByRole('button');
       await closeBtn.click();
-
-      await expect(page.getByText(/shared view/i)).not.toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText('Shared view')).not.toBeVisible({ timeout: 5_000 });
     });
 
     test('shows the "Filters" button after the sidebar is closed', async ({ page }) => {
-      const closeBtn = page.getByRole('button', { name: /close/i })
-        .or(page.locator('[aria-label*="close" i]'))
-        .first();
+      const closeBtn = page.getByText('Shared view').locator('xpath=..').getByRole('button');
       await closeBtn.click();
-
       await expect(page.getByRole('button', { name: /filters/i })).toBeVisible({ timeout: 5_000 });
     });
 
     test('reopens the sidebar when "Filters" is clicked', async ({ page }) => {
-      // Close first
-      const closeBtn = page.getByRole('button', { name: /close/i })
-        .or(page.locator('[aria-label*="close" i]'))
-        .first();
+      const closeBtn = page.getByText('Shared view').locator('xpath=..').getByRole('button');
       await closeBtn.click();
-      await expect(page.getByText(/shared view/i)).not.toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText('Shared view')).not.toBeVisible({ timeout: 5_000 });
 
-      // Reopen
       await page.getByRole('button', { name: /filters/i }).click();
-      await expect(page.getByText(/shared view/i)).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText('Shared view')).toBeVisible({ timeout: 5_000 });
     });
 
     // ──────────────────────────────────────────────
@@ -148,7 +142,7 @@ test.describe('Share view page', () => {
       });
 
       await page.goto('/share/abc123');
-      await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 15_000 });
+      await waitForShareLoad(page);
       // Allow background fetches to settle
       await page.waitForTimeout(500);
 
@@ -170,7 +164,7 @@ test.describe('Share view page', () => {
         })
       );
       await page.goto('/share/notfound');
-      await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 15_000 });
+      await waitForShareLoad(page);
     });
 
     test('shows the "Share not found" error message', async ({ page }) => {
@@ -198,7 +192,7 @@ test.describe('Share view page', () => {
         })
       );
       await page.goto('/share/broken');
-      await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 15_000 });
+      await waitForShareLoad(page);
     });
 
     test('shows a generic error message', async ({ page }) => {
@@ -214,7 +208,7 @@ test.describe('Share view page', () => {
     test.beforeEach(async ({ page }) => {
       await mockShareApi(page, 'empty', { nodes: [], links: [], groups: [] });
       await page.goto('/share/empty');
-      await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 15_000 });
+      await waitForShareLoad(page);
     });
 
     test('renders successfully (canvas visible)', async ({ page }) => {
