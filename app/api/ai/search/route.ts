@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { cleanJsonString } from "@/src/lib/aiHelpers";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-
-function cleanJsonString(str: string): string {
-  return str.replace(/```json/g, "").replace(/```/g, "").trim();
-}
 
 export interface ContextNode {
   id: string;

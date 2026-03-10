@@ -2,32 +2,9 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@/src/lib/supabase/server";
+import { cleanJsonString, isRateLimitError, isNoGroupResponse } from "@/src/lib/aiHelpers";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-
-// Допоміжна функція для очищення тексту від можливих маркдаун-тегів OpenAI/Gemini
-function cleanJsonString(str: string) {
-    return str.replace(/```json/g, "").replace(/```/g, "").trim();
-}
-
-function parseRetryAfterSeconds(message: string): number | undefined {
-    // Examples we may see:
-    // - "Please retry in 36.6229s."
-    // - ..."\"retryDelay\":\"36s\""
-    const m1 = message.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i);
-    if (m1?.[1]) return Math.max(1, Math.ceil(Number(m1[1])));
-    const m2 = message.match(/"retryDelay"\s*:\s*"(\d+)s"/i);
-    if (m2?.[1]) return Math.max(1, Number(m2[1]));
-    return undefined;
-}
-
-function isRateLimitError(err: unknown): { retryAfterSeconds?: number } | null {
-    const message = err instanceof Error ? err.message : String(err ?? "");
-    const looksLike429 = /(^|\b)429(\b|$)/.test(message) || /too many requests/i.test(message);
-    const looksLikeQuota = /quota/i.test(message) || /rate limit/i.test(message);
-    if (!looksLike429 && !looksLikeQuota) return null;
-    return { retryAfterSeconds: parseRetryAfterSeconds(message) };
-}
 
 const DEFAULT_GROUP_COLOR = '#64748b';
 
@@ -39,13 +16,6 @@ const GROUP_COLOR_PALETTE = [
 
 function randomGroupColor(): string {
     return GROUP_COLOR_PALETTE[Math.floor(Math.random() * GROUP_COLOR_PALETTE.length)];
-}
-
-/** True if AI is saying "do not assign to any group" (node stays No Group, group_id null). */
-function isNoGroupResponse(groupName: string | undefined): boolean {
-    if (groupName == null || typeof groupName !== 'string') return true;
-    const t = groupName.trim().toLowerCase();
-    return !t || t === 'none' || t === 'no group' || t === 'n/a' || t === 'uncategorized' || t === 'general';
 }
 
 /**
