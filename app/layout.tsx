@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import ExtensionTokenBroadcast from "@/src/components/ExtensionTokenBroadcast";
 import ThemeProvider from "@/src/components/ThemeProvider";
+import TelemetryProvider from "@/src/components/TelemetryProvider";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -83,10 +84,12 @@ export default function RootLayout({
                 suppressHydrationWarning
             >
                 <ThemeProvider>
-                    <ExtensionTokenBroadcast />
-                    {children}
+                    <TelemetryProvider>
+                        <ExtensionTokenBroadcast />
+                        {children}
                     <Toaster richColors position="top-right" />
-                    <Analytics />
+                        <Analytics />
+                    </TelemetryProvider>
                 </ThemeProvider>
             </body>
         </html>

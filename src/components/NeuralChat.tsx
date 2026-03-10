@@ -5,6 +5,8 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Send, Sparkles } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
+import posthog from "posthog-js";
+import { TELEMETRY_EVENTS } from "@/src/lib/telemetry/events";
 
 export interface ChatMessage {
   id: string;
@@ -115,6 +117,9 @@ export default function NeuralChat({
           tags: Array.isArray(n.tags) ? n.tags : [],
         }));
 
+      const chatStartMs = Date.now();
+      posthog.capture(TELEMETRY_EVENTS.AI_REQUEST_SENT, { endpoint: "chat", batch_size: 1 });
+
       const chatRes = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,6 +127,15 @@ export default function NeuralChat({
           userQuestion: text,
           contextNodes: contextNodesForChat,
         }),
+      });
+
+      const chatLatencyMs = Date.now() - chatStartMs;
+      const chatSuccess = chatRes.ok;
+      posthog.capture(TELEMETRY_EVENTS.AI_RESPONSE_RECEIVED, {
+        endpoint: "chat",
+        batch_size: 1,
+        latency_ms: chatLatencyMs,
+        success: chatSuccess,
       });
 
       if (!chatRes.ok) {

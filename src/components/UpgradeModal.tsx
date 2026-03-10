@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import CloseButton from "./ui/CloseButton";
 import { CONSTELLATION_FEATURES, SINGULARITY_FEATURES } from "../../app/settings/billing/page";
+import posthog from "posthog-js";
+import { TELEMETRY_EVENTS } from "@/src/lib/telemetry/events";
 
 export type UpgradeTargetPlan = "constellation" | "singularity";
 
@@ -91,7 +93,13 @@ export default function UpgradeModal({ isOpen, onClose, targetPlan = "constellat
 
             <Link
               href="/settings/billing"
-              onClick={onClose}
+              onClick={() => {
+                posthog.capture(TELEMETRY_EVENTS.UPGRADE_BUTTON_CLICKED, {
+                  target_plan: targetPlan,
+                  destination: "billing",
+                });
+                onClose();
+              }}
               className={ctaClassName}
             >
               {ctaText}

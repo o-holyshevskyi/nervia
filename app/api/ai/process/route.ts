@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@/src/lib/supabase/server";
+import { captureAIGenerationCompleted } from "@/src/lib/posthog-server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -207,6 +208,7 @@ export async function POST(req: Request) {
             try {
                 const parsed = JSON.parse(text);
                 const groupId = await resolveOrCreateGroupId(parsed.groupName, groups, user.id, supabase);
+                await captureAIGenerationCompleted(user.id, 'suggest_connections', 1);
                 return NextResponse.json({
                     description: parsed.newNodeDescription || "",
                     connections: (parsed.connections || []).filter((c: any) => c.accuracy >= 80),
@@ -275,6 +277,7 @@ export async function POST(req: Request) {
                 const idSet = new Set(existingIds);
                 const connections = (parsed.connections || [])
                     .filter((c: any) => c.accuracy >= 80 && c.id != null && idSet.has(String(c.id).trim()));
+                await captureAIGenerationCompleted(user.id, 'analyze_link', 1);
                 return NextResponse.json({
                     summary: parsed.summary || "",
                     tags: parsed.tags || [],

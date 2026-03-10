@@ -4,10 +4,50 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import CloseButton from "./ui/CloseButton";
-import { Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle, Layers, Maximize2, Minimize2, Sparkles, Check, Loader2, Lock, LocateFixed, Share2, Trash2, Sun, EyeIcon } from "lucide-react";
+import { Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle, Layers, Maximize2, Minimize2, Sparkles, Check, Loader2, Lock, LocateFixed, Share2, Trash2, Sun, EyeIcon, CheckCircle2 } from "lucide-react";
 import CreateGroupModal from "./CreateGroupModal";
 import type { Group } from "../hooks/useGroups";
 import ReactMarkdown from 'react-markdown';
+import posthog from "posthog-js";
+import { TELEMETRY_EVENTS } from "@/src/lib/telemetry/events";
+
+/** Returns a relative time string (e.g. "yesterday", "2 days ago", "1 week ago") or absolute date for old dates. */
+function formatRelativeOrAbsolute(raw: string | undefined, base: Date = new Date()): string {
+    if (!raw) return '—';
+    try {
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return '—';
+        const ms = base.getTime() - d.getTime();
+        const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+        const sameDay = base.getDate() === d.getDate() && base.getMonth() === d.getMonth() && base.getFullYear() === d.getFullYear();
+        const yesterday = new Date(base);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const wasYesterday = yesterday.getDate() === d.getDate() && yesterday.getMonth() === d.getMonth() && yesterday.getFullYear() === d.getFullYear();
+
+        if (sameDay) return `today at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        if (wasYesterday) return 'yesterday';
+        if (days >= 2 && days <= 6) return `${days} days ago`;
+        if (days >= 7 && days <= 13) return '1 week ago';
+        if (days >= 14 && days <= 20) return '2 weeks ago';
+        if (days >= 21 && days <= 27) return '3 weeks ago';
+        if (days >= 28 && days <= 44) return '4 weeks ago';
+        if (days >= 45 && days <= 59) return '1 month ago';
+        if (days >= 60 && days <= 89) return '2 months ago';
+        if (days >= 90 && days <= 364) {
+            const months = Math.floor(days / 30);
+            return `${months} months ago`;
+        }
+        if (days >= 365 && days <= 729) return '1 year ago';
+        if (days >= 730 && days <= 1094) return '2 years ago';
+        if (days >= 1095) {
+            const years = Math.floor(days / 365);
+            return `${years} years ago`;
+        }
+        return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch {
+        return '—';
+    }
+}
 
 interface SidebarProps {
     selectedNode: any | null;
@@ -26,9 +66,13 @@ interface SidebarProps {
     onDeepFocus?: (nodeId: string) => void;
     onDelete?: (nodeId: string) => void;
     onZenMode?: (nodeId: string) => void;
+    /** Optional creator name for the Activity popover, e.g. "You" or "Jane Doe". */
+    creatorDisplayName?: string | null;
+    /** Supabase client to resolve current user full name for Activity popover (Created/Edited by). */
+    supabase?: any;
 }
 
-export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode, onAddLink, onDeleteLink, groups, onAddGroup, canUseNeuralCore = false, onRequestUpgrade, onLocateNode, onDeepFocus, onDelete, onZenMode }: SidebarProps) {
+export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode, onAddLink, onDeleteLink, groups, onAddGroup, canUseNeuralCore = false, onRequestUpgrade, onLocateNode, onDeepFocus, onDelete, onZenMode, creatorDisplayName, supabase }: SidebarProps) {
     // false = 30% екрану, true = 75% екрану
     const [isFocusMode, setIsFocusMode] = useState(false);
     
@@ -55,23 +99,45 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
 
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiResponse, setAiResponse] = useState<string | null>(null);
+    const [showDatePopover, setShowDatePopover] = useState(false);
+    const [currentUser, setCurrentUser] = useState<{ id: string; displayName: string } | null>(null);
 
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!supabase) return;
+        let cancelled = false;
+        supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
+            if (cancelled || !user?.id) return;
+            const fullName = user.user_metadata?.full_name?.trim?.();
+            const displayName = fullName || user.email?.split('@')[0] || 'User';
+            setCurrentUser({ id: user.id, displayName });
+        });
+        return () => { cancelled = true; };
+    }, [supabase]);
     const titleTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Resolve the current node from graph data so the sidebar shows live updated_at (save + realtime).
+    const selectedId = selectedNode ? (typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id) : null;
+    const liveNode = useMemo(() => {
+        if (!selectedId || !allNodes?.nodes?.length) return selectedNode;
+        const found = allNodes.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n.id?.id) === selectedId);
+        return found ?? selectedNode;
+    }, [selectedId, allNodes?.nodes, selectedNode]);
 
     const nodeConnections = useMemo(() => {
         if (!selectedNode || !allNodes?.links) return [];
-        const selectedId = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
+        const sid = typeof selectedNode.id === 'string' ? selectedNode.id : selectedNode.id?.id;
         return allNodes.links
             .filter(l => {
                 const s = typeof l.source === 'object' ? l.source.id : l.source;
                 const t = typeof l.target === 'object' ? l.target.id : l.target;
-                return s === selectedId || t === selectedId;
+                return s === sid || t === sid;
             })
             .map(l => {
                 const s = typeof l.source === 'object' ? l.source.id : l.source;
                 const t = typeof l.target === 'object' ? l.target.id : l.target;
-                return s === selectedId ? t : s;
+                return s === sid ? t : s;
             });
     }, [selectedNode, allNodes.links]);
 
@@ -179,6 +245,9 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             4. **Suggested Tags:** Provide 3-5 relevant tags (comma-separated) that I could add to this neuron.
                     `.trim();
 
+        const startMs = Date.now();
+        posthog.capture(TELEMETRY_EVENTS.AI_REQUEST_SENT, { endpoint: "chat", batch_size: 1 });
+
         try {
             const res = await fetch("/api/ai/chat", {
                 method: "POST",
@@ -187,6 +256,14 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
             });
 
             const data = await res.json();
+            const latency_ms = Date.now() - startMs;
+            const success = res.ok && typeof data?.reply === "string";
+            posthog.capture(TELEMETRY_EVENTS.AI_RESPONSE_RECEIVED, {
+                endpoint: "chat",
+                batch_size: 1,
+                latency_ms,
+                success,
+            });
 
             if (!res.ok) {
                 const msg = typeof data?.error === "string" ? data.error : "Neural connection failed.";
@@ -200,6 +277,13 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                 setAiResponse("⚠️ No reply from the Exocortex.");
             }
         } catch (err) {
+            const latency_ms = Date.now() - startMs;
+            posthog.capture(TELEMETRY_EVENTS.AI_RESPONSE_RECEIVED, {
+                endpoint: "chat",
+                batch_size: 1,
+                latency_ms,
+                success: false,
+            });
             setAiResponse("⚠️ Neural connection failed. The Exocortex is currently unresponsive.");
         } finally {
             setIsAiLoading(false);
@@ -225,8 +309,12 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
         
         setTimeout(() => {
             // 2. Змінюємо ширину сітки, коли контент вже невидимий
-            setIsFocusMode(prev => !prev);
-            
+            setIsFocusMode(prev => {
+                const next = !prev;
+                posthog.capture(TELEMETRY_EVENTS.FOCUS_MODE_TOGGLED, { expanded: next });
+                return next;
+            });
+
             setTimeout(() => {
                 // 3. Повертаємо контент на місце з новою структурою
                 setIsTransitioning(false);
@@ -537,35 +625,135 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                         transition={{ duration: 0.15 }}
                         className="p-4 border-t border-black/5 dark:border-white/5 bg-black/[0.02] dark:bg-white/[0.02] flex flex-col gap-3"
                     >
-                        <div className="flex items-center gap-2">
-                            {/* Головна кнопка AI (займає залишковий простір - flex-1) */}
-                            {canUseNeuralCore ? (
-                                <button 
-                                    onClick={handleAskExocortex}
-                                    disabled={isAiLoading}
-                                    className="cursor-pointer w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-500/20 rounded-xl text-indigo-600 dark:text-indigo-400 text-sm font-medium transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isAiLoading ? (
-                                        <Loader2 size={16} className="animate-spin" />
-                                    ) : (
-                                        <Sparkles size={16} className="group-hover:animate-pulse" />
-                                    )}
-                                    {isAiLoading ? "Analyzing neural patterns..." : "Ask Exocortex about this node"}
-                                </button>
-                            ) : (
-                                <button 
-                                    type="button"
-                                    onClick={() => onRequestUpgrade?.("singularity")}
-                                    className="cursor-pointer w-full flex items-center justify-center gap-2 py-3 bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-500 dark:text-neutral-400 text-sm font-medium transition-all hover:bg-neutral-200/80 dark:hover:bg-neutral-700/80 hover:text-neutral-700 dark:hover:text-neutral-300"
-                                >
-                                    <Lock size={16} />
-                                    Ask Exocortex — Unlock with Singularity
-                                </button>
-                            )}
-
-                            {/* Блок з додатковими діями */}
-                            <div className="flex items-center gap-1 pl-2 border-l border-black/10 dark:border-white/10">
-                                <button 
+                        {/* One row: Exocortex button + Edited date · type + action icons */}
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex-1 min-w-0">
+                                {canUseNeuralCore ? (
+                                    <button
+                                        onClick={handleAskExocortex}
+                                        disabled={isAiLoading}
+                                        className="cursor-pointer max-w-[400px] w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 border border-indigo-500/20 rounded-xl text-indigo-600 dark:text-indigo-400 text-sm font-medium transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isAiLoading ? (
+                                            <Loader2 size={16} className="animate-spin" />
+                                        ) : (
+                                            <Sparkles size={16} className="group-hover:animate-pulse" />
+                                        )}
+                                        {isAiLoading ? "Analyzing patterns..." : "Ask Exocortex"}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => onRequestUpgrade?.("singularity")}
+                                        className="cursor-pointer max-w-[400px] w-full flex items-center justify-center gap-2 py-3 bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 rounded-xl text-neutral-500 dark:text-neutral-400 text-sm font-medium transition-all hover:bg-neutral-200/80 dark:hover:bg-neutral-700/80 hover:text-neutral-700 dark:hover:text-neutral-300"
+                                    >
+                                        <Lock size={16} />
+                                        Ask Exocortex — Unlock with Singularity
+                                    </button>
+                                )}
+                            </div>
+                            {liveNode && (() => {
+                                const raw = liveNode.updated_at ?? liveNode.updatedAt ?? liveNode.created_at;
+                                const dateStr = raw ? (() => {
+                                    const relative = formatRelativeOrAbsolute(raw);
+                                    if (relative === '—') return null;
+                                    return relative;
+                                })() : null;
+                                const typeLabel = liveNode.type ? String(liveNode.type) : null;
+                                if (!dateStr && !typeLabel) return null;
+                                const createdAt = liveNode.created_at ?? liveNode.createdAt;
+                                const updatedAt = liveNode.updated_at ?? liveNode.updatedAt;
+                                const nodeUserId = (liveNode as any).user_id ?? null;
+                                const isCurrentUserNode = currentUser && nodeUserId === currentUser.id;
+                                const createdBy = (() => {
+                                    if (creatorDisplayName) return creatorDisplayName;
+                                    if (isCurrentUserNode) return currentUser.displayName;
+                                    const by = (liveNode as any).created_by;
+                                    if (by) {
+                                        const first = (by.firstName ?? by.first_name ?? '').toString().trim();
+                                        const last = (by.lastName ?? by.last_name ?? '').toString().trim();
+                                        return `${first} ${last}`.trim() || '—';
+                                    }
+                                    const user = (liveNode as any).user;
+                                    if (user) {
+                                        const first = (user.firstName ?? user.first_name ?? '').toString().trim();
+                                        const last = (user.lastName ?? user.last_name ?? '').toString().trim();
+                                        return `${first} ${last}`.trim() || '—';
+                                    }
+                                    return '—';
+                                })();
+                                const editedBy = (() => {
+                                    const updatedBy = (liveNode as any).updated_by;
+                                    if (updatedBy) {
+                                        const first = (updatedBy.firstName ?? updatedBy.first_name ?? '').toString().trim();
+                                        const last = (updatedBy.lastName ?? updatedBy.last_name ?? '').toString().trim();
+                                        return `${first} ${last}`.trim() || '—';
+                                    }
+                                    if (isCurrentUserNode && currentUser) return currentUser.displayName;
+                                    return '—';
+                                })();
+                                return (
+                                    <div className="flex shrink-0 items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap">
+                                        {dateStr && (
+                                            <span
+                                                className="relative flex items-center gap-1 cursor-default"
+                                                onMouseEnter={() => setShowDatePopover(true)}
+                                                onMouseLeave={() => setShowDatePopover(false)}
+                                            >
+                                                <AnimatePresence mode="wait">
+                                                    <motion.span
+                                                        key={dateStr}
+                                                        initial={{ opacity: 0, scale: 0.96 }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        exit={{ opacity: 0, scale: 0.96 }}
+                                                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                                                        className="flex items-center gap-1"
+                                                    >
+                                                        Edited {dateStr}
+                                                        <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                                                            {isSaving ? 
+                                                                <Loader2 size={14} className="animate-spin text-indigo-500 dark:text-purple-500" /> : 
+                                                                <CheckCircle2 size={14} className="text-green-500 dark:text-green-400" />
+                                                            }
+                                                        </span>
+                                                    </motion.span>
+                                                </AnimatePresence>
+                                                {showDatePopover && (
+                                                    <div
+                                                        className="absolute bottom-full left-0 mb-1.5 z-50 min-w-[200px] px-0 py-0 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg text-left whitespace-nowrap overflow-hidden"
+                                                        role="tooltip"
+                                                    >
+                                                        <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                                            Activity
+                                                        </div>
+                                                        <div className="px-3 py-2 space-y-1 text-xs text-neutral-600 dark:text-neutral-300 flex items-center gap-1">
+                                                            <div>Created by</div><span className="font-medium text-neutral-800 dark:text-neutral-500">{createdBy}</span><div> · {formatRelativeOrAbsolute(createdAt)}</div>
+                                                        </div>
+                                                        <div className="px-3 py-2 space-y-1 text-xs text-neutral-600 dark:text-neutral-300 flex items-center gap-1">
+                                                            <div>Edited by <span className="font-medium text-neutral-800 dark:text-neutral-500">{editedBy}</span> · {formatRelativeOrAbsolute(updatedAt)}</div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </span>
+                                        )}
+                                        <AnimatePresence mode="wait">
+                                            <motion.span
+                                                key={typeLabel}
+                                                initial={{ opacity: 0, scale: 0.96 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.96 }}
+                                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                                className="flex items-center gap-1"
+                                            >
+                                                {dateStr && typeLabel && <span aria-hidden className="select-none">·</span>}
+                                                {typeLabel && <span className="capitalize">{typeLabel}</span>}
+                                            </motion.span>
+                                        </AnimatePresence>
+                                    </div>
+                                );
+                            })()}
+                            <div className="flex shrink-0 items-center gap-1 pl-3 border-l border-black/10 dark:border-white/10">
+                                <button
                                     type="button"
                                     onClick={() => {
                                         const id = typeof selectedNode.id === "string" ? selectedNode.id : selectedNode.id?.id;
@@ -576,7 +764,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 >
                                     <LocateFixed size={16} />
                                 </button>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => {
                                         const id = typeof selectedNode.id === "string" ? selectedNode.id : selectedNode.id?.id;
@@ -587,7 +775,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 >
                                     <Sun size={16} />
                                 </button>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => {
                                         const id = typeof selectedNode.id === "string" ? selectedNode.id : selectedNode.id?.id;
@@ -598,7 +786,7 @@ export default function Sidebar({ selectedNode, allNodes, onClose, onUpdateNode,
                                 >
                                     <EyeIcon size={16} />
                                 </button>
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => {
                                         const id = typeof selectedNode.id === "string" ? selectedNode.id : selectedNode.id?.id;

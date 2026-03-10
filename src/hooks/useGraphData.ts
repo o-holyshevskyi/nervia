@@ -166,6 +166,7 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
                         title: rowTitle || (existing.title ?? ''),
                         content: rowContent || (existing.content ?? ''),
                         group: row.group != null ? row.group : existing.group,
+                        updated_at: row.updated_at ?? existing.updated_at,
                     };
                     return {
                         ...prev,
@@ -348,6 +349,7 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
             }
         }
 
+        const nowIso = new Date().toISOString();
         const nodeIdNorm = nodeId;
         setData((prev) => {
             const newNodes = prev.nodes.map((node) => {
@@ -365,12 +367,15 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
                     is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
                     group: newData.group ?? node.group,
                     group_id: newData.group_id !== undefined ? newData.group_id : node.group_id,
+                    updated_at: nowIso,
                 };
             });
             return { ...prev, nodes: newNodes };
         });
 
-        const dbUpdate: Record<string, unknown> = {};
+        const dbUpdate: Record<string, unknown> = {
+            updated_at: nowIso,
+        };
         if (newData.title !== undefined) dbUpdate.title = newData.title;
         if (newData.content !== undefined) dbUpdate.content = newData.content;
         if (newData.tags !== undefined) dbUpdate.tags = newData.tags;
@@ -378,8 +383,6 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
         if (newData.is_ai_processed !== undefined) dbUpdate.is_ai_processed = newData.is_ai_processed;
         if (newData.group !== undefined) dbUpdate.group = newData.group;
         if (newData.group_id !== undefined) dbUpdate.group_id = newData.group_id;
-
-        if (Object.keys(dbUpdate).length === 0) return;
 
         await supabase.from('nodes')
             .update(dbUpdate)

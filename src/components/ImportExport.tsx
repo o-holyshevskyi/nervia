@@ -11,9 +11,15 @@ import { parseNotionFile, ParsedNotionNote } from "@/src/lib/notionParser";
 import JSZip from "jszip";
 import { toast } from "sonner";
 import { UpgradeTargetPlan } from "./UpgradeModal";
+import posthog from "posthog-js";
+import { TELEMETRY_EVENTS, type ImportSource } from "@/src/lib/telemetry/events";
+
+export interface ImportOptions {
+    skipped_duplicates?: number;
+}
 
 interface ImportExportProps {
-    onImport: (items: any[], source: 'html' | 'notion' | 'obsidian' | 'json') => Promise<void>;
+    onImport: (items: any[], source: 'html' | 'notion' | 'obsidian' | 'json', options?: ImportOptions) => Promise<void>;
     onExport: () => void;
     plan: PlanId; // 🔥 Перевіряємо тариф
     onRequestUpgrade: (plan: UpgradeTargetPlan) => void; // 🔥 Викликаємо модалку апгрейду
@@ -25,6 +31,7 @@ export default function ImportExport({ onImport, onExport, plan, onRequestUpgrad
     const [isImporting, setIsImporting] = useState(false);
     const [pendingData, setPendingData] = useState<any[]>([]);
     const [importSource, setImportSource] = useState<'html' | 'notion' | 'obsidian' | 'json'>('html');
+    const [totalParsedBeforeFilter, setTotalParsedBeforeFilter] = useState(0);
 
     const hasSingularity = plan === 'singularity';
     const hasConstellation = plan === 'constellation';
@@ -61,6 +68,7 @@ export default function ImportExport({ onImport, onExport, plan, onRequestUpgrad
             });
 
             if (newBookmarks.length > 0) {
+                setTotalParsedBeforeFilter(parsed.length);
                 setPendingData(newBookmarks);
                 setImportSource('html');
                 setIsConfirmOpen(true);
@@ -136,6 +144,7 @@ export default function ImportExport({ onImport, onExport, plan, onRequestUpgrad
     
             console.log("Successfully parsed Notion notes:", newItems);
     
+            setTotalParsedBeforeFilter(parsedNotes.length);
             setPendingData(newItems);
             setImportSource('notion');
             setIsConfirmOpen(true);
@@ -179,6 +188,7 @@ export default function ImportExport({ onImport, onExport, plan, onRequestUpgrad
             toast.success(`Skipped ${parsed.length - newItems.length} existing Obsidian notes.`);
         }
 
+        setTotalParsedBeforeFilter(parsed.length);
         setPendingData(newItems);
         setImportSource('obsidian');
         setIsConfirmOpen(true);
@@ -232,6 +242,7 @@ export default function ImportExport({ onImport, onExport, plan, onRequestUpgrad
                 toast.success(`Skipped ${parsedNotes.length - newItems.length} items that already exist.`);
             }
 
+            setTotalParsedBeforeFilter(parsedNotes.length);
             setPendingData(newItems);
             setImportSource('json' as any);
             setIsConfirmOpen(true);
@@ -245,9 +256,12 @@ export default function ImportExport({ onImport, onExport, plan, onRequestUpgrad
     };
 
     const confirmImport = async () => {
+        const source = importSource as ImportSource;
+        posthog.capture(TELEMETRY_EVENTS.IMPORT_STARTED, { source });
         setIsImporting(true);
         try {
-            await onImport(pendingData, importSource);
+            const skipped_duplicates = Math.max(0, totalParsedBeforeFilter - pendingData.length);
+            await onImport(pendingData, importSource, { skipped_duplicates });
         } catch (err) {
             console.error(err);
         } finally {

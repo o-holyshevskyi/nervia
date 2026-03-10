@@ -1,0 +1,443 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Nervia API Documentation",
+    "version": "1.0.0",
+    "description": "API for Nervia Web Clipper and Knowledge Graph integration"
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [],
+  "paths": {
+    "/api/ai/chat": {
+      "post": {
+        "description": "Chat with the Nervia Neural Core using context from the user's knowledge base. Answers based on provided context nodes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userQuestion",
+                  "contextNodes"
+                ],
+                "properties": {
+                  "userQuestion": {
+                    "type": "string"
+                  },
+                  "contextNodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reply from the neural core."
+          },
+          "400": {
+            "description": "userQuestion or contextNodes missing or invalid."
+          },
+          "500": {
+            "description": "API key missing or chat failed."
+          }
+        }
+      }
+    },
+    "/api/ai/process": {
+      "post": {
+        "description": "AI processing for the knowledge graph. Modes - suggest_connections (find related neurons + category) or analyze_link (summary, tags, connections for a new link).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "suggest_connections",
+                      "analyze_link"
+                    ]
+                  },
+                  "newNode": {
+                    "type": "object"
+                  },
+                  "existingNodes": {
+                    "type": "array"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Processed result (description/summary, connections, group_id, tags)."
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "429": {
+            "description": "Rate limit (RATE_LIMIT, retryAfterSeconds)."
+          },
+          "500": {
+            "description": "API key missing or server error."
+          }
+        }
+      }
+    },
+    "/api/ai/search": {
+      "post": {
+        "description": "Semantic search over the user's knowledge graph. Returns top 3–5 neurons that best match the query by meaning.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query",
+                  "contextNodes"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "contextNodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results (id, relevance, reason per item)."
+          },
+          "400": {
+            "description": "query or contextNodes missing or invalid."
+          },
+          "500": {
+            "description": "API key missing or search failed."
+          }
+        }
+      }
+    },
+    "/api/billing/portal": {
+      "get": {
+        "description": "Returns the Lemon Squeezy customer portal URL for the authenticated user.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portal URL (or fallback to Lemon Squeezy my-orders).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
+    "/api/extension/download": {
+      "get": {
+        "description": "Downloads the Nervia Web Clipper Chrome extension as a ZIP file.",
+        "responses": {
+          "200": {
+            "description": "ZIP file containing the extension.",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Extension not found."
+          }
+        }
+      }
+    },
+    "/api/extension/save": {
+      "post": {
+        "description": "Saves a new web page (Neuron) to the user's knowledge graph.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "url"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Neuron successfully created."
+          },
+          "400": {
+            "description": "Missing or invalid title or url."
+          },
+          "401": {
+            "description": "Unauthorized - missing or invalid token."
+          },
+          "409": {
+            "description": "Conflict - neuron with same title or URL already exists."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
+    "/api/extension/token": {
+      "get": {
+        "description": "Returns the current session's access token for the extension. Only works when called same-origin (from the app page) so cookies are sent.",
+        "responses": {
+          "200": {
+            "description": "Access token returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
+    "/api/favicon": {
+      "get": {
+        "description": "Fetches favicon/logo for a domain. Tries Clearbit logo and Google favicon service.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Favicon image (Content-Type from source)."
+          },
+          "204": {
+            "description": "No favicon found."
+          },
+          "400": {
+            "description": "Missing domain."
+          }
+        }
+      }
+    },
+    "/api/notifications/visit": {
+      "post": {
+        "description": "Records a visit to a shared collection (used when someone opens a shared link). Creates a \"New Visit\" notification for the share owner.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "slug"
+                ],
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "Share slug from the shared URL"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Visit recorded."
+          },
+          "400": {
+            "description": "Missing slug."
+          },
+          "404": {
+            "description": "Share not found."
+          },
+          "500": {
+            "description": "Failed to record visit or internal server error."
+          }
+        }
+      }
+    },
+    "/api/share/{slug}": {
+      "get": {
+        "description": "Returns shared knowledge graph data (nodes, links, groups) for a public share by slug.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shared graph data (nodes, links, groups)."
+          },
+          "400": {
+            "description": "Missing slug."
+          },
+          "404": {
+            "description": "Share not found."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    },
+    "/api/webhooks/lemon-squeezy": {
+      "post": {
+        "description": "Lemon Squeezy webhook for subscription events. Validates signature and updates user plan (subscription_created/updated → constellation/singularity; cancelled/expired → genesis).",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-signature",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook received."
+          },
+          "400": {
+            "description": "No user_id in custom_data."
+          },
+          "401": {
+            "description": "Invalid signature."
+          },
+          "500": {
+            "description": "Internal server error."
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}

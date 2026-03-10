@@ -37,6 +37,9 @@ import UpgradeModal, { type UpgradeTargetPlan } from "@/src/components/UpgradeMo
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
 import { NeuralBackground } from "@/src/components/NeuralBackground";
+import posthog from "posthog-js";
+import { TELEMETRY_EVENTS, type ImportSource } from "@/src/lib/telemetry/events";
+import type { ImportOptions } from "@/src/components/ImportExport";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -48,6 +51,7 @@ export default function Home() {
     const openUpgradeModal = useCallback((target: UpgradeTargetPlan, options?: { descriptionOverride?: string }) => {
         setUpgradeModalTarget(target);
         setUpgradeModalDescriptionOverride(options?.descriptionOverride);
+        posthog.capture(TELEMETRY_EVENTS.UPGRADE_MODAL_VIEWED, { target_plan: target });
     }, []);
 
     const { 
@@ -411,6 +415,9 @@ export default function Home() {
 
         if (nodeData.autoConnectAI) {
             try {
+                const aiStartMs = Date.now();
+                posthog.capture(TELEMETRY_EVENTS.AI_REQUEST_SENT, { endpoint: 'process', batch_size: 1 });
+
                 const res = await fetch('/api/ai/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -419,6 +426,15 @@ export default function Home() {
                         newNode: { title: nodeData.title, content: nodeData.content, type: nodeData.type, url: nodeData.url },
                         existingNodes: existingNodeTitlesForAI
                     })
+                });
+
+                const aiLatencyMs = Date.now() - aiStartMs;
+                const aiSuccess = res.ok;
+                posthog.capture(TELEMETRY_EVENTS.AI_RESPONSE_RECEIVED, {
+                    endpoint: 'process',
+                    batch_size: 1,
+                    latency_ms: aiLatencyMs,
+                    success: aiSuccess,
                 });
 
                 const aiResponse = await res.json();
@@ -471,43 +487,73 @@ export default function Home() {
         }
     };
 
-    const handleImportWithQueue = async (items: any[], source?: 'html' | 'notion' | 'obsidian' | 'json') => {
+    const handleImportWithQueue = async (items: any[], source?: 'html' | 'notion' | 'obsidian' | 'json', options?: ImportOptions) => {
         console.log(`Call -> handleImportWithQueue() | Source: ${source}`);
-        
-        // 1. Дані вже відфільтровані в ImportExport, тому просто перевіряємо чи є що імпортувати
-        if (!items || items.length === 0) {
-            console.log('No new items to import.');
-            return;
-        }
+        const startMs = Date.now();
+        const effectiveSource = (source ?? 'html') as ImportSource;
+        const skipped_duplicates = options?.skipped_duplicates ?? 0;
 
-        // 2. Створюємо ТІЛЬКИ НОВІ ноди в базі
-        const insertedNodes = await importData(items, source);
-        console.log('Nodes imported:', insertedNodes);
-    
-        if (!insertedNodes || !Array.isArray(insertedNodes) || insertedNodes.length === 0) {
-            console.log('No nodes to process (error during DB insert)');
-            return;
-        }
-    
-        // 🛑 3. ЯКЩО ЦЕ БЕКАП, OBSIDIAN АБО NOTION - ЗУПИНЯЄМОСЬ ТУТ
-        if (source === 'obsidian' || source === 'notion' || source === 'json') {
-            console.log(`${source} import detected. Skipping AI processing.`);
-            toast.success(`Imported ${insertedNodes.length} items!`);
-            return; // ШІ не чіпає ці файли, бо вони вже мають свій контент і зв'язки!
-        }
-    
-        // 🤖 4. ПРОЦЕС ШІ ТІЛЬКИ ДЛЯ ЗАКЛАДОК (HTML Bookmarks)
-        const allNodesForContext = [...data.nodes, ...insertedNodes];
-        console.log('Starting AI processing queue...');
-        
-        const MAX_NODES_PER_RUN = 25;
-        for (let i = 0; i < insertedNodes.length; i += MAX_NODES_PER_RUN) {
-            const batch = insertedNodes.slice(i, i + MAX_NODES_PER_RUN);
-            // eslint-disable-next-line no-await-in-loop
-            await processQueue(batch, allNodesForContext);
-            // Невелика пауза між батчами, щоб не перевантажити нейронку (Rate Limits)
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise((r) => setTimeout(r, 1000));
+        try {
+            // 1. Дані вже відфільтровані в ImportExport, тому просто перевіряємо чи є що імпортувати
+            if (!items || items.length === 0) {
+                console.log('No new items to import.');
+                return;
+            }
+
+            // 2. Створюємо ТІЛЬКИ НОВІ ноди в базі
+            const insertedNodes = await importData(items, source);
+            console.log('Nodes imported:', insertedNodes);
+
+            if (!insertedNodes || !Array.isArray(insertedNodes) || insertedNodes.length === 0) {
+                console.log('No nodes to process (error during DB insert)');
+                posthog.capture(TELEMETRY_EVENTS.IMPORT_COMPLETED, {
+                    source: effectiveSource,
+                    total_items: 0,
+                    skipped_duplicates,
+                    duration_ms: Date.now() - startMs,
+                });
+                return;
+            }
+
+            // 🛑 3. ЯКЩО ЦЕ БЕКАП, OBSIDIAN АБО NOTION - ЗУПИНЯЄМОСЬ ТУТ
+            if (source === 'obsidian' || source === 'notion' || source === 'json') {
+                console.log(`${source} import detected. Skipping AI processing.`);
+                toast.success(`Imported ${insertedNodes.length} items!`);
+                posthog.capture(TELEMETRY_EVENTS.IMPORT_COMPLETED, {
+                    source: effectiveSource,
+                    total_items: insertedNodes.length,
+                    skipped_duplicates,
+                    duration_ms: Date.now() - startMs,
+                });
+                return;
+            }
+
+            // 🤖 4. ПРОЦЕС ШІ ТІЛЬКИ ДЛЯ ЗАКЛАДОК (HTML Bookmarks)
+            const allNodesForContext = [...data.nodes, ...insertedNodes];
+            console.log('Starting AI processing queue...');
+
+            const MAX_NODES_PER_RUN = 25;
+            for (let i = 0; i < insertedNodes.length; i += MAX_NODES_PER_RUN) {
+                const batch = insertedNodes.slice(i, i + MAX_NODES_PER_RUN);
+                // eslint-disable-next-line no-await-in-loop
+                await processQueue(batch, allNodesForContext);
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise((r) => setTimeout(r, 1000));
+            }
+
+            posthog.capture(TELEMETRY_EVENTS.IMPORT_COMPLETED, {
+                source: effectiveSource,
+                total_items: insertedNodes.length,
+                skipped_duplicates,
+                duration_ms: Date.now() - startMs,
+            });
+        } catch (err) {
+            const error_message = err instanceof Error ? err.message : String(err);
+            posthog.capture(TELEMETRY_EVENTS.IMPORT_FAILED, {
+                source: effectiveSource,
+                error_message,
+            });
+            throw err;
         }
     };
 
@@ -524,13 +570,17 @@ export default function Home() {
             }
             if (e.key === "p" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                if (access.canUsePathfinder) setIsPathfinderOpen(true);
-                else openUpgradeModal("constellation");
+                if (access.canUsePathfinder) {
+                    posthog.capture(TELEMETRY_EVENTS.PATHFINDER_ACTIVATED);
+                    setIsPathfinderOpen(true);
+                } else openUpgradeModal("constellation");
             }
             if (e.key === "t" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
-                if (access.canUseTimeMachine) setIsTimelineOpen(true);
-                else openUpgradeModal("singularity");
+                if (access.canUseTimeMachine) {
+                    posthog.capture(TELEMETRY_EVENTS.TIME_MACHINE_USED);
+                    setIsTimelineOpen(true);
+                } else openUpgradeModal("singularity");
             }
             if (e.key === "h" && (e.metaKey || e.ctrlKey) && e.altKey) {
                 e.preventDefault();
@@ -545,7 +595,7 @@ export default function Home() {
         };
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [openSearch, access.canUsePathfinder, access.canUseTimeMachine, access.canUseEvolutionJournal, access.canUseNeuralCore]);
+    }, [openSearch, access.canUsePathfinder, access.canUseTimeMachine, access.canUseEvolutionJournal, access.canUseNeuralCore, openUpgradeModal]);
 
     const nodeIdsSet = useMemo(() => new Set(data.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id)), [data.nodes]);
 
@@ -827,8 +877,16 @@ export default function Home() {
                 onImport={handleImportWithQueue}
                 onExport={exportData}
                 onOpenSearch={openSearch}
-                onOpenPathfinder={() => setIsPathfinderOpen(true)}
-                onOpenTimeline={() => { if (access.canUseTimeMachine) setIsTimelineOpen(true); else openUpgradeModal("singularity"); }}
+                onOpenPathfinder={() => {
+                    posthog.capture(TELEMETRY_EVENTS.PATHFINDER_ACTIVATED);
+                    setIsPathfinderOpen(true);
+                }}
+                onOpenTimeline={() => {
+                    if (access.canUseTimeMachine) {
+                        posthog.capture(TELEMETRY_EVENTS.TIME_MACHINE_USED);
+                        setIsTimelineOpen(true);
+                    } else openUpgradeModal("singularity");
+                }}
                 onOpenHistory={() => { if (access.canUseEvolutionJournal) setIsHistoryOpen(true); else openUpgradeModal("singularity"); }}
                 onOpenChat={() => { if (access.canUseNeuralCore) setIsChatOpen(true); else openUpgradeModal("singularity"); }}
                 onZenModeClick={() => { if (zenModeNodeId) setZenModeNodeId(null); else setIsLeftSidebarOpen(false); }}
@@ -851,9 +909,9 @@ export default function Home() {
                 onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
             />
 
-            <Sidebar 
-                selectedNode={selectedNode} 
-                onClose={() => setSelectedNode(null)} 
+            <Sidebar
+                selectedNode={selectedNode}
+                onClose={() => setSelectedNode(null)}
                 onUpdateNode={updateNode}
                 allNodes={data}
                 onAddLink={addLink}
@@ -866,6 +924,7 @@ export default function Home() {
                 onDeepFocus={(nodeId) => { if (access.canUse3DGraph) setSolarSystemNodeId(nodeId); else openUpgradeModal("singularity"); }}
                 onDelete={deleteNode}
                 onZenMode={toggleZenMode}
+                supabase={supabase}
             />
 
 <AddModal

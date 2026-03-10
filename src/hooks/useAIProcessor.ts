@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo, useRef } from 'react';
+import posthog from 'posthog-js';
+import { TELEMETRY_EVENTS } from '@/src/lib/telemetry/events';
 
 const MAX_NODES_PER_RUN = 25;
 
@@ -38,6 +40,9 @@ export function useAIProcessor(
         setIsProcessing(true);
         setTotal(nodes.length);
         setProgress(0);
+
+        const batchStartMs = Date.now();
+        posthog.capture(TELEMETRY_EVENTS.AI_REQUEST_SENT, { endpoint: 'process', batch_size: nodes.length });
 
         const existingLinesForAPI = (existingNodes || []).map((n: any) => {
             const title = getNodeTitle(n);
@@ -154,6 +159,14 @@ export function useAIProcessor(
 
             setProgress(i + 1);
         }
+
+        const batchLatencyMs = Date.now() - batchStartMs;
+        posthog.capture(TELEMETRY_EVENTS.AI_RESPONSE_RECEIVED, {
+            endpoint: 'process',
+            batch_size: nodes.length,
+            latency_ms: batchLatencyMs,
+            success: true,
+        });
 
         setTimeout(() => {
             setIsProcessing(false);

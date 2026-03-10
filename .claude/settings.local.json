@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(xargs grep -l \"physicsConfig\\\\|PhysicsControl\")"
+    ]
+  }
+}
