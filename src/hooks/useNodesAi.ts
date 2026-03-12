@@ -1,17 +1,52 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { use, useCallback, useEffect, useState } from 'react';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 
 type NodeType = 'link' | 'idea' | 'note';
 
-type NodeOnAdd = {
+export type NodeOnAdd = {
     title: string;
-    content: string;
     type: NodeType;
+    content?: string;
     url?: string;
+    tags?: string[];
+    autoConnectAI: boolean;
 }
 
-export const useNodesAi = (supabase: SupabaseClient<any, 'public', any, any>, user: User) => {
-    const [isNodeAiLoading, setIsNodeAiLoading] = useState<boolean>(false);
+type NodeOnUpdate = {
+    isAiProcessed: boolean;
+    content: string;
+    tags: string[];
+}
+
+export interface UseHooksProps {
+    supabase: SupabaseClient<any, 'public', any, any>;
+    user: User | null
+}
+
+export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [nodes, setNodes] = useState<any[]>([]);
+
+    const fetchNodes = useCallback(async () => {
+        if (!user) return;
+
+        try {
+            setIsLoading(true);
+
+            const { data, error } = await supabase
+                .from('nodes_ai')
+                .select('*');
+
+            if (error) throw new Error(error.message);
+
+            setNodes(data);
+        } catch (error) {
+            console.error("Error fetching node:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user, setNodes, supabase]);
 
     const addNode = async (node: NodeOnAdd): Promise<string | null> => {
         if (!user) {
@@ -20,14 +55,15 @@ export const useNodesAi = (supabase: SupabaseClient<any, 'public', any, any>, us
         }
 
         try {
-            setIsNodeAiLoading(true);
+            setIsLoading(true);
 
             const newNode = {
                 user_id: user.id,
                 title: node.title,
-                content: node.content,
+                content: node.content || '',
                 type: node.type,
                 url: node.url || '',
+                tags: node.tags || [],
                 is_ai_processed: false,
             }
 
@@ -44,13 +80,44 @@ export const useNodesAi = (supabase: SupabaseClient<any, 'public', any, any>, us
             console.error("Error adding node:", error);
             return null;
         } finally {
-            setIsNodeAiLoading(false);
+            setIsLoading(false);
         }
     }
+
+    const updateNode = async (nodeId: string, { isAiProcessed, content, tags }: NodeOnUpdate) => {
+        if (!user) return;
+
+        try {
+            setIsLoading(true);
+
+            const dbUpdate: Record<string, unknown> = {
+                is_ai_processed: isAiProcessed,
+                content,
+                tags
+            };
+
+
+            await supabase
+                .from('nodes_ai')
+                .update(dbUpdate)
+                .eq('id', nodeId)
+                .eq('user_id', user.id);
+        } catch (error) {
+            console.error("Error updating node:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchNodes();
+    }, [fetchNodes]);
     
     return {
-        isNodeAiLoading,
-        
-        addNode
+        isNodeAiLoading: isLoading,
+        nodes,
+
+        addNode,
+        updateNode,
     }
 }

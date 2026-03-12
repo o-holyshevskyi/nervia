@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -37,11 +38,17 @@ import UpgradeModal, { type UpgradeTargetPlan } from "@/src/components/UpgradeMo
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
 import { NeuralBackground } from "@/src/components/NeuralBackground";
+import { NodeOnAdd, useNodesAi } from "@/src/hooks/useNodesAi";
+import { User } from "@supabase/supabase-js";
+import { useLinks } from "@/src/hooks/useLinks";
+import { useNeuronData } from "@/src/hooks/useNeuronData";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
     const { hasCompletedOnboarding, isLoading: isOnboardingLoading, completeOnboarding } = useOnboarding(supabase);
     const { plan } = usePlan(supabase);
+
+    const [user, setUser] = useState<User | null>(null);
     const access = useFeatureAccess(plan);
     const [upgradeModalTarget, setUpgradeModalTarget] = useState<UpgradeTargetPlan | null>(null);
     const [upgradeModalDescriptionOverride, setUpgradeModalDescriptionOverride] = useState<string | undefined>(undefined);
@@ -51,12 +58,12 @@ export default function Home() {
     }, []);
 
     const { 
-        data, 
-        isLoading,
-        addNewNode,
-        updateNode,
+        // data, 
+        // isLoading,
+        // addNewNode,
+        updateNode: updateNode_old,
         deleteNode,
-        addLink,
+        addLink: addLink_old,
         deleteLink,
         importData,
         exportData,
@@ -64,12 +71,23 @@ export default function Home() {
 
     const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
         supabase,
-        updateNode,
-        addLink,
-        data.nodes
+        updateNode_old,
+        addLink_old,
+        // data.nodes
     );
 
     const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup, refetch: refetchGroups } = useGroups(supabase);
+
+    // const { isNodeAiLoading, nodes, addNode, updateNode } = useNodesAi({ supabase, user });
+    // const { links, addLink } = useLinks({ supabase, user });
+
+    const {
+        isLoading,
+        data,
+        addNode,
+        updateNode,
+        addLink,
+    } = useNeuronData({ supabase, user });
 
     // When any node has a group_id not in our groups list (e.g. AI-created group on backend), refetch groups so the graph shows the real name
     const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
@@ -80,6 +98,19 @@ export default function Home() {
         });
         if (hasMissingGroup) refetchGroups();
     }, [data.nodes, groupIds, refetchGroups]);
+
+    useEffect(() => {
+        const initSession = async () => {
+            try {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                setUser(authUser);
+            } catch (error) {
+                console.error("Error initializing session/data:", error);
+            }
+        };
+
+        initSession();
+    }, [supabase]);
 
     const handleNotificationInsert = useCallback((n: any) => {
         if (n?.type === "visit") {
@@ -162,17 +193,6 @@ export default function Home() {
         markAllAsRead,
     } = useNotifications(supabase, handleNotificationInsert);
 
-    const handleNavigateToGroup = useCallback(
-        (groupId: string) => {
-            const node = data.nodes.find((n: any) => n.group_id === groupId);
-            if (node) {
-                const id = typeof node.id === "string" ? node.id : node.id?.id;
-                if (id) setFlyToNodeId(id);
-            }
-        },
-        [data.nodes]
-    );
-
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
@@ -229,6 +249,17 @@ export default function Home() {
         window.addEventListener("synapse:navigate_to_group", handler as EventListener);
         return () => window.removeEventListener("synapse:navigate_to_group", handler as EventListener);
     }, [data.nodes]);
+
+    const handleNavigateToGroup = useCallback(
+        (groupId: string) => {
+            const node = data.nodes.find((n: any) => n.group_id === groupId);
+            if (node) {
+                const id = typeof node.id === "string" ? node.id : node.id?.id;
+                if (id) setFlyToNodeId(id);
+            }
+        },
+        [data.nodes]
+    );
 
     // Open sidebar when onboarding runs so step 4 (Neural Chat) target is visible.
     useEffect(() => {
@@ -366,92 +397,71 @@ export default function Home() {
         return data.nodes.map((n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? String(n.id));
     }, [data.nodes]);
 
-    const handleAddWithAI = async (nodeData: any) => {
+    const handleAddWithAI = async (nodeData: NodeOnAdd) => {
         if (!access.canAddNeuron(data.nodes.length)) {
             openUpgradeModal("constellation");
             return;
         }
+
         setAddError(null);
         setAiTotal(1);
         setAiProgress(0);
         setIsAIProcessing(true);
 
-        let createdNode: any;
         try {
-            createdNode = await addNewNode(nodeData);
-        } catch (e) {
-            if (e instanceof Error && (e as Error & { code?: string }).code === 'NEURON_LIMIT_REACHED') {
-                openUpgradeModal("constellation");
-            } else {
-                setAddError(e instanceof Error ? e.message : 'Failed to add neuron.');
-            }
-            setIsAIProcessing(false);
-            return;
-        }
-        if (!createdNode) {
-            setIsAIProcessing(false);
-            return;
-        }
+            const createdNodeId = await addNode(nodeData);
 
-        if (nodeData.autoConnectAI) {
-            try {
+            if (!createdNodeId) {
+                throw new Error("Failed to insert node into database.");
+            }
+
+            if (nodeData.autoConnectAI) {
                 const res = await fetch('/api/ai/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        mode: 'suggest_connections',
-                        newNode: { title: nodeData.title, content: nodeData.content, type: nodeData.type, url: nodeData.url },
-                        existingNodes: existingNodeTitlesForAI
-                    })
+                    body: JSON.stringify({ nodeId: createdNodeId }) 
                 });
 
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || "AI processing failed");
+                }
+
                 const aiResponse = await res.json();
-                const groupId = typeof aiResponse.group_id === 'string' && aiResponse.group_id.length > 0 ? aiResponse.group_id : undefined;
-
-                if (aiResponse.description && !nodeData.content) {
-                    await updateNode(createdNode.id, {
-                        content: aiResponse.description,
-                        is_ai_processed: true,
-                        ...(groupId !== undefined && { group_id: groupId }),
-                    });
-                } else if (groupId !== undefined) {
-                    await updateNode(createdNode.id, { group_id: groupId });
-                }
-
-                if (Array.isArray(aiResponse.connections)) {
-                    for (const connection of aiResponse.connections) {
-                        const suggestedTitle = (connection.id ?? '').toString().trim();
-                        if (!suggestedTitle || suggestedTitle === nodeData.title) continue;
-                        const targetNode = data.nodes.find((n: any) => {
-                            const t = (n.title ?? n.content ?? n.id)?.toString?.() ?? '';
-                            return t.toLowerCase() === suggestedTitle.toLowerCase() || t.toLowerCase().includes(suggestedTitle.toLowerCase());
-                        });
-                        if (targetNode) {
-                            const targetId = typeof targetNode.id === 'string' ? targetNode.id : targetNode.id?.id;
-                            if (targetId && targetId !== createdNode.id) {
-                                const aiLabel = `AI Similarity: ${connection.accuracy ?? 0}%`;
-                                await addLink(createdNode.id, targetId, 'ai', aiLabel);
-                            }
-                        }
-                    }
-                }
-
                 setAiProgress(1);
 
-            } catch (err) {
-                console.error("AI logic failed:", err);
-                setIsAIProcessing(false);
-            } finally {
-                setTimeout(() => {
-                    setIsAIProcessing(false);
-                    setTimeout(() => {
-                        setAiProgress(0);
-                        setAiTotal(0);
-                    }, 500);
-                }, 2500);
+                await updateNode(createdNodeId, { 
+                    isAiProcessed: true,
+                    content: aiResponse.summary || nodeData.content,
+                    tags: aiResponse.tags || nodeData.tags
+                });
+
+                if (aiResponse.connections && aiResponse.connections.length > 0) {
+                    for (const match of aiResponse.connections) {
+                        // match.similarity повертає число від 0 до 1. Переводимо у відсотки.
+                        const similarityPercent = Math.round(match.similarity * 100);
+                        const aiLabel = `AI Link: ${similarityPercent}%`;
+                        
+                        await addLink({
+                            sourceId: createdNodeId,
+                            targetId: match.id,
+                            type: 'ai',
+                            label: aiLabel
+                        });
+                    }
+                }
             }
-        } else {
-            setIsAIProcessing(false);
+        } catch (error: any) {
+            console.error("Pipeline failed:", error);
+            setAddError(error.message || 'Failed to add neuron.');
+        } finally {
+            setTimeout(() => {
+                setIsAIProcessing(false);
+                setTimeout(() => {
+                    setAiProgress(0);
+                    setAiTotal(0);
+                }, 500);
+            }, 1000);
         }
     };
 
@@ -557,38 +567,38 @@ export default function Home() {
         <main className="bg-white dark:bg-neutral-950 flex min-h-screen flex-col items-center justify-between">
             <OnboardingTour run={!hasCompletedOnboarding && !isOnboardingLoading} onComplete={completeOnboarding} />
             <div className="absolute inset-0" data-tour-id="tour-graph" aria-hidden="true">
-            <GraphNetwork
-                onNodeSelect={(node) => {
-                    setSelectedNode(node);
-                    setFocusedNodeId(typeof node.id === 'string' ? node.id : node.id?.id);
-                }}
-                graphData={data}
-                timelineDate={data.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
-                activeTag={activeTag}
-                focusedNodeId={focusedNodeId}
-                zenModeNodeId={zenModeNodeId}
-                physicsConfig={physicsConfig}
-                highlightedNodes={highlightedNodes}
-                contextNodeIds={contextNodeIds}
-                pathNodes={pathData.nodes}
-                pathLinks={pathData.links}
-                flyToNodeId={flyToNodeId}
-                onFlyToComplete={() => setFlyToNodeId(null)}
-                onNodeContextMenu={handleNodeContextMenu}
-                onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
-                solarSystemNodeId={solarSystemNodeId}
-                clusterMode={clusterMode}
-                groups={groups}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                canUse3DGraph={access.canUse3DGraph}
-                onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
-                renderToolbarExtra={data.nodes.length > 0 ? (buttonClassName) => (
-                    <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
-                        <Settings2 size={18} />
-                    </button>
-                ) : undefined}
-            />
+                <GraphNetwork
+                    onNodeSelect={(node) => {
+                        setSelectedNode(node);
+                        setFocusedNodeId(typeof node.id === 'string' ? node.id : node.id?.id);
+                    }}
+                    graphData={data}
+                    timelineDate={data.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
+                    activeTag={activeTag}
+                    focusedNodeId={focusedNodeId}
+                    zenModeNodeId={zenModeNodeId}
+                    physicsConfig={physicsConfig}
+                    highlightedNodes={highlightedNodes}
+                    contextNodeIds={contextNodeIds}
+                    pathNodes={pathData.nodes}
+                    pathLinks={pathData.links}
+                    flyToNodeId={flyToNodeId}
+                    onFlyToComplete={() => setFlyToNodeId(null)}
+                    onNodeContextMenu={handleNodeContextMenu}
+                    onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
+                    solarSystemNodeId={solarSystemNodeId}
+                    clusterMode={clusterMode}
+                    groups={groups}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    canUse3DGraph={access.canUse3DGraph}
+                    onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
+                    renderToolbarExtra={data.nodes.length > 0 ? (buttonClassName) => (
+                        <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
+                            <Settings2 size={18} />
+                        </button>
+                    ) : undefined}
+                />
             </div>
             <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
                 <div className="flex items-center gap-3">
@@ -819,15 +829,15 @@ export default function Home() {
             <Sidebar 
                 selectedNode={selectedNode} 
                 onClose={() => setSelectedNode(null)} 
-                onUpdateNode={updateNode}
+                onUpdateNode={updateNode_old}
                 allNodes={data}
-                onAddLink={addLink}
+                onAddLink={addLink_old}
                 onDeleteLink={deleteLink}
                 groups={groups}
                 onAddGroup={onAddGroup}
             />
 
-<AddModal
+            <AddModal
                 isOpen={isAddModalOpen}
                 onClose={() => { setIsAddModalOpen(false); setAddError(null); }}
                 onAdd={handleAddWithAI}
