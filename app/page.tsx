@@ -64,7 +64,7 @@ export default function Home() {
         updateNode: updateNode_old,
         deleteNode,
         addLink: addLink_old,
-        deleteLink,
+        deleteLink: deleteLink_old,
         importData,
         exportData,
     } = useGraphData(supabase, { neuronLimit: access.neuronLimit });
@@ -87,6 +87,7 @@ export default function Home() {
         addNode,
         updateNode,
         addLink,
+        deleteLink,
     } = useNeuronData({ supabase, user });
 
     // When any node has a group_id not in our groups list (e.g. AI-created group on backend), refetch groups so the graph shows the real name
@@ -348,7 +349,8 @@ export default function Home() {
         isOpen: false,
         x: 0,
         y: 0,
-        node: null as any | null
+        node: null as any | null,
+        link: null as any | null
     });
 
     const allTags = useMemo(() => {
@@ -372,12 +374,13 @@ export default function Home() {
         }
     };
 
-    const handleNodeContextMenu = (node: any, event: MouseEvent) => {
+    const handleLinkContextMenu = (link: any, event: MouseEvent) => {
         setContextMenu({
             isOpen: true,
             x: event.clientX,
             y: event.clientY,
-            node: node
+            node: null, // Скидаємо ноду
+            link: link
         });
     };
 
@@ -584,7 +587,7 @@ export default function Home() {
                     pathLinks={pathData.links}
                     flyToNodeId={flyToNodeId}
                     onFlyToComplete={() => setFlyToNodeId(null)}
-                    onNodeContextMenu={handleNodeContextMenu}
+                    onLinkContextMenu={handleLinkContextMenu}
                     onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                     solarSystemNodeId={solarSystemNodeId}
                     clusterMode={clusterMode}
@@ -737,6 +740,7 @@ export default function Home() {
                 x={contextMenu.x}
                 y={contextMenu.y}
                 node={contextMenu.node}
+                link={contextMenu.link}
                 isZenModeActive={zenModeNodeId !== null}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 onDeepFocus={(nodeId) => { if (access.canUse3DGraph) setSolarSystemNodeId(nodeId); else openUpgradeModal("singularity"); }}
@@ -745,6 +749,7 @@ export default function Home() {
                     setSelectedNode(node);
                 }}
                 onDelete={deleteNode}
+                onDeleteLink={deleteLink}
             />
 
             <AIStatusBar 
@@ -832,7 +837,7 @@ export default function Home() {
                 onUpdateNode={updateNode_old}
                 allNodes={data}
                 onAddLink={addLink_old}
-                onDeleteLink={deleteLink}
+                onDeleteLink={deleteLink_old}
                 groups={groups}
                 onAddGroup={onAddGroup}
             />

@@ -62,6 +62,10 @@ export const useLinks = ({ supabase, user }: UseHooksProps) => {
         }
     }
 
+    const deleteLink = () => {
+        
+    }
+
     useEffect(() => {
         fetchLinks();
     }, [fetchLinks]);
@@ -71,5 +75,6 @@ export const useLinks = ({ supabase, user }: UseHooksProps) => {
         isLinksLoading: isLoading,
 
         addLink,
+        deleteLink,
     }
 }

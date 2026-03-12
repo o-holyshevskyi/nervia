@@ -38,6 +38,7 @@ export interface GraphNetwork2DProps {
     // ── drag (both exist in react-force-graph-2d types, no cast needed) ────
     onNodeDrag?: (node: any, translate: { x: number; y: number }) => void;
     onNodeDragEnd?: (node: any, translate: { x: number; y: number }) => void;
+    onLinkRightClick?: (link: any, event: unknown) => void;
 }
 
 const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwork2D(
@@ -45,7 +46,6 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
     ref
 ) {
     const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
-    const glowState = useRef<Map<string, number>>(new Map());
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -100,58 +100,48 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
 
         const cols = (maxX - minX) / S;
         const rows = (maxY - minY) / S;
+        
+        // Запобіжник від зависання
         if (cols * rows > 15000) {
             if (props.onRenderFramePre) props.onRenderFramePre(ctx, globalScale);
             return;
         }
 
         const baseColor     = isLightTheme ? 'rgba(20, 20, 20, 0.10)' : 'rgba(255, 255, 255, 0.10)';
-        const hoverRadiusSq = (40 / transform.k) * (40 / transform.k);
         const baseDotSize   = 1.5 / transform.k;
-        const currentGlows  = glowState.current;
-        const newGlows      = new Map<string, number>();
 
         ctx.save();
         ctx.beginPath();
         ctx.fillStyle = baseColor;
 
+        // 1. Малюємо статичну сітку одним проходом. Жодних обчислень дистанції.
         for (let x = minX; x <= maxX; x += S) {
             for (let y = minY; y <= maxY; y += S) {
-                const dx     = x - mouseWorld.x;
-                const dy     = y - mouseWorld.y;
-                const distSq = dx * dx + dy * dy;
-                const key    = `${x},${y}`;
-                let glow     = currentGlows.get(key) || 0;
-
-                if (distSq < hoverRadiusSq) {
-                    glow = Math.min(1, glow + 0.15);
-                } else {
-                    glow = Math.max(0, glow - 0.03);
-                }
-
-                if (glow > 0) {
-                    newGlows.set(key, glow);
-                } else {
-                    ctx.rect(x - baseDotSize / 2, y - baseDotSize / 2, baseDotSize, baseDotSize);
-                }
+                ctx.rect(x - baseDotSize / 2, y - baseDotSize / 2, baseDotSize, baseDotSize);
             }
         }
         ctx.fill();
 
-        if (newGlows.size > 0) {
+        // 2. Малюємо світіння навколо миші одним радіальним градієнтом. Це магія, яка рятує FPS.
+        if (mouseWorld.x !== -999999) {
+            const glowRadius = 15 / transform.k;
+            const gradient = ctx.createRadialGradient(
+                mouseWorld.x, mouseWorld.y, 0,
+                mouseWorld.x, mouseWorld.y, glowRadius
+            );
+            
+            const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+            const glowColor = isDark ? 'rgba(168, 85, 247)' : 'rgba(99, 102, 241)';
+
+            gradient.addColorStop(0, glowColor);
+            gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+            ctx.fillStyle = gradient;
             ctx.beginPath();
-            for (const [key, glow] of newGlows.entries()) {
-                const [xStr, yStr] = key.split(',');
-                const x        = parseFloat(xStr);
-                const y        = parseFloat(yStr);
-                const glowSize = (1.5 + glow * 2.5) / transform.k;
-                const isDark   = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-                ctx.fillStyle  = isDark ? `rgba(168, 85, 247, ${glow * 0.8})` : `rgba(99, 102, 241, ${glow * 0.8})`;
-                ctx.rect(x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
-            }
+            ctx.arc(mouseWorld.x, mouseWorld.y, glowRadius, 0, Math.PI * 2);
             ctx.fill();
         }
-        glowState.current = newGlows;
+
         ctx.restore();
 
         if (props.onRenderFramePre) props.onRenderFramePre(ctx, globalScale);
@@ -167,6 +157,7 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
                 ref={ref == null ? undefined : (ref as MutableRefObject<any>)}
                 {...props}
                 onRenderFramePre={handleRenderFramePre}
+                onLinkRightClick={props.onLinkRightClick}
             />
         </div>
     );

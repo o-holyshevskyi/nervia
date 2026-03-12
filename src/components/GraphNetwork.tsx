@@ -256,6 +256,7 @@ interface GraphNetworkProps {
     onRequest3DUpgrade?: () => void;
     viewMode?: '2D' | '3D';
     onViewModeChange?: (mode: '2D' | '3D') => void;
+    onLinkContextMenu?: (link: any, event: MouseEvent) => void;
 }
 
 function getLinkEnd(linkEnd: any): string | undefined {
@@ -328,16 +329,6 @@ export default function GraphNetwork({
     const physicsAppliedRef = useRef(false);
     const zoomScheduledRef = useRef(false);
     const clusterCentersRef = useRef<Record<string | number, { x: number; y: number }>>({});
-    const ambientRafRef = useRef<number>(0);
-
-    // ── CHANGE 1: promote orbit maps to refs so drag handlers can reach them ─
-    const orbitMapRef = useRef<Map<any, { radius: number; angle: number; speed: number }>>(new Map());
-    const clusterOrbitMapRef = useRef<Map<string | number, { radius: number; angle: number; speed: number }>>(new Map());
-    // Live (currently-orbiting) cluster center positions, updated every RAF tick
-    const liveClusterCentersRef = useRef<Record<string | number, { x: number; y: number }>>({});
-
-    // Node currently being dragged — RAF tick skips it
-    const draggingNodeRef = useRef<any>(null);
 
     const initialFitDone = useRef(false);
     const threeDKeyRef = useRef(0);
@@ -546,179 +537,6 @@ export default function GraphNetwork({
         }
         return null;
     }, []);
-
-    // ── CHANGE 2: Orbital animation — uses refs, skips dragged node, ring layout
-    useEffect(() => {
-        if (viewMode !== '2D') return;
-
-        // Reset refs on re-init (clusterMode or nodes changed)
-        orbitMapRef.current.clear();
-        clusterOrbitMapRef.current.clear();
-
-        let initialized = false;
-        const GOLDEN = 2.399;
-        const BASE_SPEED    = 0.00008;   // node speed around cluster center
-        const CLUSTER_SPEED = 0.000022;  // cluster speed around global center
-
-        const getClusterKey = (node: any): string | number =>
-            clusterMode === 'group'
-                ? getNodeGroupKey(node)
-                : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
-
-        const init = (): boolean => {
-            const centers = clusterCentersRef.current;
-            const nodes   = processedData.nodes;
-            if (!nodes.length || !Object.keys(centers).length) return false;
-
-            const settled = nodes.filter((n: any) =>
-                isFinite(n.x) && isFinite(n.y) && (Math.abs(n.x) > 1 || Math.abs(n.y) > 1)
-            );
-            if (settled.length < nodes.length * 0.8) return false;
-
-            // ── Cluster orbits around (0,0) — unchanged from original ──────
-            Object.entries(centers).forEach(([keyStr, center], i) => {
-                const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
-                const radius = Math.hypot(center.x, center.y);
-                const angle  = Math.atan2(center.y, center.x);
-                const speed  = CLUSTER_SPEED * (0.8 + ((i * GOLDEN) % 1) * 0.4);
-                clusterOrbitMapRef.current.set(key, { radius: Math.max(10, radius), angle, speed });
-            });
-
-            // ── CHANGE 2a: node orbits — evenly distributed on concentric rings ──
-            // Group nodes by cluster first so we can assign slots
-            const byCluster = new Map<string | number, any[]>();
-            nodes.forEach((node: any) => {
-                if (node.fx != null) return;
-                const key = getClusterKey(node);
-                if (!byCluster.has(key)) byCluster.set(key, []);
-                byCluster.get(key)!.push(node);
-            });
-
-            byCluster.forEach((clusterNodes) => {
-                const total = clusterNodes.length;
-                clusterNodes.forEach((node: any, localIdx: number) => {
-                    const ring       = Math.floor(localIdx / ORBIT_NODES_PER_RING);
-                    const posInRing  = localIdx % ORBIT_NODES_PER_RING;
-                    // How many nodes actually sit on this ring
-                    const ringCount  = Math.min(
-                        ORBIT_NODES_PER_RING,
-                        total - ring * ORBIT_NODES_PER_RING
-                    );
-                    // Evenly spread + stagger rings so they don't stack radially
-                    const angle  = (posInRing / ringCount) * 2 * Math.PI
-                                 + ring * (Math.PI / ORBIT_NODES_PER_RING);
-                    const radius = ORBIT_RING_BASE_R + ring * ORBIT_RING_GAP;
-
-                    const globalIdx = nodes.indexOf(node);
-                    const speed     = BASE_SPEED * (0.7 + ((globalIdx * GOLDEN) % 1) * 0.6);
-                    orbitMapRef.current.set(node, { radius, angle, speed });
-                });
-            });
-
-            return orbitMapRef.current.size > 0;
-        };
-
-        let lastTime = 0;
-        const tick = (now: number) => {
-            const fg = fgRef.current;
-            const dt = Math.min(lastTime ? now - lastTime : 16, 64);
-            lastTime = now;
-
-            if (fg) {
-                if (!initialized) initialized = init();
-
-                if (initialized) {
-                    // Step 1 — advance cluster centers around (0,0)
-                    const liveCenters: Record<string | number, { x: number; y: number }> = {};
-                    clusterOrbitMapRef.current.forEach((orbit, key) => {
-                        orbit.angle += orbit.speed * dt;
-                        liveCenters[key] = {
-                            x: Math.cos(orbit.angle) * orbit.radius,
-                            y: Math.sin(orbit.angle) * orbit.radius,
-                        };
-                    });
-                    // Expose live centers so drag handler can use them
-                    liveClusterCentersRef.current = liveCenters;
-
-                    // Step 2 — advance node orbits around their moving cluster center
-                    // CHANGE 2b: skip the node being dragged
-                    orbitMapRef.current.forEach((orbit, node) => {
-                        if (node === draggingNodeRef.current) return;
-                        orbit.angle += orbit.speed * dt;
-                        const key    = getClusterKey(node);
-                        const center = liveCenters[key] ?? clusterCentersRef.current[key] ?? { x: 0, y: 0 };
-                        node.x = center.x + Math.cos(orbit.angle) * orbit.radius;
-                        node.y = center.y + Math.sin(orbit.angle) * orbit.radius;
-                    });
-
-                    fg.refresh?.();
-                }
-            }
-
-            ambientRafRef.current = requestAnimationFrame(tick);
-        };
-
-        const startTimer = setTimeout(() => {
-            ambientRafRef.current = requestAnimationFrame(tick);
-        }, 700);
-
-        return () => {
-            clearTimeout(startTimer);
-            cancelAnimationFrame(ambientRafRef.current);
-            orbitMapRef.current.clear();
-            clusterOrbitMapRef.current.clear();
-        };
-    }, [viewMode, processedData.nodes, clusterMode]);
-
-    // ── CHANGE 3: drag handlers ───────────────────────────────────────────────
-    const getClusterKeyForNode = useCallback((node: any): string | number =>
-        clusterMode === 'group'
-            ? getNodeGroupKey(node)
-            : (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string,
-    [clusterMode]);
-
-    const handleNodeDrag = useCallback((node: any) => {
-        draggingNodeRef.current = node;
-
-        // Clamp position to ORBIT_MAX_DRAG_R from the live cluster center
-        const key        = getClusterKeyForNode(node);
-        const liveCenter = liveClusterCentersRef.current[key]
-                        ?? clusterCentersRef.current[key]
-                        ?? { x: 0, y: 0 };
-
-        const dx   = (node.x ?? 0) - liveCenter.x;
-        const dy   = (node.y ?? 0) - liveCenter.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > ORBIT_MAX_DRAG_R) {
-            const s = ORBIT_MAX_DRAG_R / dist;
-            node.x  = liveCenter.x + dx * s;
-            node.y  = liveCenter.y + dy * s;
-        }
-    }, [getClusterKeyForNode]);
-
-    const handleNodeDragEnd = useCallback((node: any) => {
-        draggingNodeRef.current = null;
-
-        // Re-capture orbit from the dropped position so animation resumes from here
-        const key          = getClusterKeyForNode(node);
-        const clusterOrbit = clusterOrbitMapRef.current.get(key);
-        const liveCenter   = clusterOrbit
-            ? {
-                x: Math.cos(clusterOrbit.angle) * clusterOrbit.radius,
-                y: Math.sin(clusterOrbit.angle) * clusterOrbit.radius,
-            }
-            : clusterCentersRef.current[key];
-
-        if (!liveCenter) return;
-        const existing = orbitMapRef.current.get(node);
-        if (!existing) return;
-
-        const dx = (node.x ?? 0) - liveCenter.x;
-        const dy = (node.y ?? 0) - liveCenter.y;
-        existing.radius = Math.max(10, Math.hypot(dx, dy));
-        existing.angle  = Math.atan2(dy, dx);
-        // speed intentionally preserved
-    }, [getClusterKeyForNode]);
 
     const isLinkHidden = useCallback((link: any) => {
         const sId = typeof link.source === 'string' ? link.source : link.source?.id;
@@ -1217,9 +1035,6 @@ export default function GraphNetwork({
                             onNodeRightClick={(node, event) => {
                                 if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
                             }}
-                            // ── CHANGE 4: wire drag handlers ─────────────────
-                            onNodeDrag={handleNodeDrag}
-                            onNodeDragEnd={handleNodeDragEnd}
                             onBackgroundClick={() => { if (onBackgroundClick) onBackgroundClick(); }}
                             onLinkHover={(link) => setHoveredLink(link)}
                             nodePointerAreaPaint={(node: any, color, ctx) => {
@@ -1294,6 +1109,9 @@ export default function GraphNetwork({
                             enablePointerInteraction={true}
                             onEngineStop={handleEngineStop}
                             graphTheme={graphTheme}
+                            onLinkRightClick={(link, event) => {
+                                if (!readOnly && onNodeContextMenu) onNodeContextMenu(link, event as unknown as MouseEvent);
+                            }}
                         />
                     </motion.div>
                 )}
