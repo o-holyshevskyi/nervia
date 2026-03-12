@@ -12,6 +12,7 @@ import ContextMenu from "@/src/components/ui/ContextMenu";
 import PhysicsControl, { PhysicsConfig } from "@/src/components/PhysicsControl";
 import { AnimatePresence, motion } from "framer-motion";
 import { useGraphData } from "@/src/hooks/useGraphData";
+import { useGraphData as useGD } from "@/src/hooks/useGraphData_new";
 import { useAIProcessor } from "@/src/hooks/useAIProcessor";
 import { useGroups } from "@/src/hooks/useGroups";
 import { createClient } from "@/src/lib/supabase/client";
@@ -40,6 +41,8 @@ import { NeuralBackground } from "@/src/components/NeuralBackground";
 import posthog from "posthog-js";
 import { TELEMETRY_EVENTS, type ImportSource } from "@/src/lib/telemetry/events";
 import type { ImportOptions } from "@/src/components/ImportExport";
+import NexusGraph from "@/src/components/NexusGraph";
+import { useNodes } from "@/src/hooks/useNodes";
 
 export default function Home() {
     const supabase = useMemo(() => createClient(), []);
@@ -55,8 +58,8 @@ export default function Home() {
     }, []);
 
     const { 
-        data, 
-        isLoading,
+        // graphData, 
+        // isLoading,
         addNewNode,
         updateNode,
         deleteNode,
@@ -66,24 +69,25 @@ export default function Home() {
         exportData,
     } = useGraphData(supabase, { neuronLimit: access.neuronLimit });
 
+    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup, refetch: refetchGroups } = useGroups(supabase);
+    const { graphData, isLoading } = useGD(supabase, access.neuronLimit);
+
     const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
         supabase,
         updateNode,
         addLink,
-        data.nodes
+        graphData.nodes
     );
-
-    const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup, refetch: refetchGroups } = useGroups(supabase);
 
     // When any node has a group_id not in our groups list (e.g. AI-created group on backend), refetch groups so the graph shows the real name
     const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
     useEffect(() => {
-        const hasMissingGroup = data.nodes.some((n: any) => {
+        const hasMissingGroup = graphData.nodes.some((n: any) => {
             const gid = n?.group_id;
             return typeof gid === 'string' && gid.length > 0 && !groupIds.has(gid);
         });
         if (hasMissingGroup) refetchGroups();
-    }, [data.nodes, groupIds, refetchGroups]);
+    }, [graphData.nodes, groupIds, refetchGroups]);
 
     const handleNotificationInsert = useCallback((n: any) => {
         if (n?.type === "visit") {
@@ -168,13 +172,13 @@ export default function Home() {
 
     const handleNavigateToGroup = useCallback(
         (groupId: string) => {
-            const node = data.nodes.find((n: any) => n.group_id === groupId);
+            const node = graphData.nodes.find((n: any) => n.group_id === groupId);
             if (node) {
-                const id = typeof node.id === "string" ? node.id : node.id?.id;
+                const id = typeof node.id === "string" ? node.id : node.id;
                 if (id) setFlyToNodeId(id);
             }
         },
-        [data.nodes]
+        [graphData.nodes]
     );
 
     const [selectedNode, setSelectedNode] = useState<any | null>(null);
@@ -238,9 +242,9 @@ export default function Home() {
             const e = evt as CustomEvent<{ groupId?: string }>;
             const groupId = e?.detail?.groupId;
             if (!groupId) return;
-            const node = data.nodes.find((n: any) => n.group_id === groupId);
+            const node = graphData.nodes.find((n: any) => n.group_id === groupId);
             if (!node) return;
-            const id = typeof node.id === "string" ? node.id : node.id?.id;
+            const id = typeof node.id === "string" ? node.id : node.id;
             if (id) {
                 setFlyToNodeId(id);
                 setIsLeftSidebarOpen(false);
@@ -248,7 +252,7 @@ export default function Home() {
         };
         window.addEventListener("synapse:navigate_to_group", handler as EventListener);
         return () => window.removeEventListener("synapse:navigate_to_group", handler as EventListener);
-    }, [data.nodes]);
+    }, [graphData.nodes]);
 
     // Open sidebar when onboarding runs so step 4 (Neural Chat) target is visible.
     useEffect(() => {
@@ -258,7 +262,7 @@ export default function Home() {
     }, [hasCompletedOnboarding, isOnboardingLoading]);
 
     const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
-        const nodes = data.nodes;
+        const nodes = graphData.nodes;
         if (!nodes.length) {
             const now = Date.now();
             return { timelineMinDate: now, timelineMaxDate: now, timelineDatePoints: [] as number[] };
@@ -282,26 +286,26 @@ export default function Home() {
         const fallbackMin = datePoints[0] ?? Date.now();
         const fallbackMax = datePoints[datePoints.length - 1] ?? Date.now();
         return { timelineMinDate: fallbackMin, timelineMaxDate: fallbackMax, timelineDatePoints: datePoints };
-    }, [data.nodes]);
+    }, [graphData.nodes]);
 
     const [timelineDate, setTimelineDate] = useState<number>(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackDurationSeconds, setPlaybackDurationSeconds] = useState(60);
     const timelineInitialized = useRef(false);
     useLayoutEffect(() => {
-        if (data.nodes.length === 0) return;
+        if (graphData.nodes.length === 0) return;
         if (!timelineInitialized.current) {
             setTimelineDate(timelineMaxDate);
             timelineInitialized.current = true;
         }
-    }, [data.nodes.length, timelineMaxDate]);
+    }, [graphData.nodes.length, timelineMaxDate]);
 
     const timelineDateRef = useRef(timelineDate);
     timelineDateRef.current = timelineDate;
     const playbackRafRef = useRef<number>(0);
     const playbackCancelledRef = useRef(false);
     useEffect(() => {
-        if (!isPlaying || data.nodes.length === 0 || timelineDatePoints.length === 0) return;
+        if (!isPlaying || graphData.nodes.length === 0 || timelineDatePoints.length === 0) return;
         playbackCancelledRef.current = false;
         const duration = playbackDurationSeconds * 1000;
         const start = Date.now();
@@ -331,7 +335,7 @@ export default function Home() {
             playbackCancelledRef.current = true;
             cancelAnimationFrame(playbackRafRef.current);
         };
-    }, [isPlaying, data.nodes.length, timelineDatePoints, playbackDurationSeconds]);
+    }, [isPlaying, graphData.nodes.length, timelineDatePoints, playbackDurationSeconds]);
 
     const [contextMenu, setContextMenu] = useState({
         isOpen: false,
@@ -342,11 +346,11 @@ export default function Home() {
 
     const allTags = useMemo(() => {
         const tagsSet = new Set<string>();
-        data.nodes.forEach((node: any) => {
+        graphData.nodes.forEach((node: any) => {
             if (node.tags) node.tags.forEach((tag: string) => tagsSet.add(tag));
         });
         return Array.from(tagsSet);
-    }, [data]);
+    }, [graphData]);
 
     const toggleZenMode = (nodeId: string) => {
         if (!access.canUseZenMode) {
@@ -383,11 +387,11 @@ export default function Home() {
     }, []);
 
     const existingNodeTitlesForAI = useMemo(() => {
-        return data.nodes.map((n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? String(n.id));
-    }, [data.nodes]);
+        return graphData.nodes.map((n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? String(n.id));
+    }, [graphData.nodes]);
 
     const handleAddWithAI = async (nodeData: any) => {
-        if (!access.canAddNeuron(data.nodes.length)) {
+        if (!access.canAddNeuron(graphData.nodes.length)) {
             openUpgradeModal("constellation");
             return;
         }
@@ -454,12 +458,12 @@ export default function Home() {
                     for (const connection of aiResponse.connections) {
                         const suggestedTitle = (connection.id ?? '').toString().trim();
                         if (!suggestedTitle || suggestedTitle === nodeData.title) continue;
-                        const targetNode = data.nodes.find((n: any) => {
+                        const targetNode = graphData.nodes.find((n: any) => {
                             const t = (n.title ?? n.content ?? n.id)?.toString?.() ?? '';
                             return t.toLowerCase() === suggestedTitle.toLowerCase() || t.toLowerCase().includes(suggestedTitle.toLowerCase());
                         });
                         if (targetNode) {
-                            const targetId = typeof targetNode.id === 'string' ? targetNode.id : targetNode.id?.id;
+                            const targetId = typeof targetNode.id === 'string' ? targetNode.id : targetNode.id;
                             if (targetId && targetId !== createdNode.id) {
                                 const aiLabel = `AI Similarity: ${connection.accuracy ?? 0}%`;
                                 await addLink(createdNode.id, targetId, 'ai', aiLabel);
@@ -529,7 +533,7 @@ export default function Home() {
             }
 
             // 🤖 4. ПРОЦЕС ШІ ТІЛЬКИ ДЛЯ ЗАКЛАДОК (HTML Bookmarks)
-            const allNodesForContext = [...data.nodes, ...insertedNodes];
+            const allNodesForContext = [...graphData.nodes, ...insertedNodes];
             console.log('Starting AI processing queue...');
 
             const MAX_NODES_PER_RUN = 25;
@@ -597,11 +601,11 @@ export default function Home() {
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [openSearch, access.canUsePathfinder, access.canUseTimeMachine, access.canUseEvolutionJournal, access.canUseNeuralCore, openUpgradeModal]);
 
-    const nodeIdsSet = useMemo(() => new Set(data.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id)), [data.nodes]);
+    const nodeIdsSet = useMemo(() => new Set(graphData.nodes.map((n: any) => typeof n.id === 'string' ? n.id : n.id?.id)), [graphData.nodes]);
 
     // When graph is empty or when referenced nodes no longer exist, clear node-related state to avoid "node not found" errors
     useEffect(() => {
-        if (data.nodes.length === 0) {
+        if (graphData.nodes.length === 0) {
             setSelectedNode(null);
             setFocusedNodeId(null);
             setZenModeNodeId(null);
@@ -627,7 +631,7 @@ export default function Home() {
             nodes: prev.nodes.filter((id) => nodeIdsSet.has(id)),
             links: prev.links,
         }));
-    }, [data.nodes.length, nodeIdsSet]);
+    }, [graphData.nodes.length, nodeIdsSet]);
 
     if (isLoading) {
         return (
@@ -641,14 +645,14 @@ export default function Home() {
     return (
         <main className="bg-white dark:bg-neutral-950 flex min-h-screen flex-col items-center justify-between">
             <OnboardingTour run={!hasCompletedOnboarding && !isOnboardingLoading} onComplete={completeOnboarding} />
-            <div className="absolute inset-0" data-tour-id="tour-graph" aria-hidden="true">
-            <GraphNetwork
+            <div className="absolute inset-0" aria-hidden="true">
+            {/* <GraphNetwork
                 onNodeSelect={(node) => {
                     setSelectedNode(node);
                     setFocusedNodeId(typeof node.id === 'string' ? node.id : node.id?.id);
                 }}
-                graphData={data}
-                timelineDate={data.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
+                graphData={graphData}
+                timelineDate={graphData.nodes.length > 0 && isTimelineOpen ? timelineDate : undefined}
                 activeTag={activeTag}
                 focusedNodeId={focusedNodeId}
                 zenModeNodeId={zenModeNodeId}
@@ -668,14 +672,18 @@ export default function Home() {
                 onViewModeChange={setViewMode}
                 canUse3DGraph={access.canUse3DGraph}
                 onRequest3DUpgrade={() => openUpgradeModal('singularity', { descriptionOverride: 'Unlock the 3D Perspective. Experience your knowledge in infinite depth with Singularity.' })}
-                renderToolbarExtra={data.nodes.length > 0 ? (buttonClassName) => (
+                renderToolbarExtra={graphData.nodes.length > 0 ? (buttonClassName) => (
                     <button type="button" onClick={() => setPhysicsPanelOpen(true)} className={buttonClassName} title="Physics of the Universe" aria-label="Physics settings">
                         <Settings2 size={18} />
                     </button>
                 ) : undefined}
+            /> */}
+            <NexusGraph 
+                data={graphData}
+                groups={groups}
             />
             </div>
-            <div className="absolute top-10 left-10 pointer-events-none" data-tour-id="tour-welcome">
+            <div className="absolute top-10 left-10 pointer-events-none">
                 <div className="flex items-center gap-3">
                     <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg" aria-hidden>
                         <NeuralBackground clipPathId="neural-brain-clip-app-welcome" />
@@ -686,7 +694,7 @@ export default function Home() {
             </div>
 
             <AnimatePresence>
-                {!isLoading && data.nodes.length === 0 && (
+                {!isLoading && graphData.nodes.length === 0 && (
                     <motion.div 
                         initial={{ opacity: 0, x: 0 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -702,7 +710,6 @@ export default function Home() {
                                     Start building your knowledge graph. Add a Source, Memory, or Impulse to create your first neural link.
                                 </p>
                                 <button
-                                    data-tour-id="tour-new-neuron"
                                     onClick={() => setIsAddModalOpen(true)}
                                     className="hover:cursor-pointer flex items-center gap-2 px-8 py-3.5 rounded-xl bg-indigo-500/20 dark:bg-purple-500/20 border border-indigo-500/40 dark:border-purple-500/40 text-indigo-700 dark:text-purple-300 hover:bg-indigo-500/30 dark:hover:bg-purple-500/30 hover:text-indigo-900 dark:hover:text-white font-medium transition-all shadow-[0_0_20px_rgba(99,102,241,0.15)] dark:shadow-[0_0_20px_rgba(168,85,247,0.15)]"
                                 >
@@ -831,7 +838,7 @@ export default function Home() {
             />
 
             <NeuralSearch
-                nodes={data.nodes}
+                nodes={graphData.nodes}
                 onResultSelect={handleSearchResultSelect}
                 onSearchChange={setHighlightedNodes}
                 isOpen={isSearchOpen}
@@ -850,14 +857,14 @@ export default function Home() {
                     setIsChatOpen(false);
                     setContextNodeIds([]);
                 }}
-                nodes={data.nodes}
+                nodes={graphData.nodes}
                 setContextNodeIds={setContextNodeIds}
             />
 
             {isPathfinderOpen && (
                 <PathfinderPanel
-                    nodes={data.nodes}
-                    links={data.links}
+                    nodes={graphData.nodes}
+                    links={graphData.links}
                     onPathFound={(pathNodes, pathLinks) => setPathData({ nodes: pathNodes, links: pathLinks })}
                     onClose={() => {
                         setIsPathfinderOpen(false);
@@ -872,7 +879,7 @@ export default function Home() {
                 tags={allTags}
                 activeTag={activeTag}
                 onTagSelect={setActiveTag}
-                nodes={data.nodes}
+                nodes={graphData.nodes}
                 onSelect={handleSearchSelect}
                 onImport={handleImportWithQueue}
                 onExport={exportData}
@@ -913,7 +920,7 @@ export default function Home() {
                 selectedNode={selectedNode}
                 onClose={() => setSelectedNode(null)}
                 onUpdateNode={updateNode}
-                allNodes={data}
+                allNodes={graphData}
                 onAddLink={addLink}
                 onDeleteLink={deleteLink}
                 groups={groups}
@@ -927,11 +934,11 @@ export default function Home() {
                 supabase={supabase}
             />
 
-<AddModal
+            <AddModal
                 isOpen={isAddModalOpen}
                 onClose={() => { setIsAddModalOpen(false); setAddError(null); }}
                 onAdd={handleAddWithAI}
-                existingNodes={data.nodes}
+                existingNodes={graphData.nodes}
                 allTags={allTags}
                 submitError={addError}
                 onUpgradeRequest={() => { setIsAddModalOpen(false); openUpgradeModal("constellation"); }}
@@ -941,7 +948,7 @@ export default function Home() {
 
             <CommandPalette onOpenSearch={openSearch} />
 
-            {data.nodes.length > 0 && (
+            {graphData.nodes.length > 0 && (
                 <PhysicsControl
                     config={physicsConfig}
                     onChange={(cfg) => {
@@ -956,7 +963,7 @@ export default function Home() {
             {isTimelineOpen && (
                 <TimelinePanel
                     datePoints={timelineDatePoints}
-                    currentDate={data.nodes.length > 0 ? timelineDate : timelineMaxDate}
+                    currentDate={graphData.nodes.length > 0 ? timelineDate : timelineMaxDate}
                     onChange={setTimelineDate}
                     isPlaying={isPlaying}
                     onTogglePlay={() => setIsPlaying((p) => !p)}
@@ -972,7 +979,7 @@ export default function Home() {
 
             {isHistoryOpen && (
                 <UniverseHistory
-                    nodes={data.nodes}
+                    nodes={graphData.nodes}
                     groups={groups}
                     supabase={supabase}
                     onClose={() => setIsHistoryOpen(false)}
@@ -986,10 +993,9 @@ export default function Home() {
                 onClose={() => { setUpgradeModalTarget(null); setUpgradeModalDescriptionOverride(undefined); }}
             />
 
-            {!isLoading && data.nodes.length > 0 && (
+            {!isLoading && graphData.nodes.length > 0 && (
                 <motion.button
                     type="button"
-                    data-tour-id="tour-new-neuron"
                     onClick={() => setIsAddModalOpen(true)}
                     className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full backdrop-blur-2xl bg-white/90 dark:bg-neutral-900/50 border border-black/10 dark:border-white/10 text-neutral-900 dark:text-white font-medium tracking-wide flex items-center gap-2 shadow-[0_0_30px_rgba(99,102,241,0.15)] dark:shadow-[0_0_30px_rgba(168,85,247,0.15)] cursor-pointer z-20"
                     whileHover={{ scale: 1.05 }}

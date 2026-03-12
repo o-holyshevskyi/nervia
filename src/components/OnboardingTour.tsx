@@ -1,7 +1,10 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
-import Joyride, { ACTIONS, EVENTS, STATUS } from 'react-joyride';
+import { ACTIONS, EVENTS, STATUS } from 'react-joyride';
+
+const Joyride = dynamic(() => import('react-joyride'), { ssr: false });
 
 const ONBOARDING_STEPS = [
     {

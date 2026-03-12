@@ -2,8 +2,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { ParsedBookmark } from '../lib/bookmarkParser';
 import { ParsedObsidianNote } from '../lib/obsidianParser';
-import { NodeData } from '../components/AddModal';
+// import { NodeData } from '../components/AddModal';
 import { toast } from 'sonner';
+import { LinkDb, NodeDb, NodeOnAdd } from './types/types';
 
 const NEW_NODE_PING_DURATION_MS = 4000;
 
@@ -24,7 +25,7 @@ export interface UseGraphDataOptions {
 export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
     const neuronLimit = options?.neuronLimit;
     const [user, setUser] = useState<any>(null);
-    const [data, setData] = useState({ nodes: [] as any[], links: [] as any[] });
+    const [data, setData] = useState({ nodes: [] as NodeDb[], links: [] as any[] });
     const [isLoading, setIsLoading] = useState(true);
 
     const notificationSound = useRef<HTMLAudioElement | null>(null);
@@ -124,19 +125,19 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
                     notificationSound.current.play().catch((e) => console.log('Audio blocked by browser', e));
                 }
 
-                setData((prev) => {
-                    if (prev.nodes.some((n: any) => (n.id ?? n.id?.id) === nodeId)) return prev;
-                    const n = row as Record<string, unknown>;
-                    const normalized = {
-                        ...n,
-                        title: n.title ?? n.Title ?? '',
-                        content: n.content ?? n.Content ?? '',
-                        group: n.group != null ? n.group : (n.type === 'note' ? 2 : n.type === 'idea' ? 3 : 1),
-                        isNew: true,
-                        newPingAt: Date.now(),
-                    };
-                    return { ...prev, nodes: [...prev.nodes, normalized] };
-                });
+                // setData((prev) => {
+                //     if (prev.nodes.some((n: any) => (n.id ?? n.id?.id) === nodeId)) return prev;
+                //     const n = row as Record<string, unknown>;
+                //     const normalized = {
+                //         ...n,
+                //         title: n.title ?? n.Title ?? '',
+                //         content: n.content ?? n.Content ?? '',
+                //         group: n.group != null ? n.group : (n.type === 'note' ? 2 : n.type === 'idea' ? 3 : 1),
+                //         isNew: true,
+                //         newPingAt: Date.now(),
+                //     };
+                //     return { ...prev, nodes: [...prev.nodes, normalized] };
+                // });
 
                 setTimeout(() => {
                     setData((prev) => ({
@@ -165,8 +166,8 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
                         ...row,
                         title: rowTitle || (existing.title ?? ''),
                         content: rowContent || (existing.content ?? ''),
-                        group: row.group != null ? row.group : existing.group,
-                        updated_at: row.updated_at ?? existing.updated_at,
+                        // group: row.group != null ? row.group : existing.group,
+                        // updated_at: row.updated_at ?? existing.updated_at,
                     };
                     return {
                         ...prev,
@@ -183,24 +184,24 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
         };
     }, [supabase, user?.id]);
 
-    const addNewNode = async (nodeData: NodeData): Promise<any> => {
+    const addNewNode = async (node: NodeOnAdd): Promise<NodeDb | undefined> => {
         if (!user) return undefined;
 
-        // Enforce neuron limit (Genesis 60). For security, also add Supabase RLS on nodes INSERT.
         if (typeof neuronLimit === 'number' && data.nodes.length >= neuronLimit) {
             const err = new Error('NEURON_LIMIT_REACHED') as Error & { code?: string };
             err.code = 'NEURON_LIMIT_REACHED';
             throw err;
         }
 
-        const titleLower = (nodeData.title ?? '').toString().trim().toLowerCase();
-        const urlNorm = normalizeUrl(nodeData.url);
+        const titleLower = (node.title ?? '').toString().trim().toLowerCase();
+        const urlNorm = normalizeUrl(node.url);
 
         const duplicateTitle = data.nodes.some(
             (n: any) => (n.title ?? n.content ?? n.id ?? '').toString().trim().toLowerCase() === titleLower
         );
+
         if (duplicateTitle) {
-            throw new Error(`A neuron with the title "${(nodeData.title ?? '').toString().trim()}" already exists.`);
+            throw new Error(`A neuron with the title "${(node.title ?? '').toString().trim()}" already exists.`);
         }
 
         if (urlNorm) {
@@ -213,44 +214,42 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
             }
         }
 
-        let group = 1;
-        if (nodeData.type === 'link') group = 1;
-        if (nodeData.type === 'note') group = 2;
-        if (nodeData.type === 'idea') group = 3;
-
         const existingIdSet = new Set(
             data.nodes
                 .map((n: any) => (typeof n?.id === 'string' ? n.id : n?.id))
                 .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
         );
-        const validTargetIds = (nodeData.connections || [])
-            .map((id) => String(id))
-            .filter((id) => existingIdSet.has(id));
 
-        const newId = crypto.randomUUID();
-        const newNode = {
-            id: newId,
-            title: nodeData.title,
-            group: group,
-            val: 5,
-            type: nodeData.type,
-            url: nodeData.url ?? '',
-            tags: nodeData.tags,
-            content: nodeData.content ?? '',
-            full_data: nodeData
+        // const validTargetIds = (node.connections || [])
+        //     .map((id) => String(id))
+        //     .filter((id) => existingIdSet.has(id));
+
+        const newNodeId = crypto.randomUUID();
+
+        const newNode: NodeDb = {
+            id: newNodeId,
+            title: node.title,
+            // group: group,
+            // val: 5,
+            type: node.type,
+            url: node.url ?? '',
+            tags: node.tags,
+            content: node.content ?? '',
+            full_data: node,
+            group_id: null,
+            is_ai_processed: false,
+            user_id: null,
         };
 
-        const newLinks: any[] = validTargetIds.map(targetNodeId => ({
-            source: newId,
-            target: targetNodeId,
-            relationType: nodeData.autoConnectAI ? 'ai' : 'manual',
-            label: nodeData.autoConnectAI ? 'AI connection' : 'Manual connection',
-            weight: 1
-        }));
+        // const newLink: LinkDb = {
+        //     id: crypto.randomUUID(),
+        //     source: newNodeId,
+        //     target: 
+        // }
 
         setData(prev => ({
             nodes: [...prev.nodes, newNode],
-            links: [...prev.links, ...newLinks]
+            links: [...prev.links, ...[]]
         }));
 
         const dbNode = {
@@ -274,24 +273,118 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
             return undefined;
         }
 
-        if (newLinks.length > 0) {
-            const dbLinks = newLinks.map(l => ({
-                source: typeof l.source === 'object' ? l.source.id : l.source,
-                target: typeof l.target === 'object' ? l.target.id : l.target,
-                relation_type: l.relationType,
-                label: l.label,
-                weight: l.weight,
-                user_id: user.id
-            }));
-            const { error: linkError } = await supabase.from('links').insert(dbLinks);
-
-            if (linkError) {
-                console.error("🔴 Failed to save links:", linkError.message);
-            }
-        }
-
         return newNode;
-    };
+    }
+
+    // const addNewNode = async (nodeData: NodeDb): Promise<any> => {
+    //     if (!user) return undefined;
+
+    //     // Enforce neuron limit (Genesis 60). For security, also add Supabase RLS on nodes INSERT.
+    //     if (typeof neuronLimit === 'number' && data.nodes.length >= neuronLimit) {
+    //         const err = new Error('NEURON_LIMIT_REACHED') as Error & { code?: string };
+    //         err.code = 'NEURON_LIMIT_REACHED';
+    //         throw err;
+    //     }
+
+    //     const titleLower = (nodeData.title ?? '').toString().trim().toLowerCase();
+    //     const urlNorm = normalizeUrl(nodeData.url);
+
+    //     const duplicateTitle = data.nodes.some(
+    //         (n: any) => (n.title ?? n.content ?? n.id ?? '').toString().trim().toLowerCase() === titleLower
+    //     );
+    //     if (duplicateTitle) {
+    //         throw new Error(`A neuron with the title "${(nodeData.title ?? '').toString().trim()}" already exists.`);
+    //     }
+
+    //     if (urlNorm) {
+    //         const duplicateUrl = data.nodes.some((n: any) => {
+    //             const u = (n.url ?? '').toString().trim();
+    //             return u && normalizeUrl(u) === urlNorm;
+    //         });
+    //         if (duplicateUrl) {
+    //             throw new Error('A neuron with this URL already exists.');
+    //         }
+    //     }
+
+    //     let group = 1;
+    //     if (nodeData.type === 'link') group = 1;
+    //     if (nodeData.type === 'note') group = 2;
+    //     if (nodeData.type === 'idea') group = 3;
+
+    //     const existingIdSet = new Set(
+    //         data.nodes
+    //             .map((n: any) => (typeof n?.id === 'string' ? n.id : n?.id))
+    //             .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+    //     );
+    //     const validTargetIds = (nodeData.connections || [])
+    //         .map((id) => String(id))
+    //         .filter((id) => existingIdSet.has(id));
+
+    //     const newId = crypto.randomUUID();
+    //     const newNode = {
+    //         id: newId,
+    //         title: nodeData.title,
+    //         group: group,
+    //         val: 5,
+    //         type: nodeData.type,
+    //         url: nodeData.url ?? '',
+    //         tags: nodeData.tags,
+    //         content: nodeData.content ?? '',
+    //         full_data: nodeData
+    //     };
+
+    //     const newLinks: any[] = validTargetIds.map(targetNodeId => ({
+    //         source: newId,
+    //         target: targetNodeId,
+    //         relationType: nodeData.autoConnectAI ? 'ai' : 'manual',
+    //         label: nodeData.autoConnectAI ? 'AI connection' : 'Manual connection',
+    //         weight: 1
+    //     }));
+
+    //     setData(prev => ({
+    //         nodes: [...prev.nodes, newNode],
+    //         links: [...prev.links, ...newLinks]
+    //     }));
+
+    //     const dbNode = {
+    //         ...newNode,
+    //         user_id: user.id,
+    //     };
+
+    //     const { error: nodeError } = await supabase.from('nodes').insert(dbNode);
+
+    //     if (nodeError) {
+    //         console.error("🔴 Failed to save node:", nodeError.message, nodeError.details);
+
+    //         setData(prev => ({
+    //             nodes: prev.nodes.filter(n => n.id !== newNode.id),
+    //             links: prev.links.filter(l =>
+    //                 (typeof l.source === 'object' ? l.source.id : l.source) !== newNode.id &&
+    //                 (typeof l.target === 'object' ? l.target.id : l.target) !== newNode.id
+    //             )
+    //         }));
+
+    //         return undefined;
+    //     }
+
+    //     if (newLinks.length > 0) {
+    //         const dbLinks = newLinks.map(l => ({
+    //             source: typeof l.source === 'object' ? l.source.id : l.source,
+    //             target: typeof l.target === 'object' ? l.target.id : l.target,
+    //             relation_type: l.relationType,
+    //             label: l.label,
+    //             weight: l.weight,
+    //             user_id: user.id
+    //         }));
+    //         const { error: linkError } = await supabase.from('links').insert(dbLinks);
+
+    //         if (linkError) {
+    //             console.error("🔴 Failed to save links:", linkError.message);
+    //         }
+    //     }
+
+    //     return newNode;
+    // };
 
     const addLink = async (sourceId: string, targetId: string, type = 'manual', label = 'Manual connection') => {
         if (!user || sourceId === targetId) return;
@@ -353,8 +446,8 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
         const nodeIdNorm = nodeId;
         setData((prev) => {
             const newNodes = prev.nodes.map((node) => {
-                const nid = typeof node.id === 'string' ? node.id : node.id?.id;
-                if (nid !== nodeIdNorm) return node;
+                // const nid = typeof node.id === 'string' ? node.id : node.id?.id;
+                // if (nid !== nodeIdNorm) return node;
                 const proposedTitle = newData.title !== undefined ? newData.title : node.title;
                 const titleIsNodeId = proposedTitle != null && String(proposedTitle).trim() === nodeIdNorm;
                 const safeTitle = titleIsNodeId ? (node.title ?? '') : (newData.title ?? node.title);
@@ -365,7 +458,7 @@ export function useGraphData(supabase: any, options?: UseGraphDataOptions) {
                     tags: newData.tags ?? node.tags,
                     url: newData.url ?? node.url,
                     is_ai_processed: newData.is_ai_processed ?? node.is_ai_processed,
-                    group: newData.group ?? node.group,
+                    // group: newData.group ?? node.group,
                     group_id: newData.group_id !== undefined ? newData.group_id : node.group_id,
                     updated_at: nowIso,
                 };
