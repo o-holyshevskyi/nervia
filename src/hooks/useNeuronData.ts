@@ -4,8 +4,8 @@ import { useLinks } from "./useLinks";
 import { UseHooksProps, useNodesAi } from "./useNodesAi"
 
 export const useNeuronData = ({ supabase, user }: UseHooksProps) => {
-    const { nodes, isNodeAiLoading, addNode, updateNode } = useNodesAi({ supabase, user });
-    const { links, isLinksLoading, addLink } = useLinks({ supabase, user });
+    const { nodes, isNodeAiLoading, addNode, updateNode, deleteNode } = useNodesAi({ supabase, user });
+    const { links, isLinksLoading, addLink, deleteLink } = useLinks({ supabase, user });
 
     const data = useMemo(() => {
         const nodeIdSet = new Set(
@@ -33,6 +33,9 @@ export const useNeuronData = ({ supabase, user }: UseHooksProps) => {
 
         addNode,
         updateNode,
+        deleteNode,
+
         addLink,
+        deleteLink,
     }
 }

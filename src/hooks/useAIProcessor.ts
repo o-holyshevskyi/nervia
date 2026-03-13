@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { LinksOnAdd } from './useLinks';
 
 const MAX_NODES_PER_RUN = 25;
 
 export function useAIProcessor(
     supabase: any,
     onNodeUpdate: (id: string, data: any) => void,
-    onAddLink: (sourceId: string, targetId: string, type: string, label: string) => Promise<void>,
+    onAddLink: (links: LinksOnAdd) => Promise<void>,
     nodes: any[] = []
 ) {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -109,7 +110,7 @@ export function useAIProcessor(
 
                             if (finalTargetId && finalTargetId !== nodeId) {
                                 const label = `AI Similarity: ${conn.accuracy ?? 0}%`;
-                                await onAddLink(nodeId, finalTargetId, 'ai', label);
+                                await onAddLink({ sourceId: nodeId, targetId: finalTargetId, type: 'ai', label });
                             } else {
                                 console.warn(`[AI Resolver] Node not found for "${aiSuggestedTitle}". Skipping link.`);
                                 setFailed(prev => prev + 1);

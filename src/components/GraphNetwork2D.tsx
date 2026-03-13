@@ -45,14 +45,16 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
     props,
     ref
 ) {
-    const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
+    const mousePosRef = useRef({ x: -1000, y: -1000 });
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    };
+        mousePosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }, []);
 
-    const handleMouseLeave = () => setMousePos({ x: -1000, y: -1000 });
+    const handleMouseLeave = useCallback(() => {
+        mousePosRef.current = { x: -1000, y: -1000 };
+    }, []);
 
     const isLightTheme = useMemo(() => {
         const bg = props.graphTheme.graphBg?.trim() || '#000000';
@@ -76,8 +78,9 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
         const fg = (ref as MutableRefObject<any>)?.current;
         let mouseWorld = { x: -999999, y: -999999 };
 
-        if (fg && mousePos.x !== -1000) {
-            try { mouseWorld = fg.screen2GraphCoords(mousePos.x, mousePos.y); } catch (e) {}
+        // Читаємо безпосередньо з ref, жодних рендерів
+        if (fg && mousePosRef.current.x !== -1000) {
+            try { mouseWorld = fg.screen2GraphCoords(mousePosRef.current.x, mousePosRef.current.y); } catch (e) {}
         }
 
         const transform = fg?.zoomTransform?.() || { k: globalScale, x: 0, y: 0 };
@@ -101,7 +104,6 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
         const cols = (maxX - minX) / S;
         const rows = (maxY - minY) / S;
         
-        // Запобіжник від зависання
         if (cols * rows > 15000) {
             if (props.onRenderFramePre) props.onRenderFramePre(ctx, globalScale);
             return;
@@ -114,38 +116,16 @@ const GraphNetwork2D = forwardRef<any, GraphNetwork2DProps>(function GraphNetwor
         ctx.beginPath();
         ctx.fillStyle = baseColor;
 
-        // 1. Малюємо статичну сітку одним проходом. Жодних обчислень дистанції.
         for (let x = minX; x <= maxX; x += S) {
             for (let y = minY; y <= maxY; y += S) {
                 ctx.rect(x - baseDotSize / 2, y - baseDotSize / 2, baseDotSize, baseDotSize);
             }
         }
         ctx.fill();
-
-        // 2. Малюємо світіння навколо миші одним радіальним градієнтом. Це магія, яка рятує FPS.
-        if (mouseWorld.x !== -999999) {
-            const glowRadius = 15 / transform.k;
-            const gradient = ctx.createRadialGradient(
-                mouseWorld.x, mouseWorld.y, 0,
-                mouseWorld.x, mouseWorld.y, glowRadius
-            );
-            
-            const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-            const glowColor = isDark ? 'rgba(168, 85, 247)' : 'rgba(99, 102, 241)';
-
-            gradient.addColorStop(0, glowColor);
-            gradient.addColorStop(1, 'rgba(0,0,0,0)');
-
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(mouseWorld.x, mouseWorld.y, glowRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
         ctx.restore();
 
         if (props.onRenderFramePre) props.onRenderFramePre(ctx, globalScale);
-    }, [mousePos, props, ref, isLightTheme]);
+    }, [props, ref, isLightTheme]);
 
     return (
         <div

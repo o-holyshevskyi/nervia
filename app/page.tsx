@@ -38,9 +38,8 @@ import UpgradeModal, { type UpgradeTargetPlan } from "@/src/components/UpgradeMo
 import { toast } from "sonner";
 import { playNotificationPlink } from "@/src/lib/notificationSound";
 import { NeuralBackground } from "@/src/components/NeuralBackground";
-import { NodeOnAdd, useNodesAi } from "@/src/hooks/useNodesAi";
+import { NodeOnAdd } from "@/src/hooks/useNodesAi";
 import { User } from "@supabase/supabase-js";
-import { useLinks } from "@/src/hooks/useLinks";
 import { useNeuronData } from "@/src/hooks/useNeuronData";
 
 export default function Home() {
@@ -61,20 +60,13 @@ export default function Home() {
         // data, 
         // isLoading,
         // addNewNode,
-        updateNode: updateNode_old,
-        deleteNode,
-        addLink: addLink_old,
-        deleteLink: deleteLink_old,
+        // updateNode: updateNode_old,
+        // deleteNode,
+        // addLink: addLink_old,
+        // deleteLink: deleteLink_old,
         importData,
         exportData,
     } = useGraphData(supabase, { neuronLimit: access.neuronLimit });
-
-    const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
-        supabase,
-        updateNode_old,
-        addLink_old,
-        // data.nodes
-    );
 
     const { groups, addGroup: onAddGroup, deleteGroup: onDeleteGroup, refetch: refetchGroups } = useGroups(supabase);
 
@@ -86,9 +78,17 @@ export default function Home() {
         data,
         addNode,
         updateNode,
+        deleteNode,
         addLink,
         deleteLink,
     } = useNeuronData({ supabase, user });
+
+    const { isProcessing, progress, total, failed, processQueue } = useAIProcessor(
+        supabase,
+        updateNode,
+        addLink,
+        data.nodes
+    );
 
     // When any node has a group_id not in our groups list (e.g. AI-created group on backend), refetch groups so the graph shows the real name
     const groupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
@@ -269,7 +269,7 @@ export default function Home() {
         }
     }, [hasCompletedOnboarding, isOnboardingLoading]);
 
-    const { timelineMinDate, timelineMaxDate, timelineDatePoints } = useMemo(() => {
+    const { timelineMaxDate, timelineDatePoints } = useMemo(() => {
         const nodes = data.nodes;
         if (!nodes.length) {
             const now = Date.now();
@@ -384,6 +384,16 @@ export default function Home() {
         });
     };
 
+    const handleNodeContextMenu = useCallback((node: any, event: MouseEvent) => {
+        setContextMenu({
+            isOpen: true,
+            x: event.clientX,
+            y: event.clientY,
+            node: node, // Передаємо ноду
+            link: null  // Скидаємо лінк
+        });
+    }, []);
+
     const handleSearchSelect = (node: any) => {
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
         setFocusedNodeId(idStr);
@@ -395,10 +405,6 @@ export default function Home() {
         setIsSearchOpen(false);
         setFlyToNodeId(idStr);
     }, []);
-
-    const existingNodeTitlesForAI = useMemo(() => {
-        return data.nodes.map((n: any) => (n.title ?? n.content ?? n.id)?.toString?.() ?? String(n.id));
-    }, [data.nodes]);
 
     const handleAddWithAI = async (nodeData: NodeOnAdd) => {
         if (!access.canAddNeuron(data.nodes.length)) {
@@ -436,7 +442,8 @@ export default function Home() {
                 await updateNode(createdNodeId, { 
                     isAiProcessed: true,
                     content: aiResponse.summary || nodeData.content,
-                    tags: aiResponse.tags || nodeData.tags
+                    tags: aiResponse.tags || nodeData.tags,
+                    groupId: aiResponse.groupId
                 });
 
                 if (aiResponse.connections && aiResponse.connections.length > 0) {
@@ -588,6 +595,7 @@ export default function Home() {
                     flyToNodeId={flyToNodeId}
                     onFlyToComplete={() => setFlyToNodeId(null)}
                     onLinkContextMenu={handleLinkContextMenu}
+                    onNodeContextMenu={handleNodeContextMenu}
                     onBackgroundClick={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                     solarSystemNodeId={solarSystemNodeId}
                     clusterMode={clusterMode}
@@ -834,10 +842,10 @@ export default function Home() {
             <Sidebar 
                 selectedNode={selectedNode} 
                 onClose={() => setSelectedNode(null)} 
-                onUpdateNode={updateNode_old}
+                onUpdateNode={updateNode}
                 allNodes={data}
-                onAddLink={addLink_old}
-                onDeleteLink={deleteLink_old}
+                onAddLink={addLink}
+                onDeleteLink={deleteLink}
                 groups={groups}
                 onAddGroup={onAddGroup}
             />

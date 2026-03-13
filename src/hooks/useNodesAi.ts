@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { use, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 
 type NodeType = 'link' | 'idea' | 'note';
@@ -13,10 +13,13 @@ export type NodeOnAdd = {
     autoConnectAI: boolean;
 }
 
+// Гнучкий тип для оновлення
 type NodeOnUpdate = {
-    isAiProcessed: boolean;
-    content: string;
-    tags: string[];
+    title?: string;
+    content?: string;
+    tags?: string[];
+    groupId?: string | null;
+    isAiProcessed?: boolean;
 }
 
 export interface UseHooksProps {
@@ -28,35 +31,39 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [nodes, setNodes] = useState<any[]>([]);
 
-    const fetchNodes = useCallback(async () => {
+    useEffect(() => {
         if (!user) return;
 
-        try {
-            setIsLoading(true);
+        const fetchInitial = async () => {
+            const { data } = await supabase.from('nodes_ai').select('*');
+            if (data) setNodes(data);
+        };
+        fetchInitial();
 
-            const { data, error } = await supabase
-                .from('nodes_ai')
-                .select('*');
+        const channel = supabase
+            .channel('nodes-realtime')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'nodes_ai' 
+            }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setNodes(prev => [...prev, payload.new]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setNodes(prev => prev.map(n => n.id === payload.new.id ? payload.new : n));
+                } else if (payload.eventType === 'DELETE') {
+                    setNodes(prev => prev.filter(n => n.id !== payload.old.id));
+                }
+            })
+            .subscribe();
 
-            if (error) throw new Error(error.message);
-
-            setNodes(data);
-        } catch (error) {
-            console.error("Error fetching node:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [user, setNodes, supabase]);
+        return () => { supabase.removeChannel(channel); };
+    }, [user, supabase]);
 
     const addNode = async (node: NodeOnAdd): Promise<string | null> => {
-        if (!user) {
-            console.error("User is not authenticated");
-            return null;
-        }
-
+        if (!user) return null;
         try {
             setIsLoading(true);
-
             const newNode = {
                 user_id: user.id,
                 title: node.title,
@@ -66,15 +73,8 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
                 tags: node.tags || [],
                 is_ai_processed: false,
             }
-
-            const { data, error } = await supabase
-                .from('nodes_ai')
-                .insert(newNode)
-                .select('id')
-                .single();
-
-            if (error) throw new Error(error.message);
-
+            const { data, error } = await supabase.from('nodes_ai').insert(newNode).select('*').single();
+            if (error) throw error;
             return data.id;
         } catch (error) {
             console.error("Error adding node:", error);
@@ -84,24 +84,31 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
         }
     }
 
-    const updateNode = async (nodeId: string, { isAiProcessed, content, tags }: NodeOnUpdate) => {
+    // ОНОВЛЕНА ФУНКЦІЯ
+    const updateNode = async (nodeId: string, updates: NodeOnUpdate) => {
         if (!user) return;
 
         try {
             setIsLoading(true);
 
-            const dbUpdate: Record<string, unknown> = {
-                is_ai_processed: isAiProcessed,
-                content,
-                tags
-            };
+            // Динамічно збираємо об'єкт для бази
+            const dbUpdate: Record<string, any> = {};
+            
+            if (updates.title !== undefined) dbUpdate.title = updates.title;
+            if (updates.content !== undefined) dbUpdate.content = updates.content;
+            if (updates.tags !== undefined) dbUpdate.tags = updates.tags;
+            if (updates.groupId !== undefined) dbUpdate.group_id = updates.groupId;
+            if (updates.isAiProcessed !== undefined) dbUpdate.is_ai_processed = updates.isAiProcessed;
 
-
-            await supabase
+            const { error } = await supabase
                 .from('nodes_ai')
                 .update(dbUpdate)
                 .eq('id', nodeId)
                 .eq('user_id', user.id);
+
+            if (error) throw error;
+            
+            // Стейт оновиться автоматично через Realtime канал
         } catch (error) {
             console.error("Error updating node:", error);
         } finally {
@@ -109,15 +116,20 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
         }
     }
 
-    useEffect(() => {
-        fetchNodes();
-    }, [fetchNodes]);
+    const deleteNode = async (nodeId: string) => {
+        if (!user) return;
+        try {
+            await supabase.from('nodes_ai').delete().eq('id', nodeId).eq('user_id', user.id);
+        } catch (error) {
+            console.error("Error deleting node:", error);
+        }
+    }
     
     return {
         isNodeAiLoading: isLoading,
         nodes,
-
         addNode,
         updateNode,
+        deleteNode,
     }
 }

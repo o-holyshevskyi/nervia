@@ -45,24 +45,24 @@ export function useGroups(supabase: any) {
                 }
 
                 const { data: listData, ok: fetchOk } = await fetchGroups(user.id);
-                let list = listData;
+                const list = listData;
                 if (fetchOk) {
                     const hasGeneral = list.some((g: Group) => g.name.trim().toLowerCase() === 'general');
-                    if (!hasGeneral) {
-                        const { data: inserted, error: insertErr } = await supabase
-                            .from('groups')
-                            .insert({
-                                user_id: user.id,
-                                name: 'No Group',
-                                color: DEFAULT_GENERAL_COLOR,
-                                sort_order: 0,
-                            })
-                            .select()
-                            .single();
-                        if (!insertErr && inserted && !cancelled) {
-                            list = [inserted as Group, ...list.filter((g: Group) => g.id !== inserted.id)];
-                        }
-                    }
+                    // if (!hasGeneral) {
+                    //     const { data: inserted, error: insertErr } = await supabase
+                    //         .from('groups')
+                    //         .insert({
+                    //             user_id: user.id,
+                    //             name: 'No Group',
+                    //             color: DEFAULT_GENERAL_COLOR,
+                    //             sort_order: 0,
+                    //         })
+                    //         .select()
+                    //         .single();
+                    //     if (!insertErr && inserted && !cancelled) {
+                    //         list = [inserted as Group, ...list.filter((g: Group) => g.id !== inserted.id)];
+                    //     }
+                    // }
                 }
 
                 if (!cancelled) setGroups(list);

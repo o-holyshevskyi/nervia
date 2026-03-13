@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { forceManyBody, forceX, forceY, forceRadial, forceCollide } from 'd3-force';
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock, Orbit } from "lucide-react";
+import { FileText, Lightbulb, LinkIcon, Sparkles, ZoomIn, ZoomOut, Locate, Box, Lock, Orbit, Boxes } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import GraphNetwork2D from './GraphNetwork2D';
 import GraphNetwork3D from './GraphNetwork3D';
@@ -36,18 +36,6 @@ const loadingLabels = [
     "Connection Stable",
     "Synchronized",
 ];
-
-const tagNeonPalette = [
-    "#06b6d4", "#4f46e5", "#f97316", "#10b981", "#ec4899",
-    "#eab308", "#6366f1", "#14b8a6", "#f43f5e", "#8b5cf6",
-];
-
-function getColorForTag(tag: string): string {
-    let h = 0;
-    for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
-    const idx = Math.abs(h) % tagNeonPalette.length;
-    return tagNeonPalette[idx] ?? tagNeonPalette[0];
-}
 
 function hashStr(s: string): number {
     let h = 0;
@@ -115,15 +103,6 @@ function accentRgba(alpha: number): string {
     return isDarkTheme() ? `rgba(168, 85, 247, ${alpha})` : `rgba(99, 102, 241, ${alpha})`;
 }
 
-function getClusterKeyForDraw(node: any, clusterMode: 'group' | 'tag', nodeIdToGroupKey: Map<string | number, string | number>): number | string | null {
-    if (clusterMode === 'group') {
-        const nodeId = typeof node.id === 'string' ? node.id : node?.id;
-        const key = nodeId != null ? (nodeIdToGroupKey.get(nodeId) ?? getNodeGroupKey(node)) : getNodeGroupKey(node);
-        return key ?? null;
-    }
-    return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
-}
-
 function getGroupColor(key: string | number, groupColorsById: Record<string, string>): string | undefined {
     if (typeof key === 'string') return groupColorsById[key];
     return groupColors[key];
@@ -137,81 +116,6 @@ function getGroupLabel(key: string | number, groupNamesById: Record<string, stri
         return key;
     }
     return groupNames[key] ?? `Group ${key}`;
-}
-
-function drawGroupAreas(
-    ctx: CanvasRenderingContext2D,
-    nodes: any[],
-    dimensions: { width: number; height: number },
-    _globalScale: number,
-    nodeIdToGroupKey: Map<string | number, string | number>,
-    clusterMode: 'group' | 'tag',
-    container: HTMLElement | null,
-    groupColorsById: Record<string, string>,
-    groupNamesById: Record<string, string>
-) {
-    const byCluster: Record<string, { x: number; y: number }[]> = {};
-    for (const node of nodes) {
-        const key = getClusterKeyForDraw(node, clusterMode, nodeIdToGroupKey);
-        if (key == null) continue;
-        const keyStr = String(key);
-        const x = Number(node.x);
-        const y = Number(node.y);
-        if (!isFinite(x) || !isFinite(y)) continue;
-        if (!byCluster[keyStr]) byCluster[keyStr] = [];
-        byCluster[keyStr].push({ x, y });
-    }
-
-    const prevComposite = ctx.globalCompositeOperation;
-    ctx.globalCompositeOperation = "screen";
-
-    for (const keyStr of Object.keys(byCluster)) {
-        const points = byCluster[keyStr];
-        if (!points?.length) continue;
-        const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
-        const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
-        if (!isFinite(centerX) || !isFinite(centerY)) continue;
-        const maxDist = points.reduce((max, p) => Math.max(max, Math.hypot(p.x - centerX, p.y - centerY)), 0);
-        const radius = Math.min(dimensions.width + dimensions.height, Math.max(80, maxDist * 1.2));
-        if (!isFinite(radius) || radius <= 0) continue;
-        const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
-        const color = clusterMode === 'group'
-            ? (getGroupColor(key, groupColorsById) ?? groupColors[Number(keyStr)])
-            : getColorForTag(keyStr);
-        if (!color) continue;
-        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-        gradient.addColorStop(0, color + "19");
-        gradient.addColorStop(0.5, color + "0D");
-        gradient.addColorStop(1, "transparent");
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-    }
-
-    ctx.globalCompositeOperation = prevComposite;
-
-    for (const keyStr of Object.keys(byCluster)) {
-        const points = byCluster[keyStr];
-        if (!points?.length) continue;
-        const centerX = points.reduce((a, p) => a + p.x, 0) / points.length;
-        const centerY = points.reduce((a, p) => a + p.y, 0) / points.length;
-        if (!isFinite(centerX) || !isFinite(centerY)) continue;
-        const key: string | number = /^\d+$/.test(keyStr) ? Number(keyStr) : keyStr;
-        const label = clusterMode === 'group' ? getGroupLabel(key, groupNamesById) : `#${keyStr}`;
-        const themeColors = getGraphThemeColors(container);
-        const labelColor = themeColors.nodeColor.startsWith('#')
-            ? themeColors.nodeColor
-            : themeColors.nodeColor.replace(/,\s*[\d.]+\)$/, ', 0.9)');
-        ctx.font = "600 14px Inter, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.shadowBlur = 4;
-        ctx.fillStyle = labelColor;
-        ctx.fillText(label, centerX, centerY);
-        ctx.shadowBlur = 0;
-    }
 }
 
 const createIconImage = (IconComponent: any, color: string, strokeWidth: number = 2.5) => {
@@ -285,13 +189,6 @@ function buildClusterCenters2D(
     return centers;
 }
 
-// ─── Orbit layout constants ──────────────────────────────────────────────────
-// Nodes are spread across concentric rings inside each cluster.
-const ORBIT_NODES_PER_RING = 6;   // max nodes on the innermost ring
-const ORBIT_RING_BASE_R    = 60;  // px from cluster center to ring-0
-const ORBIT_RING_GAP       = 52;  // extra px per ring
-const ORBIT_MAX_DRAG_R     = 160; // max px a node may be dragged from its live cluster center
-
 export default function GraphNetwork({
     onNodeSelect,
     onBackgroundClick,
@@ -312,11 +209,7 @@ export default function GraphNetwork({
     clusterMode = 'group',
     groups = [],
     readOnly = false,
-    renderToolbarExtra,
-    canUse3DGraph = false,
-    onRequest3DUpgrade,
     viewMode = '2D',
-    onViewModeChange,
 }: GraphNetworkProps) {
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
     const [isInitialFitting, setIsInitialFitting] = useState(true);
@@ -333,6 +226,7 @@ export default function GraphNetwork({
     const initialFitDone = useRef(false);
     const threeDKeyRef = useRef(0);
     const [engineReadyCount, setEngineReadyCount] = useState(0);
+    const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isInitialFitting) return;
@@ -463,8 +357,11 @@ export default function GraphNetwork({
         const { nodes, links } = graphData;
         const getNodeId = (n: any) => (typeof n === 'string' ? n : n?.id);
         const useTimeline = typeof timelineDate === 'number' && Number.isFinite(timelineDate);
+
+        // 1. БАЗОВА ФІЛЬТРАЦІЯ (Таймлайн)
         let workingNodes = nodes;
         let workingLinks = links;
+
         if (useTimeline) {
             const filteredNodes = nodes.filter(
                 (n: any) => new Date(n.created_at ?? n.createdAt ?? 0).getTime() <= timelineDate!
@@ -479,54 +376,132 @@ export default function GraphNetwork({
                 return sId != null && tId != null && filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
             });
         }
+
+        // Якщо увімкнено пошук або шляхи — скасовуємо Мета-граф, показуємо все як є
+        if (searchActive || pathfinderActive) {
+            return { nodes: workingNodes, links: workingLinks };
+        }
+
+        // 2. АГРЕГАЦІЯ (Макро-рівень / Галактика)
+        if (activeGroupId === null) {
+            const metaNodesMap = new Map();
+            const metaLinksMap = new Map();
+
+            workingNodes.forEach((n: any) => {
+                const gId = getNodeGroupKey(n);
+                const gName = getGroupLabel(gId, groupNamesById);
+                
+                // Сироти (No Group) залишаються звичайними дрібними нодами
+                if (gId === 1 || gId === 2 || gName === 'No Group') {
+                    metaNodesMap.set(n.id, { ...n, val: 6 }); // Даємо їм базовий розмір
+                    return;
+                }
+
+                // Створюємо Мета-ноду (Планету), якщо її ще немає
+                if (!metaNodesMap.has(gId)) {
+                    metaNodesMap.set(gId, {
+                        id: `meta-${gId}`,
+                        isMetaNode: true,
+                        groupId: gId,
+                        title: gName,
+                        val: 25, // Початковий радіус
+                        originalNodesCount: 0
+                    });
+                }
+                
+                // Нарощуємо масу планети залежно від кількості нод у ній
+                const metaNode = metaNodesMap.get(gId);
+                metaNode.originalNodesCount += 1;
+                metaNode.val = Math.min(90, 25 + metaNode.originalNodesCount * 1.5); 
+            });
+
+            // Агрегуємо лінки між Мета-нодами
+            workingLinks.forEach((l: any) => {
+                const sId = getLinkEnd(l.source);
+                const tId = getLinkEnd(l.target);
+                const sNode = workingNodes.find((n: any) => getNodeId(n) === sId);
+                const tNode = workingNodes.find((n: any) => getNodeId(n) === tId);
+                if (!sNode || !tNode) return;
+
+                const sGid = getNodeGroupKey(sNode);
+                const tGid = getNodeGroupKey(tNode);
+                const sName = getGroupLabel(sGid, groupNamesById);
+                const tName = getGroupLabel(tGid, groupNamesById);
+
+                const sKey = (sGid === 1 || sGid === 2 || sName === 'No Group') ? getNodeId(sNode) : `meta-${sGid}`;
+                const tKey = (tGid === 1 || tGid === 2 || tName === 'No Group') ? getNodeId(tNode) : `meta-${tGid}`;
+
+                if (sKey !== tKey) {
+                    const linkKey = sKey < tKey ? `${sKey}-${tKey}` : `${tKey}-${sKey}`;
+                    if (!metaLinksMap.has(linkKey)) {
+                        metaLinksMap.set(linkKey, {
+                            source: sKey,
+                            target: tKey,
+                            isMetaLink: true,
+                            weight: 1
+                        });
+                    } else {
+                        metaLinksMap.get(linkKey).weight += 0.2; // Потовщуємо лінк
+                    }
+                }
+            });
+
+            return { 
+                nodes: Array.from(metaNodesMap.values()), 
+                links: Array.from(metaLinksMap.values()) 
+            };
+        } 
+        
+        // 3. МІКРО-РІВЕНЬ (Користувач зайшов у кластер)
+        const coreNodes = workingNodes.filter((n: any) => getNodeGroupKey(n) === activeGroupId);
+        const coreNodeIds = new Set(coreNodes.map(getNodeId));
+        
+        const validLinks = workingLinks.filter((l: any) => {
+            const sId = getLinkEnd(l.source);
+            const tId = getLinkEnd(l.target);
+            // ЗМІНА ТУТ: АБО замість І
+            return coreNodeIds.has(sId) || coreNodeIds.has(tId); 
+        });
+
+        // Розраховуємо вагу кожної ноди всередині кластера для фізики
+        const neighborIds = new Set();
+        validLinks.forEach((l: any) => {
+            const sId = getLinkEnd(l.source);
+            const tId = getLinkEnd(l.target);
+            if (!coreNodeIds.has(sId)) neighborIds.add(sId);
+            if (!coreNodeIds.has(tId)) neighborIds.add(tId);
+        });
+
+        const neighborNodes = workingNodes.filter((n: any) => neighborIds.has(getNodeId(n)));
+        const allClusterNodes = [...coreNodes, ...neighborNodes];
+
         const degreeMap: Record<string, number> = {};
-        workingLinks.forEach((link: any) => {
-            const sId = getNodeId(link.source);
-            const tId = getNodeId(link.target);
+        validLinks.forEach((link: any) => {
+            const sId = getLinkEnd(link.source);
+            const tId = getLinkEnd(link.target);
             if (sId != null) degreeMap[sId] = (degreeMap[sId] ?? 0) + 1;
             if (tId != null && tId !== sId) degreeMap[tId] = (degreeMap[tId] ?? 0) + 1;
         });
-        const minDim = Math.min(dimensions.width, dimensions.height);
-        const layoutRadius = minDim * 0.48;
-        const getClusterKey = (n: any): string | number =>
-            clusterMode === 'group'
-                ? getNodeGroupKey(n)
-                : (n.tags && n.tags.length > 0 ? n.tags[0] : 'untagged') as string;
-        const clusterCenters = buildClusterCenters2D(workingNodes, clusterMode, layoutRadius);
-        const jitter = 28;
-        const nodesWithVal = workingNodes.map((node: any, index: number) => {
+
+        const nodesWithVal = allClusterNodes.map((node: any) => {
             const id = getNodeId(node);
             const degree = degreeMap[id] ?? 0;
-            const val = Math.min(4 + degree * 1.5, 20);
-            const idStr = id != null ? String(id) : `i${index}`;
-            const key = getClusterKey(node);
-            const center = clusterCenters[key];
-            const dx = center ? jitter * (hashStr(idStr + 'x') - 0.5) : 0;
-            const dy = center ? jitter * (hashStr(idStr + 'y') - 0.5) : 0;
-            const x = center ? center.x + dx : 0;
-            const y = center ? center.y + dy : 0;
-            return { ...node, val, x, y };
+            const isExternal = !coreNodeIds.has(id); 
+            return { 
+                ...node, 
+                val: Math.min(4 + degree * 1.5, 20),
+                isExternalNeighbor: isExternal 
+            };
         });
-        const linksCopy = workingLinks.map((link: any) => ({ ...link }));
-        if (pathfinderActive) {
-            const pathSet = new Set(pathNodes);
-            const dim: any[] = [], bright: any[] = [];
-            nodesWithVal.forEach((n: any) => {
-                const id = getNodeId(n);
-                if (pathSet.has(id)) bright.push(n); else dim.push(n);
-            });
-            return { nodes: [...dim, ...bright], links: linksCopy };
-        }
-        if (searchActive) {
-            const dim: any[] = [], bright: any[] = [];
-            nodesWithVal.forEach((n: any) => {
-                const id = getNodeId(n);
-                if (highlightedSet.has(id)) bright.push(n); else dim.push(n);
-            });
-            return { nodes: [...dim, ...bright], links: linksCopy };
-        }
-        return { nodes: nodesWithVal, links: linksCopy };
-    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate, dimensions.width, dimensions.height, clusterMode]);
+
+        const cleanLinks = validLinks.map((l: any) => ({
+            ...l,
+            source: getLinkEnd(l.source),
+            target: getLinkEnd(l.target)
+        }));
+
+        return { nodes: nodesWithVal, links: cleanLinks };
+    }, [graphData, searchActive, highlightedSet, pathfinderActive, pathNodes, timelineDate, activeGroupId, groupNamesById]);
 
     const getNodeIconUrl = useCallback((node: any) => {
         if (node.type === 'link' && node.url) {
@@ -562,6 +537,41 @@ export default function GraphNetwork({
         const x = Number(node.x);
         const y = Number(node.y);
         if (!isFinite(x) || !isFinite(y)) return;
+
+        if (node.isMetaNode) {
+            const color = getGroupColor(node.groupId, groupColorsById) ?? "#ec4899";
+            const radius = node.val; 
+
+            // Світлова аура
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+            gradient.addColorStop(0, hexToRgba(color, 0.4)); 
+            gradient.addColorStop(1, hexToRgba(color, 0.05));
+            
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Оболонка планети
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3 / globalScale;
+            ctx.stroke();
+
+            // Текст (Назва кластера + кількість)
+            const fontSize = Math.max(14 / globalScale, 4); 
+            if (fontSize < 30) { 
+                ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = isDarkTheme() ? '#ffffff' : '#171717';
+                ctx.fillText(node.title, x, y - radius / 4);
+                
+                ctx.font = `500 ${fontSize * 0.65}px Inter, sans-serif`;
+                ctx.fillStyle = isDarkTheme() ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)';
+                ctx.fillText(`${node.originalNodesCount} neurons`, x, y + radius / 3);
+            }
+            return; // ЗУПИНЯЄМО РЕНДЕР: далі йде код для звичайних нод, він нам тут не потрібен
+        }
 
         const themeColors = getGraphThemeColors(containerRef.current);
         const idStr = typeof node.id === 'string' ? node.id : node.id?.id;
@@ -713,7 +723,7 @@ export default function GraphNetwork({
     const handleRenderFramePre = useCallback(
         (ctx: CanvasRenderingContext2D, globalScale: number) => {
             if (solarSystemNodeId) return;
-            drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, containerRef.current, groupColorsById, groupNamesById);
+            // drawGroupAreas(ctx, processedData.nodes, dimensions, globalScale, nodeIdToGroupKeyMap, clusterMode, containerRef.current, groupColorsById, groupNamesById);
         },
         [processedData.nodes, dimensions, nodeIdToGroupKeyMap, clusterMode, solarSystemNodeId, groupColorsById, groupNamesById]
     );
@@ -725,70 +735,67 @@ export default function GraphNetwork({
     }, []);
 
     useEffect(() => {
-        if (viewMode !== '2D') return;
-        if (!fgRef.current) return;
+        if (viewMode !== '2D' || !fgRef.current) return;
         const fg = fgRef.current;
-        const minDim = Math.min(dimensions.width, dimensions.height);
-        const radius = minDim * 0.48;
 
-        const getClusterKey = (node: any): string | number => {
-            if (clusterMode === 'group') return getNodeGroupKey(node);
-            return (node.tags && node.tags.length > 0 ? node.tags[0] : 'untagged') as string;
-        };
-
-        const clusterCenters = buildClusterCenters2D(processedData.nodes, clusterMode, radius);
-        clusterCentersRef.current = clusterCenters;
-
-        fg.d3Force('x', forceX((node: any) => clusterCentersRef.current[getClusterKey(node)]?.x ?? 0).strength(0.4));
-        fg.d3Force('y', forceY((node: any) => clusterCentersRef.current[getClusterKey(node)]?.y ?? 0).strength(0.4));
-
-        const jitter = 28;
-        processedData.nodes.forEach((node: any) => {
-            const key = getClusterKey(node);
-            const center = clusterCenters[key];
-            if (!center) return;
-            const idStr = (typeof node.id === 'string' ? node.id : node?.id) ?? '';
-            const dx = jitter * (hashStr(String(idStr) + 'x') - 0.5);
-            const dy = jitter * (hashStr(String(idStr) + 'y') - 0.5);
-            (node as any).x = center.x + dx;
-            (node as any).y = center.y + dy;
+        // 0. Очищаємо всі кастомні координати, щоб фізика працювала з чистого аркуша
+        processedData.nodes.forEach((node: any) => { 
+            delete node.fx; 
+            delete node.fy; 
         });
 
-        const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
+        fg.d3Force('center', null); // Центрування D3 нам не треба, ми керуємо камерою
 
         if (solarSystemNodeId && solarNeighbors.size > 0) {
+            // === РЕЖИМ 1: СОНЯЧНА СИСТЕМА ===
+            const getNodeIdStr = (node: any) => typeof node.id === 'string' ? node.id : node.id?.id;
             const centerNode = processedData.nodes.find((n: any) => getNodeIdStr(n) === solarSystemNodeId);
-            if (centerNode) { (centerNode as any).fx = 0; (centerNode as any).fy = 0; }
+            
+            if (centerNode) { 
+                centerNode.fx = 0; 
+                centerNode.fy = 0; 
+            }
+            
             fg.d3Force('x', null);
             fg.d3Force('y', null);
-            fg.d3Force('radial', forceRadial(250, 0, 0).strength((node: any) =>
-                solarNeighbors.has(getNodeIdStr(node)) ? 1 : 0
-            ));
+            fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
+            fg.d3Force('radial', forceRadial(250, 0, 0).strength((node: any) => {
+                return solarNeighbors.has(getNodeIdStr(node)) ? 1 : 0;
+            }));
             fg.d3Force('collide', forceCollide(24).strength(1));
+            
         } else {
-            processedData.nodes.forEach((node: any) => { delete (node as any).fx; delete (node as any).fy; });
+            // === РЕЖИМ 2: ГАЛАКТИКА (Мета-ноди) АБО МІКРО-РІВЕНЬ ===
             fg.d3Force('radial', null);
-            fg.d3Force('collide', null);
-            fg.d3Force('x', forceX((node: any) => clusterCenters[getClusterKey(node)]?.x ?? 0).strength(0.4));
-            fg.d3Force('y', forceY((node: any) => clusterCenters[getClusterKey(node)]?.y ?? 0).strength(0.4));
+            
+            // 1. Легка гравітація до центру (0,0), щоб граф не розлетівся в нескінченність
+            fg.d3Force('x', forceX(0).strength(0.05));
+            fg.d3Force('y', forceY(0).strength(0.05));
+
+            // 2. Розумна колізія (бетонні стіни між планетами)
+            fg.d3Force('collide', forceCollide((node: any) => {
+                if (node.isMetaNode) return node.val + 40; 
+                const size = Math.min(20, Math.max(6, (node.val ?? 4)));
+                return size + 15;
+            }).iterations(2));
+
+            // 3. Розумне відштовхування (магніти)
+            fg.d3Force('charge', forceManyBody().strength((node: any) => {
+                if (node.isMetaNode) return -800; // Мета-планети масивні
+                return -physicsConfig.repulsion;
+            }));
         }
 
-        fg.d3Force('charge', forceManyBody().strength(-physicsConfig.repulsion));
-        fg.d3Force('center', null);
-
+        // === ПРУЖИНИ (ЛІНКИ) ДЛЯ ОБОХ РЕЖИМІВ ===
         const linkForce = fg.d3Force('link');
         if (linkForce) {
-            linkForce.distance(physicsConfig.linkDistance);
-            linkForce.strength((link: any) => {
-                const sNode = typeof link.source === 'object' ? link.source : processedData.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.source);
-                const tNode = typeof link.target === 'object' ? link.target : processedData.nodes.find((n: any) => (typeof n.id === 'string' ? n.id : n?.id) === link.target);
-                const s = sNode != null ? getClusterKey(sNode) : undefined;
-                const t = tNode != null ? getClusterKey(tNode) : undefined;
-                return s !== undefined && t !== undefined && s === t ? 0.7 : 0.1;
-            });
+            linkForce.distance((link: any) => link.isMetaLink ? 250 : physicsConfig.linkDistance);
+            linkForce.strength((link: any) => link.isMetaLink ? 0.5 : 0.1);
         }
 
         fg.d3ReheatSimulation();
+
+        // Запуск початкового центрування
         if (!initialFitDone.current && !zoomScheduledRef.current) {
             zoomScheduledRef.current = true;
             setTimeout(() => {
@@ -1026,11 +1033,21 @@ export default function GraphNetwork({
                             d3VelocityDecay={0.35}
                             d3AlphaMin={0.001}
                             onNodeClick={(node: any) => {
-                                if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
-                                    fgRef.current.centerAt(node.x, node.y, 800);
-                                    fgRef.current.zoom(4, 800);
+                                if (node.isMetaNode) {
+                                    // Провалюємось у групу
+                                    setActiveGroupId(node.groupId);
+                                    // Дозволяємо фізиці розкласти ноди, потім центруємо
+                                    setTimeout(() => {
+                                        fgRef.current?.zoomToFit(800, 100);
+                                    }, 100);
+                                } else {
+                                    // Звичайний клік по ноді – відкриває твій існуючий Sidebar
+                                    if (fgRef.current && isFinite(Number(node.x)) && isFinite(Number(node.y))) {
+                                        fgRef.current.centerAt(node.x, node.y, 800);
+                                        fgRef.current.zoom(4, 800);
+                                    }
+                                    if (!readOnly) onNodeSelect(node);
                                 }
-                                if (!readOnly) onNodeSelect(node);
                             }}
                             onNodeRightClick={(node, event) => {
                                 if (!readOnly && onNodeContextMenu) onNodeContextMenu(node, event as unknown as MouseEvent);
@@ -1088,9 +1105,9 @@ export default function GraphNetwork({
                             linkDirectionalParticles={(link: any) => {
                                 if (isLinkHidden(link)) return 0;
                                 if (pathfinderActive && isPathLink(link)) return 4;
-                                return link.relationType === 'ai' ? physicsConfig.linkDistance / 20 : 0;
+                                return 5;
                             }}
-                            linkDirectionalParticleSpeed={pathfinderActive ? 0.01 : 0.005}
+                            linkDirectionalParticleSpeed={pathfinderActive ? 0.0001 : 0.0001}
                             linkDirectionalParticleWidth={4}
                             linkDirectionalParticleColor={() => {
                                 const theme = getGraphThemeColors(containerRef.current);
@@ -1164,7 +1181,23 @@ export default function GraphNetwork({
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        {canUse3DGraph ? (
+                        <AnimatePresence>
+                            {activeGroupId !== null && (
+                                <motion.div
+                                    key="nav-zoom-exit"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1, transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] } }}
+                                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } }}
+                                    className="flex flex-col gap-1 origin-top"
+                                >
+                                    <button type="button" onClick={() => {
+                                        setActiveGroupId(null);
+                                        setTimeout(() => fgRef.current?.zoomToFit(800, 100), 50);
+                                    }} className={navBtnClass} title={`Exit ${getGroupLabel(activeGroupId, groupNamesById)} Cluster`} aria-label="Recenter"><Boxes size={18} /></button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        {/* {canUse3DGraph ? (
                             <button
                                 type="button"
                                 onClick={() => onViewModeChange?.(viewMode === '3D' ? '2D' : '3D')}
@@ -1187,8 +1220,8 @@ export default function GraphNetwork({
                                 <Box size={18} />
                                 <Lock size={10} className="absolute bottom-0.5 right-0.5 text-indigo-500 dark:text-purple-400" />
                             </button>
-                        )}
-                        {renderToolbarExtra?.(navBtnClass)}
+                        )} */}
+                        {/* {renderToolbarExtra?.(navBtnClass)} */}
                     </div>
                 </div>
             )}
