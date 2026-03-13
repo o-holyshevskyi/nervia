@@ -8,7 +8,6 @@ import { Hash, Save, Plus, X, Globe, ExternalLink, LinkIcon, AlertCircle, Layers
 import CreateGroupModal from "./CreateGroupModal";
 import type { Group } from "../hooks/useGroups";
 import ReactMarkdown from 'react-markdown';
-import posthog from "posthog-js";
 import { LinksOnAdd } from "../hooks/useLinks";
 // import { TELEMETRY_EVENTS } from "@/src/lib/telemetry/events";
 

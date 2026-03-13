@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SupabaseClient, User } from '@supabase/supabase-js';
 
 type NodeType = 'link' | 'idea' | 'note';
@@ -28,15 +28,19 @@ export interface UseHooksProps {
 }
 
 export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isFetching, setIsFetching] = useState<boolean>(true);
     const [nodes, setNodes] = useState<any[]>([]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setIsFetching(false);
+            return;
+        }
 
         const fetchInitial = async () => {
             const { data } = await supabase.from('nodes_ai').select('*');
             if (data) setNodes(data);
+            setIsFetching(false);
         };
         fetchInitial();
 
@@ -63,7 +67,6 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
     const addNode = async (node: NodeOnAdd): Promise<string | null> => {
         if (!user) return null;
         try {
-            setIsLoading(true);
             const newNode = {
                 user_id: user.id,
                 title: node.title,
@@ -79,8 +82,6 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
         } catch (error) {
             console.error("Error adding node:", error);
             return null;
-        } finally {
-            setIsLoading(false);
         }
     }
 
@@ -89,11 +90,9 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
         if (!user) return;
 
         try {
-            setIsLoading(true);
-
             // Динамічно збираємо об'єкт для бази
             const dbUpdate: Record<string, any> = {};
-            
+
             if (updates.title !== undefined) dbUpdate.title = updates.title;
             if (updates.content !== undefined) dbUpdate.content = updates.content;
             if (updates.tags !== undefined) dbUpdate.tags = updates.tags;
@@ -107,12 +106,10 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
                 .eq('user_id', user.id);
 
             if (error) throw error;
-            
+
             // Стейт оновиться автоматично через Realtime канал
         } catch (error) {
             console.error("Error updating node:", error);
-        } finally {
-            setIsLoading(false);
         }
     }
 
@@ -124,9 +121,9 @@ export const useNodesAi = ({ supabase, user }: UseHooksProps) => {
             console.error("Error deleting node:", error);
         }
     }
-    
+
     return {
-        isNodeAiLoading: isLoading,
+        isNodeAiLoading: isFetching,
         nodes,
         addNode,
         updateNode,
